@@ -58,12 +58,10 @@ inductive Msg (n : Nat) (Tx : Type) : Type where
   | nullify (q : Fin n) (v : View) : Msg n Tx
   | tx (tr : Tx) : Msg n Tx
 
-/-- プロセッサ（§4.3, Table 2）: 自分の添字と局所変数の全部。
-    大域側は `Fin n → Processor n Tx` で持ち、「i 番目の `index` は i」は
-    不変量として別途保つ。 -/
+/-- プロセッサ（§4.3, Table 2）: 局所変数の全部。自分の添字 i は
+    フィールドに持たず、スロット遷移が引数として受け取る
+    （5 行目のガード p_i = lead(v) はそこで読む）。 -/
 structure Processor (n : Nat) (Tx : Type) where
-  /-- 自分が p_i の i であること。5 行目のガード p_i = lead(v) が読む。 -/
-  index : Fin n
   /-- 現在の view。初期値 1。 -/
   view : View
   /-- タイマー T。view 入場で 0 にリセット、スロットごとに +1。 -/
@@ -91,7 +89,7 @@ structure Sent (n : Nat) (Tx : Type) where
     通じて不変の定数なので、フィールドでなくステップ関係の引数に回す。
     リーダー割り当ては §4.4 の固定輪番なので、状態ですらなくただの関数。 -/
 structure State (n : Nat) (Tx : Type) where
-  /-- 各プロセッサ。「`(procs i).index = i`」は不変量として別途保つ。 -/
+  /-- 各プロセッサ。`procs i` が p_i。 -/
   procs : Fin n → Processor n Tx
   /-- これまでに腐敗したプロセッサ。ステップで単調増加し、濃度 ≤ f は
       実行の条件として課す。correct = 実行全体で一度もここに入らないこと。 -/

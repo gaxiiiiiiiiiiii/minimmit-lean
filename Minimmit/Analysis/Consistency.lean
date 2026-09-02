@@ -263,24 +263,166 @@ theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     card_le_of_byz hb _ fun w hw => exists_byz_of_not_correct (Finset.mem_filter.mp hw).2
   omega
 
+omit [DecidableEq Tx] in
+theorem receivesM_of_receivesL (hn : 5 * f + 1 ≤ n) {b : Block Tx} (hL : ReceivesL f instrs b) :
+    ReceivesM f instrs b :=
+  hL.imp_right fun h => le_trans (by omega) h
+
+theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) {b : Block Tx}
+    (hL : ReceivesL f instrs b) (hg : b ≠ .gen) : 1 ≤ b.view.val := by
+  rcases hL with rfl | hL
+  · exact absurd rfl hg
+  · obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hL)
+    exact one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
+
+/-- M-notarisation を受けた genesis でないブロックには、9〜11 行で投票した正直者がいる。
+    その段の入力 st2 の S に valid proposal がある。 -/
+theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hb : ByzBound f s₀ instrs) {b₂ : Block Tx} (hg : b₂ ≠ .gen) (hM : ReceivesM f instrs b₂) :
+    ∃ q t, Correct s₀ instrs q
+      ∧ (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view = b₂.view
+      ∧ ValidProposal f lead (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S
+          (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view b₂ := by
+  classical
+  have hex : ∃ t, ∃ q, Correct s₀ instrs q ∧ ∃ j, Action.send (Msg.vote q b₂) j ∈ (instrs t).actions q := by
+    rcases hM with rfl | hM
+    · exact absurd rfl hg
+    · obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM)
+      obtain ⟨t, j, h⟩ := mem_voteSenders.mp hq
+      exact ⟨t, q, hqc, j, h⟩
+  obtain ⟨q, hqc, j, hj⟩ := Nat.find_spec hex
+  have hmin : ∀ t' < Nat.find hex, ∀ w, Correct s₀ instrs w → ∀ j',
+      Action.send (Msg.vote w b₂) j' ∈ (instrs t').actions w → False :=
+    fun t' ht' w hw j' h => absurd (Nat.find_min' hex ⟨w, hw, j', h⟩) (not_le.mpr ht')
+  have hact := hh (Nat.find hex) q (hqc _)
+  rw [hact] at hj
+  rw [Algo.step_eq_stepPair, Algo.stepPair_snd] at hj
+  simp only [List.mem_append] at hj
+  rcases hj with ((((((hj | hj) | hj) | hj) | hj) | hj) | hj)
+  · obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit (Algo.send_forwardNew_mem hj) rfl
+    exact absurd hj' (hmin t' ht' q hqc j')
+  · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj; cases hm
+  · obtain ⟨b', hm, hbv, _, _, hvp, _⟩ := Algo.send_voteProposal_eq hj
+    injection hm with _ hbb
+    subst hbb
+    exact ⟨q, Nat.find hex, hqc, hbv.symm, hvp⟩
+  · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq hj; cases hm
+  · exact absurd hj Algo.send_advanceNull
+  · obtain ⟨b', hm, _, hM5, _, _, _⟩ := Algo.send_advanceM_eq hj
+    injection hm with _ hbb
+    subst hbb
+    rcases hM5 with hg' | hM5
+    · exact absurd hg' hg
+    obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM5)
+    have hwm := mem_voters.mp hw
+    rcases Algo.mem_S_st5 hwm with hwm | ⟨v, hv⟩
+    · rcases Algo.mem_S_st3 hwm with hwm | ⟨b'', hb'', hsend⟩
+      · rcases Algo.mem_S_st2 hwm with hwm | ⟨b'', hb''⟩
+        · obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hwm rfl
+          exact absurd hj' (hmin t' ht' w hwc j')
+        · cases hb''
+      · injection hb'' with hwq hbb
+        subst hwq
+        subst hbb
+        obtain ⟨b', hm, hbv, _, _, hvp, _⟩ := Algo.send_voteProposal_eq hsend
+        injection hm with _ hbb
+        subst hbb
+        exact ⟨w, Nat.find hex, hwc, hbv.symm, hvp⟩
+    · cases hv
+  · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq hj; cases hm
+
+/-- 正直者の st2 の S にある M-notarisation は、実行上の M-notarisation。 -/
+theorem receivesM_of_MNotarised_st2 (hinit : Init s₀) {q : Fin n} {t : Nat} {b₀ : Block Tx}
+    (h : MNotarised f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S b₀) :
+    ReceivesM f instrs b₀ := by
+  rcases h with rfl | h
+  · exact Or.inl rfl
+  · right
+    refine h.trans (Finset.card_le_card fun w hw => ?_)
+    rw [mem_voters] at hw
+    rw [mem_voteSenders]
+    rcases Algo.mem_S_st2 hw with hw | ⟨b, hb⟩
+    · exact sends_of_mem_S hinit hw rfl
+    · cases hb
+
+theorem receivesNullification_of_Nullified_st2 (hinit : Init s₀) {q : Fin n} {t : Nat} {w : View}
+    (h : Nullified f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S w) :
+    ReceivesNullification f instrs w := by
+  refine h.trans (Finset.card_le_card fun x hx => ?_)
+  rw [mem_nullifiers] at hx
+  rw [mem_nullifySenders]
+  rcases Algo.mem_S_st2 hx with hx | ⟨b, hb⟩
+  · exact sends_of_mem_S hinit hx rfl
+  · cases hb
+
+/-- M-notarisation を受けたブロックの親は M-notarisation を受け、親の view と自分の view の
+    間の view は nullification を受ける。 -/
+theorem receivesM_parent (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hb : ByzBound f s₀ instrs) {v : View} {tr : List Tx} {p₀ : Block Tx}
+    (hM : ReceivesM f instrs (Block.node v tr p₀)) :
+    ReceivesM f instrs p₀
+      ∧ ∀ w : View, p₀.view.val < w.val → w.val < v.val → ReceivesNullification f instrs w := by
+  obtain ⟨q, t, _, hview, hvp⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hM
+  have hpar : p₀ ∈ (Block.node v tr p₀).parent := by simp [Block.parent]
+  refine ⟨receivesM_of_MNotarised_st2 hinit (hvp.parent p₀ hpar), fun w h1 h2 => ?_⟩
+  refine receivesNullification_of_Nullified_st2 hinit (hvp.gaps p₀ hpar w h1 ?_)
+  rw [hview]; exact h2
+
+/-- M-notarisation を受けたブロックの祖先は M-notarisation を受ける。 -/
+theorem receivesM_ancestor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hb : ByzBound f s₀ instrs) {c b : Block Tx} (hanc : Block.Ancestor c b)
+    (hM : ReceivesM f instrs b) : ReceivesM f instrs c := by
+  induction hanc with
+  | refl => exact hM
+  | parent v tr p _ ih => exact ih (receivesM_parent hinit hh hb hM).1
+
 /-- Lemma 5.4（Consistency）の本体: L-notarisation を受けた 2 つのブロックは、一方が他方の
     祖先。 -/
 theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {b b' : Block Tx} (hL : ReceivesL f instrs b) (hL' : ReceivesL f instrs b') :
     b.Ancestor b' ∨ b'.Ancestor b := by
-  sorry
+  by_contra hcon
+  simp only [not_or] at hcon
+  wlog hle : b.view.val ≤ b'.view.val generalizing b b' with H
+  · exact H hL' hL ⟨hcon.2, hcon.1⟩ (not_le.mp hle).le
+  have hbg : b ≠ .gen := fun h => hcon.1 (h ▸ Block.gen_ancestor b')
+  have hv₁ := one_le_view_of_receivesL hn hinit hh hb hL hbg
+  obtain ⟨v, tr, p₀, hanc, hge, hlt⟩ := Block.exists_crossing hv₁ hle
+  have hM : ReceivesM f instrs (Block.node v tr p₀) :=
+    receivesM_ancestor hinit hh hb hanc (receivesM_of_receivesL hn hL')
+  have hna : ¬ b.Ancestor (Block.node v tr p₀) := fun h => hcon.1 (h.trans hanc)
+  have hne : v.val ≠ b.view.val := by
+    intro heq
+    have hv : (Block.node v tr p₀).view = b.view := View.val_injective heq
+    have := x1 hn hinit hh hb hL hv hM
+    exact hna (this ▸ Block.Ancestor.refl _)
+  obtain ⟨_, hgap⟩ := receivesM_parent hinit hh hb hM
+  exact x2 hn hinit hh hb hL (hgap b.view hlt (lt_of_le_of_ne hge (Ne.symm hne)))
+
+/-- 正直者の S にある L-notarisation は、実行上の L-notarisation。 -/
+theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block Tx}
+    (h : LNotarised f ((State.run s₀ instrs t).procs i).S b) : ReceivesL f instrs b := by
+  rcases h with rfl | h
+  · exact Or.inl rfl
+  · right
+    refine h.trans (Finset.card_le_card fun w hw => ?_)
+    rw [mem_voters] at hw
+    rw [mem_voteSenders]
+    exact sends_of_mem_S hinit hw rfl
 
 /-- Consistency（§2）をブロックの形で: 正直者が L-notarisation を持つ 2 つのブロックは、
     一方が他方の祖先。log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が
     L-notarisation を持つブロックの Tr* に当たる。 -/
 theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    {i j : Fin n} (hi : Correct s₀ instrs i) (hj : Correct s₀ instrs j)
+    {i j : Fin n} (_hi : Correct s₀ instrs i) (_hj : Correct s₀ instrs j)
     {t t' : Nat} {b b' : Block Tx}
     (hbi : LNotarised f ((State.run s₀ instrs t).procs i).S b)
     (hbj : LNotarised f ((State.run s₀ instrs t').procs j).S b') :
-    b.Ancestor b' ∨ b'.Ancestor b := by
-  sorry
+    b.Ancestor b' ∨ b'.Ancestor b :=
+  finalised_compatible hn hinit hh hb (receivesL_of_LNotarised hinit hbi)
+    (receivesL_of_LNotarised hinit hbj)
 
 end Minimmit

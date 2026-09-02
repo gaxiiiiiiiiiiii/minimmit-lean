@@ -1082,6 +1082,71 @@ theorem mem_S_stage_or (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
     · exact Or.inr h
   · exact Or.inr h
 
+/-! #### 各段の後の S の中身 -/
+
+theorem mem_S_forwardNew {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (forwardNew f i q).1.S) : m ∈ q.S := by
+  rw [forwardNew_eq, disseminateAll_fst] at hm
+  have key : ∀ (ms : List (Msg n Tx)) (q : Processor n Tx), (∀ m ∈ ms, m ∈ q.S) →
+      ∀ m ∈ (ms.foldl (fun p m => (disseminate i p m).1) q).S, m ∈ q.S := by
+    intro ms
+    induction ms with
+    | nil => intro q _ m hm; exact hm
+    | cons m' ms ih =>
+      intro q hq m hm
+      rw [List.foldl_cons] at hm
+      have hm' := ih _ (fun m'' hm'' => S_subset_disseminate_fst i q m'
+        (hq m'' (List.mem_cons_of_mem _ hm''))) m hm
+      rcases mem_S_disseminate_or i q m' hm' with h | rfl
+      · exact h
+      · exact hq m (List.mem_cons_self ..)
+  exact key _ q (fun m hm => mem_S_of_mem_forwardMsgs hm) m hm
+
+theorem mem_S_propose {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
+    {m : Msg n Tx} (hm : m ∈ (propose f lead i q).1.S) : m ∈ q.S ∨ ∃ b, m = Msg.block i b := by
+  unfold propose at hm
+  split_ifs at hm
+  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h⟩
+  · exact Or.inl hm
+
+theorem mem_S_voteProposal {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
+    {m : Msg n Tx} (hm : m ∈ (voteProposal f lead i q).1.S) :
+    m ∈ q.S ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (voteProposal f lead i q).2 := by
+  unfold voteProposal at hm ⊢
+  generalize proposals lead q.S q.view = l at hm ⊢
+  rcases l with _ | ⟨b, _ | ⟨b', l⟩⟩
+  · exact Or.inl hm
+  · simp only at hm ⊢
+    split_ifs at hm ⊢
+    · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨b, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+    · exact Or.inl hm
+  · exact Or.inl hm
+
+theorem mem_S_nullifyTimeout {Δ : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (nullifyTimeout Δ i q).1.S) : m ∈ q.S ∨ ∃ v, m = Msg.nullify i v := by
+  unfold nullifyTimeout at hm
+  split_ifs at hm
+  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h⟩
+  · exact Or.inl hm
+
+theorem mem_S_advanceNull {f : Nat} {q : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (advanceNull f q).1.S) : m ∈ q.S := by
+  rcases advanceNull_eq f q with h | h <;> rw [h] at hm <;> exact hm
+
+theorem mem_S_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (st2 f lead i p).S) : m ∈ p.S ∨ ∃ b, m = Msg.block i b :=
+  (mem_S_propose hm).imp_left mem_S_forwardNew
+
+theorem mem_S_st3 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (st3 f lead i p).S) :
+    m ∈ (st2 f lead i p).S
+      ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (voteProposal f lead i (st2 f lead i p)).2 :=
+  mem_S_voteProposal hm
+
+theorem mem_S_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (st5 f Δ lead i p).S) : m ∈ (st3 f lead i p).S ∨ ∃ v, m = Msg.nullify i v :=
+  mem_S_nullifyTimeout (mem_S_advanceNull hm)
+
 /-! #### 各段が送る message とそのときの条件 -/
 
 theorem send_forwardNew_mem {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}

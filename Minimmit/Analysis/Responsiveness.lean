@@ -3,8 +3,12 @@ import Minimmit.Analysis.Liveness
 /-!
 # Optimistic responsiveness（§5.3）
 
-Lemma 5.8〜5.10。δ ≤ Δ は GST 後の実際の遅延の上界、f_a ≤ f は実際に腐敗する人数。
+Lemma 5.8〜5.10。δ ≤ Δ は GST 以後の実際の遅延の上界、f_a ≤ f は実際に腐敗する人数。
 論文の O(·) は、証明中の具体的な bound で置き換えている。
+
+δ の仮定は `PartialSync δ`、つまり GST 前に送った packet も GST + δ までに届く。5.8 の
+証明は、最初の正直者が証明書を転送した時刻が GST より前であっても、それが t + δ までに
+全員へ届くことを使うので、この読みが要る。
 -/
 
 namespace Minimmit

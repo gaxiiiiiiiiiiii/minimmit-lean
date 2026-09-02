@@ -15,7 +15,7 @@ variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : N
 /-- Lemma 5.8: lead(v) が正直で、最初の正直者が t ≥ GST に view v に入るなら、正直者は
     全員 t + 3δ までに view v のブロックを finalise し、view v を離れる。 -/
 theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hv : Valid s₀ instrs) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View} (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j →
@@ -25,7 +25,7 @@ theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
 
 /-- Lemma 5.9: 最初の正直者が t ≥ GST に view v に入るなら、lead(v) が正直かどうかに
     よらず、正直者は全員 t + 2Δ + 3δ までに view v を離れる。 -/
-theorem leave_view (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
+theorem leave_view (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View}
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
@@ -37,7 +37,7 @@ theorem leave_view (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ i
     どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する（論文の
     lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす）。 -/
 theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hv : Valid s₀ instrs) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {fa : Nat} (hfa : ByzBound fa s₀ instrs)
     (hlead : ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa
       ∧ Correct s₀ instrs (lead v'))

@@ -3,8 +3,8 @@ import Minimmit.Model.Algo
 /-!
 # 制約
 
-遷移系が課さない規則。定理の仮定になる。初期状態、署名と網の規則、部分同期、腐敗、
-リーダー、プロトコルに従うこと、の順。
+遷移系が課さない規則。定理の仮定になる。初期状態、部分同期、腐敗、リーダー、
+プロトコルに従うこと、の順。
 -/
 
 namespace Minimmit
@@ -19,20 +19,6 @@ structure Init (s₀ : State n Tx) : Prop where
   byz : s₀.byz = ∅
   pool : s₀.pool = ∅
   now : s₀.now = ⟨0⟩
-
-/-! ### 署名と網の規則（§2 の暗号仮定と、送られた packet だけが届くこと） -/
-
-/-- 状態 s に対して指示 instr が規則を満たす。 -/
-structure Instr.Valid [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : Prop where
-  /-- 各 send の message は、送り手の署名付きか、送り手がスロット冒頭の S に受信済み。 -/
-  send : ∀ i m j, Action.send m j ∈ instr.actions i →
-    m.signer = some i ∨ m ∈ (s.procs i).S
-  /-- 各 deliver の packet は pool にある。pool はそのスロットの送信を含む。 -/
-  deliver : ∀ x ∈ instr.deliveries, x ∈ (s.step instr).pool
-
-/-- 指示の列が全スロットで規則を満たす。 -/
-def Valid [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
-  ∀ t, (instrs t).Valid (State.run s₀ instrs t)
 
 /-! ### 部分同期 -/
 

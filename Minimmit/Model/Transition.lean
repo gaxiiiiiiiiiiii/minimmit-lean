@@ -96,6 +96,7 @@ structure Packet (n : Nat) (Tx : Type) where
   msg : Msg n Tx
   dst : Fin n
   sentAt : Time
+deriving DecidableEq
 
 /-- 大域状態: 全プロセッサの局所状態、腐敗集合、網に載った packet、現在のタイムスロット。 -/
 structure State (n : Nat) (Tx : Type) where
@@ -104,7 +105,7 @@ structure State (n : Nat) (Tx : Type) where
   /-- これまでに腐敗したプロセッサ。 -/
   byz : Finset (Fin n)
   /-- 網に載った packet の全体。 -/
-  pool : Set (Packet n Tx)
+  pool : Finset (Packet n Tx)
   /-- 現在のタイムスロット。`State.tick` で進む。 -/
   now : Time
 
@@ -147,15 +148,16 @@ def tick (p : Processor n Tx) : Processor n Tx :=
 `Action` の 2 つに対応する。`State.execute` から呼ばれるほか、`Algo.step` が動作の列を
 組み立てながら局所状態を追うのにも使う。 -/
 
-/-- m を j へ送った局所状態への効果。m が自分の署名付きなら種類に応じてフラグを
-    立てる。§4 の nullified・proposed・notarised の記録に当たる。他人のものと取引では
-    何もしない。j が自分なら即時受信。 -/
+/-- m を j へ送った局所状態への効果。m が自分の署名付きで現在の view のものなら、
+    種類に応じてフラグを立てる。§4 の nullified・proposed・notarised は「現在の view で
+    送ったか」の記録なので、他の view のもの、他人のもの、取引では何もしない。
+    j が自分なら即時受信。 -/
 def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
     Processor n Tx :=
   let p := match m with
-    | .block q _   => if q = i then { p with proposed := true } else p
-    | .vote q b    => if q = i then { p with notarised := some b } else p
-    | .nullify q _ => if q = i then { p with nullified := true } else p
+    | .block q b   => if q = i ∧ b.view = p.view then { p with proposed := true } else p
+    | .vote q b    => if q = i ∧ b.view = p.view then { p with notarised := some b } else p
+    | .nullify q v => if q = i ∧ v = p.view then { p with nullified := true } else p
     | .tx _        => p
   if j = i then p.receive m else p
 
@@ -179,27 +181,30 @@ def update (s : State n Tx) (i : Fin n) (f : Processor n Tx → Processor n Tx) 
   { s with procs := Function.update s.procs i (f (s.procs i)) }
 
 /-- packet x を網に載せる。`send` から呼ぶ。 -/
-def transmit (s : State n Tx) (x : Packet n Tx) : State n Tx :=
+def transmit [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   { s with pool := insert x s.pool }
 
 /-! ### 指示が起こす遷移
 `Instr` の成分ごとに対応する。actions の各動作が send と progress、deliveries が deliver、
 submits が submit、corrupts が corrupt。 -/
 
-/-- p_i が m を j へ送る。局所状態への効果は `Processor.send`、網には now 付きの
-    packet。署名の規則は `Instr.Valid` が課す。 -/
+/-- p_i が m を j へ送る。m が自分の署名付きか受信済みのときだけ送り、そうでなければ
+    何もしない（§2 の、署名は偽造できないという仮定）。局所状態への効果は
+    `Processor.send`、網には now 付きの packet。 -/
 def send [DecidableEq Tx] (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n) :
     State n Tx :=
-  (s.update i (·.send i m j)).transmit ⟨m, j, s.now⟩
+  if m.signer = some i ∨ m ∈ (s.procs i).S then
+    (s.update i (·.send i m j)).transmit ⟨m, j, s.now⟩
+  else s
 
 /-- p_i が次の view へ。 -/
 def progress (s : State n Tx) (i : Fin n) : State n Tx :=
   s.update i Processor.progress
 
-/-- packet x のメッセージが宛先に届く。x が pool にあるという規則は
-    `Instr.Valid` が課す。 -/
+/-- packet x のメッセージが宛先に届く。x が pool にあるときだけ届き、そうでなければ
+    何もしない。 -/
 def deliver [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
-  s.update x.dst (·.receive x.msg)
+  if x ∈ s.pool then s.update x.dst (·.receive x.msg) else s
 
 /-- 環境が p_j に取引 tr を渡す。 -/
 def submit [DecidableEq Tx] (s : State n Tx) (j : Fin n) (tr : Tx) : State n Tx :=

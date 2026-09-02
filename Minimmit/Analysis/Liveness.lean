@@ -23,7 +23,7 @@ structure FirstEntry (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (v : View
   first : ∀ i t', Correct s₀ instrs i → v.val ≤ (viewAt s₀ instrs i (t' + 1)).val → t ≤ t'
 
 /-- Lemma 5.5（Progression through views）: 正直者はすべての view に入る。 -/
-theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
+theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hs : PartialSync Δ s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i) (v : View) :
     ∃ t, v.val ≤ (viewAt s₀ instrs i t).val := by
@@ -32,7 +32,7 @@ theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ 
 /-- Lemma 5.6（Correct leaders finalise blocks）: lead(v) が正直で、最初の正直者が GST 以降に
     view v に入るなら、lead(v) はブロックを送り、それは L-notarisation を受ける。 -/
 theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hv : Valid s₀ instrs) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hs : PartialSync Δ s₀ instrs) {v : View} (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
     ∃ b : Block Tx, b.view = v ∧ Sends instrs (lead v) (.block (lead v) b)
@@ -41,7 +41,7 @@ theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
 
 /-- Lemma 5.7（Liveness）: 正直者 p_i が受け取った取引は、正直者 p_j が L-notarisation を
     持つブロックの Tr* にいつか入る。 -/
-theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
+theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hs : PartialSync Δ s₀ instrs) (hlead : Fair lead)
     {i j : Fin n} (hi : Correct s₀ instrs i) (hj : Correct s₀ instrs j)

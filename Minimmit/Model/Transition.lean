@@ -219,7 +219,7 @@ def corrupt (s : State n Tx) (i : Fin n) : State n Tx :=
 
 /-- スロットを進める: 全プロセッサの `tick` と now + 1。s₀ はこのスロット冒頭の状態で、
     各プロセッサの prevS にその S を入れる。 -/
-def tick (s₀ s : State n Tx) : State n Tx :=
+def tick (s : State n Tx) (s₀ : State n Tx) : State n Tx :=
   { s with procs := fun i => (s.procs i).tick (s₀.procs i).S, now := ⟨s.now.val + 1⟩ }
 
 /-- p_i が動作 a を実行する。 -/

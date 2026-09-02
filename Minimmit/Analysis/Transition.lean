@@ -128,6 +128,22 @@ theorem send_vote_notarised (i : Fin n) (p : Processor n Tx) (b : Block Tx) (j :
   simp only [send, true_and]
   split_ifs <;> rfl
 
+/-- 自分の現在の view の nullify でなければ nullified は変わらない。 -/
+theorem send_nullified_of_not_nullify (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
+    (h : ∀ v, m = .nullify i v → v ≠ p.view) : (p.send i m j).nullified = p.nullified := by
+  cases m with
+  | nullify q v =>
+    simp only [send]
+    have : ¬ (q = i ∧ v = p.view) := fun ⟨hq, hv⟩ => h v (by rw [hq]) hv
+    simp only [this, if_false]
+    split_ifs <;> rfl
+  | _ => simp only [send]; split_ifs <;> rfl
+
+theorem send_nullify_nullified (i : Fin n) (p : Processor n Tx) (v : View) (j : Fin n) :
+    (p.send i (.nullify i v) j).nullified = if v = p.view then true else p.nullified := by
+  simp only [send, true_and]
+  split_ifs <;> rfl
+
 /-- 署名者が k でない message が k の動作の後に S にあるなら、動作の前からあった。 -/
 theorem mem_S_executeAll_of_signer_ne (k : Fin n) (p : Processor n Tx) (acts : List (Action n Tx))
     {m : Msg n Tx} (hm : m ∈ (p.executeAll k acts).S) (hs : m.signer ≠ some k) : m ∈ p.S := by

@@ -1,5 +1,6 @@
 import Minimmit.Model.Algo
 import Minimmit.Analysis.Transition
+import Minimmit.Analysis.Certificate
 
 /-!
 # Algorithm 1 の補題
@@ -446,11 +447,11 @@ theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · exact S_subset_nullifyNoProgress _ _ _ (mem_S_of_send_advanceM h)
   · exact mem_S_of_send_nullifyNoProgress h
 
-/-! ### 票の不変量
-Lemma 5.1 の核。正直者 p_i の局所状態について、S にある自分の票と view・notarised の関係。 -/
+/-! ### 正直者の局所状態の不変量
+Lemma 5.1・5.3 の核。S にある自分の票・nullify と、view・notarised・nullified の関係。 -/
 
-/-- p_i の S にある自分の票についての不変量。 -/
-structure VoteInv (i : Fin n) (p : Processor n Tx) : Prop where
+/-- 送信の途中（全員へ送る途中）でも保たれる部分。 -/
+structure PreInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop where
   /-- view は 1 以上。 -/
   view_pos : 1 ≤ p.view.val
   /-- 自分の票 (vote, c) が S にあれば、c は view 1 以上のブロックで、現在の view より前の
@@ -459,52 +460,110 @@ structure VoteInv (i : Fin n) (p : Processor n Tx) : Prop where
     1 ≤ c.view.val ∧ (c.view.val < p.view.val ∨ (c.view = p.view ∧ p.notarised = some c))
   /-- S にある自分の票で view が同じものは一致する。 -/
   unique : ∀ c c', Msg.vote i c ∈ p.S → Msg.vote i c' ∈ p.S → c.view = c'.view → c = c'
+  /-- notarised のブロックは現在の view。 -/
+  notar_view : ∀ c, p.notarised = some c → c.view = p.view
+  /-- 自分の nullify(w) が S にあれば、1 ≤ w ≤ 現在の view。 -/
+  null_view : ∀ w, Msg.nullify i w ∈ p.S → 1 ≤ w.val ∧ w.val ≤ p.view.val
+  /-- 自分の現在の view の nullify が S にあれば nullified。 -/
+  null_flag : Msg.nullify i p.view ∈ p.S → p.nullified = true
+  /-- 自分の nullify(w) と、view w のブロック c への自分の票が両方 S にあるなら、
+      S は view w で c 以外への進捗のなさの証拠を含む（24〜28 行で送った）。 -/
+  null_vote : ∀ w c, Msg.nullify i w ∈ p.S → Msg.vote i c ∈ p.S → c.view = w →
+    NoProgress f p.S w (some c)
 
-namespace VoteInv
+/-- 正直者の局所状態の不変量。 -/
+structure LocalInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop extends PreInv f i p where
+  /-- notarised のブロックへの自分の票は S にある。 -/
+  notar_mem : ∀ c, p.notarised = some c → Msg.vote i c ∈ p.S
 
-variable {i : Fin n} {p : Processor n Tx}
+namespace PreInv
 
-/-- 自分の票でない message の送信は不変量を保つ。 -/
-theorem send_of_not_vote (h : VoteInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.vote i b)
-    (j : Fin n) : VoteInv i (p.send i m j) := by
-  have hS : ∀ c, Msg.vote i c ∈ (p.send i m j).S → Msg.vote i c ∈ p.S := by
-    intro c hc
-    rw [Processor.send_S] at hc
-    split_ifs at hc with hj
-    · rcases Finset.mem_insert.mp hc with hc | hc
-      · exact absurd hc.symm (hm c)
-      · exact hc
-    · exact hc
-  have hn : (p.send i m j).notarised = p.notarised :=
-    Processor.send_notarised_of_not_vote i p m j fun b hb => absurd hb (hm b)
-  refine ⟨by rw [Processor.send_view]; exact h.view_pos, fun c hc => ?_,
-    fun c c' hc hc' hv => h.unique c c' (hS c hc) (hS c' hc') hv⟩
-  rw [Processor.send_view, hn]
-  exact h.notar c (hS c hc)
+variable {f : Nat} {i : Fin n} {p : Processor n Tx}
 
-/-- S にある message の再送は不変量を保つ。 -/
-theorem send_of_mem (h : VoteInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n) :
-    VoteInv i (p.send i m j) := by
-  have hS : (p.send i m j).S = p.S := by
-    rw [Processor.send_S]; split_ifs <;> simp [Finset.insert_eq_of_mem hm]
-  by_cases hv : ∃ b, m = Msg.vote i b
-  · obtain ⟨b, rfl⟩ := hv
-    refine ⟨by rw [Processor.send_view]; exact h.view_pos, fun c hc => ?_,
-      fun c c' hc hc' hv => h.unique c c' (hS ▸ hc) (hS ▸ hc') hv⟩
-    rw [hS] at hc
-    rw [Processor.send_view, Processor.send_vote_notarised]
-    obtain ⟨hpos, hlt | ⟨hce, hcn⟩⟩ := h.notar c hc
-    · exact ⟨hpos, Or.inl hlt⟩
-    · refine ⟨hpos, Or.inr ⟨hce, ?_⟩⟩
+omit [DecidableEq Tx] in
+/-- 関係する欄が等しければ移る。 -/
+theorem congr (h : PreInv f i p) {q : Processor n Tx} (hv : q.view = p.view)
+    (hn : q.notarised = p.notarised) (hnl : q.nullified = p.nullified) (hS : q.S = p.S) :
+    PreInv f i q := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [hv]; exact h.view_pos
+  · intro c hc; rw [hS] at hc; rw [hv, hn]; exact h.notar c hc
+  · intro c c' hc hc'; rw [hS] at hc hc'; exact h.unique c c' hc hc'
+  · intro c hc; rw [hn] at hc; rw [hv]; exact h.notar_view c hc
+  · intro w hw; rw [hS] at hw; rw [hv]; exact h.null_view w hw
+  · intro hw; rw [hv, hS] at hw; rw [hnl]; exact h.null_flag hw
+  · intro w c hw hc hcw; rw [hS] at hw hc ⊢; exact h.null_vote w c hw hc hcw
+
+omit [DecidableEq Tx] in
+/-- view・notarised・nullified が変わらず S が増えても、増えた分に自分の票と nullify が
+    無ければ保たれる。 -/
+theorem of_grow (h : PreInv f i p) {q : Processor n Tx} (hv : q.view = p.view)
+    (hn : q.notarised = p.notarised) (hnl : q.nullified = p.nullified) (hS : p.S ⊆ q.S)
+    (hvote : ∀ c, Msg.vote i c ∈ q.S → Msg.vote i c ∈ p.S)
+    (hnull : ∀ w, Msg.nullify i w ∈ q.S → Msg.nullify i w ∈ p.S) : PreInv f i q := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [hv]; exact h.view_pos
+  · intro c hc; rw [hv, hn]; exact h.notar c (hvote c hc)
+  · intro c c' hc hc'; exact h.unique c c' (hvote c hc) (hvote c' hc')
+  · intro c hc; rw [hn] at hc; rw [hv]; exact h.notar_view c hc
+  · intro w hw; rw [hv]; exact h.null_view w (hnull w hw)
+  · intro hw; rw [hv] at hw; rw [hnl]; exact h.null_flag (hnull _ hw)
+  · intro w c hw hc hcw; exact (h.null_vote w c (hnull w hw) (hvote c hc) hcw).mono hS
+
+omit [DecidableEq Tx] in
+theorem of_sgrows (h : PreInv f i p) {q : Processor n Tx} (hg : p.SGrows q)
+    (hvote : ∀ c, Msg.vote i c ∈ q.S → Msg.vote i c ∈ p.S)
+    (hnull : ∀ w, Msg.nullify i w ∈ q.S → Msg.nullify i w ∈ p.S) : PreInv f i q :=
+  h.of_grow hg.view hg.notarised hg.nullified hg.S hvote hnull
+
+theorem mem_S_send_iff_of_ne (i : Fin n) (p : Processor n Tx) {m m' : Msg n Tx} (j : Fin n)
+    (hne : m' ≠ m) : m' ∈ (p.send i m j).S ↔ m' ∈ p.S := by
+  rw [Processor.send_S]
+  split_ifs
+  · simp [Finset.mem_insert, hne]
+  · exact Iff.rfl
+
+/-- 自分の票でも自分の nullify でもない message の送信は不変量を保つ。 -/
+theorem send_of_not_own (h : PreInv f i p) {m : Msg n Tx} (hv : ∀ b, m ≠ Msg.vote i b)
+    (hn : ∀ v, m ≠ Msg.nullify i v) (j : Fin n) : PreInv f i (p.send i m j) := by
+  refine h.of_grow (Processor.send_view i p m j)
+    (Processor.send_notarised_of_not_vote i p m j fun b hb => absurd hb (hv b))
+    (Processor.send_nullified_of_not_nullify i p m j fun v hv' => absurd hv' (hn v))
+    (Processor.S_subset_send i p m j) (fun c hc => ?_) (fun w hw => ?_)
+  · exact (mem_S_send_iff_of_ne i p j fun h' => hv c h'.symm).mp hc
+  · exact (mem_S_send_iff_of_ne i p j fun h' => hn w h'.symm).mp hw
+
+/-- S にある message の再送は、view・notarised・nullified・S を変えない。 -/
+theorem send_of_mem_eq (h : PreInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n) :
+    (p.send i m j).notarised = p.notarised ∧ (p.send i m j).nullified = p.nullified
+      ∧ (p.send i m j).S = p.S := by
+  refine ⟨?_, ?_, ?_⟩
+  · by_cases hv : ∃ b, m = Msg.vote i b
+    · obtain ⟨b, rfl⟩ := hv
+      rw [Processor.send_vote_notarised]
       split_ifs with hb
-      · exact congrArg some (h.unique b c hm hc (hb.trans hce.symm))
-      · exact hcn
-  · exact h.send_of_not_vote (fun b hb => hv ⟨b, hb⟩) j
+      · exact ((h.notar b hm).2.resolve_left (by rw [hb]; exact lt_irrefl _)).2.symm
+      · rfl
+    · exact Processor.send_notarised_of_not_vote i p m j fun b hb => absurd ⟨b, hb⟩ hv
+  · by_cases hn : ∃ v, m = Msg.nullify i v
+    · obtain ⟨v, rfl⟩ := hn
+      rw [Processor.send_nullify_nullified]
+      split_ifs with hv
+      · subst hv; exact (h.null_flag hm).symm
+      · rfl
+    · exact Processor.send_nullified_of_not_nullify i p m j fun v hv => absurd ⟨v, hv⟩ hn
+  · rw [Processor.send_S]; split_ifs <;> simp [Finset.insert_eq_of_mem hm]
 
-/-- notarised が ⊥ か、既に b のときの、現在の view のブロック b への票。 -/
-theorem send_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
-    (hn : p.notarised = none ∨ p.notarised = some b) (j : Fin n) :
-    VoteInv i (p.send i (Msg.vote i b) j) := by
+theorem send_of_mem (h : PreInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n) :
+    PreInv f i (p.send i m j) :=
+  let ⟨hn, hnl, hS⟩ := h.send_of_mem_eq hm j
+  h.congr (Processor.send_view i p m j) hn hnl hS
+
+/-- 現在の view のブロック b への自分の票。notarised が ⊥ か既に b で、現在の view の
+    nullify を送っていないとき。 -/
+theorem send_vote (h : PreInv f i p) {b : Block Tx} (hb : b.view = p.view)
+    (hn : p.notarised = none ∨ p.notarised = some b) (hnn : Msg.nullify i p.view ∉ p.S)
+    (j : Fin n) : PreInv f i (p.send i (Msg.vote i b) j) := by
   have hS : ∀ c, Msg.vote i c ∈ (p.send i (Msg.vote i b) j).S → c = b ∨ Msg.vote i c ∈ p.S := by
     intro c hc
     rw [Processor.send_S] at hc
@@ -513,7 +572,8 @@ theorem send_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
       · exact Or.inl (by cases hc; rfl)
       · exact Or.inr hc
     · exact Or.inr hc
-  -- 現在の view の自分の票が S にあれば、それは b
+  have hN : ∀ w, Msg.nullify i w ∈ (p.send i (Msg.vote i b) j).S → Msg.nullify i w ∈ p.S :=
+    fun w hw => (mem_S_send_iff_of_ne i p j (by simp)).mp hw
   have hcur : ∀ c, Msg.vote i c ∈ p.S → c.view = p.view → c = b := by
     intro c hc hcv
     rcases (h.notar c hc).2 with hlt | ⟨_, hcn⟩
@@ -521,72 +581,223 @@ theorem send_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
     · rcases hn with hn | hn
       · rw [hn] at hcn; cases hcn
       · rw [hn] at hcn; exact (Option.some.inj hcn).symm
-  refine ⟨by rw [Processor.send_view]; exact h.view_pos, fun c hc => ?_,
-    fun c c' hc hc' hv => ?_⟩
-  · rw [Processor.send_view, Processor.send_vote_notarised, if_pos hb]
+  have hview := Processor.send_view i p (Msg.vote i b) j
+  have hnot := Processor.send_vote_notarised i p b j
+  rw [if_pos hb] at hnot
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [hview]; exact h.view_pos
+  · intro c hc
+    rw [hview, hnot]
     rcases hS c hc with rfl | hc
     · exact ⟨by rw [hb]; exact h.view_pos, Or.inr ⟨hb, rfl⟩⟩
     · obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
       · exact ⟨hpos, Or.inl hlt⟩
       · exact ⟨hpos, Or.inr ⟨hce, congrArg some (hcur c hc hce).symm⟩⟩
-  · rcases hS c hc with hcb | hc
+  · intro c c' hc hc' hv
+    rcases hS c hc with hcb | hc
     · rcases hS c' hc' with hcb' | hc'
       · exact hcb.trans hcb'.symm
-      · rw [hcb]
-        exact (hcur c' hc' (hv.symm.trans (hcb ▸ hb))).symm
+      · rw [hcb]; exact (hcur c' hc' (hv.symm.trans (hcb ▸ hb))).symm
     · rcases hS c' hc' with hcb' | hc'
-      · rw [hcb']
-        exact hcur c hc (hv.trans (hcb' ▸ hb))
+      · rw [hcb']; exact hcur c hc (hv.trans (hcb' ▸ hb))
       · exact h.unique c c' hc hc' hv
+  · intro c hc; rw [hnot] at hc; rw [hview, ← Option.some.inj hc]; exact hb
+  · intro w hw; rw [hview]; exact h.null_view w (hN w hw)
+  · intro hw; rw [hview] at hw; exact absurd (hN _ hw) hnn
+  · intro w c hw hc hcw
+    have hw' := hN w hw
+    rcases hS c hc with rfl | hc
+    · have hwv : w = p.view := hcw.symm.trans hb
+      rw [hwv] at hw'
+      exact absurd hw' hnn
+    · exact (h.null_vote w c hw' hc hcw).mono (Processor.S_subset_send i p _ j)
+
+/-- 現在の view の nullify。notarised が ⊥ か、notarised のブロック以外への進捗のなさの
+    証拠があるとき。 -/
+theorem send_nullify (h : PreInv f i p)
+    (hH : p.notarised = none ∨ ∃ c₀, p.notarised = some c₀ ∧ NoProgress f p.S p.view (some c₀))
+    (j : Fin n) : PreInv f i (p.send i (Msg.nullify i p.view) j) := by
+  have hV : ∀ c, Msg.vote i c ∈ (p.send i (Msg.nullify i p.view) j).S → Msg.vote i c ∈ p.S :=
+    fun c hc => (mem_S_send_iff_of_ne i p j (by simp)).mp hc
+  have hN : ∀ w, Msg.nullify i w ∈ (p.send i (Msg.nullify i p.view) j).S →
+      w = p.view ∨ Msg.nullify i w ∈ p.S := by
+    intro w hw
+    rw [Processor.send_S] at hw
+    split_ifs at hw
+    · rcases Finset.mem_insert.mp hw with hw | hw
+      · exact Or.inl (by cases hw; rfl)
+      · exact Or.inr hw
+    · exact Or.inr hw
+  have hview := Processor.send_view i p (Msg.nullify i p.view) j
+  have hnot := Processor.send_notarised_of_not_vote i p (Msg.nullify i p.view) j
+    fun b hb => by cases hb
+  have hnl := Processor.send_nullify_nullified i p p.view j
+  rw [if_pos rfl] at hnl
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [hview]; exact h.view_pos
+  · intro c hc; rw [hview, hnot]; exact h.notar c (hV c hc)
+  · intro c c' hc hc'; exact h.unique c c' (hV c hc) (hV c' hc')
+  · intro c hc; rw [hnot] at hc; rw [hview]; exact h.notar_view c hc
+  · intro w hw
+    rw [hview]
+    rcases hN w hw with rfl | hw
+    · exact ⟨h.view_pos, le_refl _⟩
+    · exact h.null_view w hw
+  · intro _; exact hnl
+  · intro w c hw hc hcw
+    have hc' := hV c hc
+    rcases hN w hw with rfl | hw
+    · obtain ⟨_, hlt | ⟨_, hcn⟩⟩ := h.notar c hc'
+      · rw [hcw] at hlt; exact absurd hlt (lt_irrefl _)
+      · rcases hH with hH | ⟨c₀, hc₀, hnp⟩
+        · rw [hH] at hcn; cases hcn
+        · rw [hc₀] at hcn
+          rw [← Option.some.inj hcn]
+          exact hnp.mono (Processor.S_subset_send i p _ j)
+    · exact (h.null_vote w c hw hc' hcw).mono (Processor.S_subset_send i p _ j)
 
 omit [DecidableEq Tx] in
-/-- 次の view へ進んでも不変量は保たれる。 -/
-theorem progress (h : VoteInv i p) : VoteInv i p.progress := by
-  refine ⟨Nat.le_succ_of_le h.view_pos, fun c hc => ?_,
-    fun c c' hc hc' hv => h.unique c c' hc hc' hv⟩
-  obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
-  · exact ⟨hpos, Or.inl (Nat.lt_succ_of_lt hlt)⟩
-  · exact ⟨hpos, Or.inl (by simp only [Processor.progress]; rw [hce]; exact Nat.lt_succ_self _)⟩
+/-- 次の view へ進んでも保たれる。 -/
+theorem progress (h : PreInv f i p) : PreInv f i p.progress := by
+  refine ⟨Nat.le_succ_of_le h.view_pos, ?_, fun c c' hc hc' hv => h.unique c c' hc hc' hv,
+    ?_, ?_, ?_, ?_⟩
+  · intro c hc
+    obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
+    · exact ⟨hpos, Or.inl (Nat.lt_succ_of_lt hlt)⟩
+    · exact ⟨hpos, Or.inl (by simp only [Processor.progress]; rw [hce]; exact Nat.lt_succ_self _)⟩
+  · intro c hc; simp [Processor.progress] at hc
+  · intro w hw
+    obtain ⟨h1, h2⟩ := h.null_view w hw
+    exact ⟨h1, Nat.le_succ_of_le h2⟩
+  · intro hw
+    have := (h.null_view _ hw).2
+    simp only [Processor.progress] at this
+    omega
+  · intro w c hw hc hcw; exact h.null_vote w c hw hc hcw
 
 /-! #### 全員への送信 -/
 
-theorem foldl_send_of_not_vote (h : VoteInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.vote i b)
-    (l : List (Fin n)) : VoteInv i (l.foldl (fun p j => p.send i m j) p) := by
+theorem foldl_send_of_not_own (h : PreInv f i p) {m : Msg n Tx} (hv : ∀ b, m ≠ Msg.vote i b)
+    (hn : ∀ v, m ≠ Msg.nullify i v) (l : List (Fin n)) :
+    PreInv f i (l.foldl (fun p j => p.send i m j) p) := by
   induction l generalizing p with
   | nil => exact h
-  | cons j l ih => exact ih (h.send_of_not_vote hm j)
+  | cons j l ih => exact ih (h.send_of_not_own hv hn j)
 
-theorem foldl_send_of_mem (h : VoteInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (l : List (Fin n)) :
-    VoteInv i (l.foldl (fun p j => p.send i m j) p) := by
+theorem foldl_send_of_mem_eq (h : PreInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) (l : List (Fin n)) :
+    PreInv f i (l.foldl (fun p j => p.send i m j) p)
+      ∧ (l.foldl (fun p j => p.send i m j) p).notarised = p.notarised
+      ∧ (l.foldl (fun p j => p.send i m j) p).S = p.S := by
   induction l generalizing p with
-  | nil => exact h
-  | cons j l ih => exact ih (h.send_of_mem hm j) (Processor.S_subset_send i p m j hm)
+  | nil => exact ⟨h, rfl, rfl⟩
+  | cons j l ih =>
+    obtain ⟨hn, _, hS⟩ := h.send_of_mem_eq hm j
+    obtain ⟨h', hn', hS'⟩ := ih (h.send_of_mem hm j) (hS ▸ hm)
+    exact ⟨h', hn'.trans hn, hS'.trans hS⟩
 
-theorem foldl_send_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
-    (hn : p.notarised = none ∨ p.notarised = some b) (l : List (Fin n)) :
-    VoteInv i (l.foldl (fun p j => p.send i (Msg.vote i b) j) p) := by
+theorem foldl_send_vote (h : PreInv f i p) {b : Block Tx} (hb : b.view = p.view)
+    (hn : p.notarised = none ∨ p.notarised = some b) (hnn : Msg.nullify i p.view ∉ p.S)
+    (l : List (Fin n)) : PreInv f i (l.foldl (fun p j => p.send i (Msg.vote i b) j) p) := by
   induction l generalizing p with
   | nil => exact h
   | cons j l ih =>
-    refine ih (h.send_vote hb hn j) (by rw [Processor.send_view]; exact hb) ?_
-    right
-    rw [Processor.send_vote_notarised, if_pos hb]
+    refine ih (h.send_vote hb hn hnn j) (by rw [Processor.send_view]; exact hb) ?_ ?_
+    · right; rw [Processor.send_vote_notarised, if_pos hb]
+    · rw [Processor.send_view]
+      exact fun hw => hnn ((mem_S_send_iff_of_ne i p j (by simp)).mp hw)
 
-theorem disseminate_of_not_vote (h : VoteInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.vote i b) :
-    VoteInv i (disseminate i p m).1 := by
-  rw [disseminate_fst]; exact h.foldl_send_of_not_vote hm _
+theorem foldl_send_vote_notarised {b : Block Tx} (hb : b.view = p.view) {l : List (Fin n)}
+    (hl : l ≠ []) : (l.foldl (fun p j => p.send i (Msg.vote i b) j) p).notarised = some b := by
+  induction l generalizing p with
+  | nil => exact absurd rfl hl
+  | cons j l ih =>
+    rw [List.foldl_cons]
+    rcases l with _ | ⟨j', l⟩
+    · simp only [List.foldl_nil]; rw [Processor.send_vote_notarised, if_pos hb]
+    · exact ih (by rw [Processor.send_view]; exact hb) (List.cons_ne_nil _ _)
 
-theorem disseminate_of_mem (h : VoteInv i p) {m : Msg n Tx} (hm : m ∈ p.S) :
-    VoteInv i (disseminate i p m).1 := by
-  rw [disseminate_fst]; exact h.foldl_send_of_mem hm _
+theorem foldl_send_nullify (h : PreInv f i p) {v : View} (hv : v = p.view)
+    (hH : p.notarised = none ∨ ∃ c₀, p.notarised = some c₀ ∧ NoProgress f p.S v (some c₀))
+    (l : List (Fin n)) :
+    PreInv f i (l.foldl (fun p j => p.send i (Msg.nullify i v) j) p) := by
+  induction l generalizing p with
+  | nil => exact h
+  | cons j l ih =>
+    subst hv
+    rw [List.foldl_cons]
+    refine ih (h.send_nullify hH j) (Processor.send_view i p _ j).symm ?_
+    rw [Processor.send_notarised_of_not_vote i p _ j fun b hb => by cases hb]
+    exact hH.imp_right fun ⟨c₀, hc₀, hnp⟩ =>
+      ⟨c₀, hc₀, hnp.mono (Processor.S_subset_send i p _ j)⟩
 
-theorem disseminate_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
-    (hn : p.notarised = none ∨ p.notarised = some b) :
-    VoteInv i (disseminate i p (Msg.vote i b)).1 := by
-  rw [disseminate_fst]; exact h.foldl_send_vote hb hn _
+theorem foldl_send_notarised_of_not_vote {m : Msg n Tx} (hv : ∀ b, m ≠ Msg.vote i b)
+    (l : List (Fin n)) (p : Processor n Tx) :
+    (l.foldl (fun p j => p.send i m j) p).notarised = p.notarised := by
+  induction l generalizing p with
+  | nil => rfl
+  | cons j l ih =>
+    rw [List.foldl_cons, ih, Processor.send_notarised_of_not_vote i p m j fun b hb => absurd hb (hv b)]
 
-theorem disseminateAll_of_mem (h : VoteInv i p) {ms : List (Msg n Tx)} (hm : ∀ m ∈ ms, m ∈ p.S) :
-    VoteInv i (disseminateAll i p ms).1 := by
+end PreInv
+
+namespace LocalInv
+
+variable {f : Nat} {i : Fin n} {p : Processor n Tx}
+
+omit [DecidableEq Tx] in
+theorem of_grow (h : LocalInv f i p) {q : Processor n Tx} (hv : q.view = p.view)
+    (hn : q.notarised = p.notarised) (hnl : q.nullified = p.nullified) (hS : p.S ⊆ q.S)
+    (hvote : ∀ c, Msg.vote i c ∈ q.S → Msg.vote i c ∈ p.S)
+    (hnull : ∀ w, Msg.nullify i w ∈ q.S → Msg.nullify i w ∈ p.S) : LocalInv f i q :=
+  ⟨h.toPreInv.of_grow hv hn hnl hS hvote hnull, fun c hc => hS (h.notar_mem c (hn ▸ hc))⟩
+
+omit [DecidableEq Tx] in
+theorem of_sgrows (h : LocalInv f i p) {q : Processor n Tx} (hg : p.SGrows q)
+    (hvote : ∀ c, Msg.vote i c ∈ q.S → Msg.vote i c ∈ p.S)
+    (hnull : ∀ w, Msg.nullify i w ∈ q.S → Msg.nullify i w ∈ p.S) : LocalInv f i q :=
+  h.of_grow hg.view hg.notarised hg.nullified hg.S hvote hnull
+
+omit [DecidableEq Tx] in
+theorem tick (h : LocalInv f i p) (S₀ : Finset (Msg n Tx)) : LocalInv f i (p.tick S₀) :=
+  h.of_grow rfl rfl rfl (Finset.Subset.refl _) (fun _ hc => hc) (fun _ hw => hw)
+
+omit [DecidableEq Tx] in
+theorem progress (h : LocalInv f i p) : LocalInv f i p.progress :=
+  ⟨h.toPreInv.progress, fun c hc => by simp [Processor.progress] at hc⟩
+
+theorem disseminate_of_not_own (h : LocalInv f i p) {m : Msg n Tx} (hv : ∀ b, m ≠ Msg.vote i b)
+    (hn : ∀ v, m ≠ Msg.nullify i v) : LocalInv f i (disseminate i p m).1 := by
+  rw [disseminate_fst]
+  refine ⟨h.toPreInv.foldl_send_of_not_own hv hn _, fun c hc => ?_⟩
+  rw [PreInv.foldl_send_notarised_of_not_vote hv] at hc
+  exact S_subset_foldl_send i m _ p (h.notar_mem c hc)
+
+theorem disseminate_of_mem (h : LocalInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) :
+    LocalInv f i (disseminate i p m).1 := by
+  rw [disseminate_fst]
+  obtain ⟨h', hn, hS⟩ := h.toPreInv.foldl_send_of_mem_eq hm (List.finRange n)
+  exact ⟨h', fun c hc => by rw [hS]; exact h.notar_mem c (hn ▸ hc)⟩
+
+theorem disseminate_vote (h : LocalInv f i p) {b : Block Tx} (hb : b.view = p.view)
+    (hn : p.notarised = none ∨ p.notarised = some b) (hnn : Msg.nullify i p.view ∉ p.S) :
+    LocalInv f i (disseminate i p (Msg.vote i b)).1 := by
+  have hmem := mem_S_disseminate_fst i p (Msg.vote i b)
+  rw [disseminate_fst] at hmem ⊢
+  refine ⟨h.toPreInv.foldl_send_vote hb hn hnn _, fun c hc => ?_⟩
+  rw [PreInv.foldl_send_vote_notarised hb (List.ne_nil_of_mem (List.mem_finRange i))] at hc
+  rw [← Option.some.inj hc]
+  exact hmem
+
+theorem disseminate_nullify (h : LocalInv f i p)
+    (hH : p.notarised = none ∨ ∃ c₀, p.notarised = some c₀ ∧ NoProgress f p.S p.view (some c₀)) :
+    LocalInv f i (disseminate i p (Msg.nullify i p.view)).1 := by
+  rw [disseminate_fst]
+  refine ⟨h.toPreInv.foldl_send_nullify rfl hH _, fun c hc => ?_⟩
+  rw [PreInv.foldl_send_notarised_of_not_vote (fun b hb => by cases hb)] at hc
+  exact S_subset_foldl_send i _ _ p (h.notar_mem c hc)
+
+theorem disseminateAll_of_mem (h : LocalInv f i p) {ms : List (Msg n Tx)} (hm : ∀ m ∈ ms, m ∈ p.S) :
+    LocalInv f i (disseminateAll i p ms).1 := by
   rw [disseminateAll_fst]
   induction ms generalizing p with
   | nil => exact h
@@ -596,78 +807,72 @@ theorem disseminateAll_of_mem (h : VoteInv i p) {ms : List (Msg n Tx)} (hm : ∀
 
 /-! #### 各段 -/
 
-theorem forwardNew (h : VoteInv i p) (f : Nat) : VoteInv i (forwardNew f i p).1 := by
+theorem forwardNew (h : LocalInv f i p) : LocalInv f i (forwardNew f i p).1 := by
   rw [forwardNew_eq]
   exact h.disseminateAll_of_mem fun m hm => mem_S_of_mem_forwardMsgs hm
 
-theorem propose (h : VoteInv i p) (f : Nat) (lead : View → Fin n) :
-    VoteInv i (propose f lead i p).1 := by
+theorem propose (h : LocalInv f i p) (lead : View → Fin n) :
+    LocalInv f i (propose f lead i p).1 := by
   unfold Algo.propose
   split_ifs
-  · exact h.disseminate_of_not_vote fun _ h => by cases h
+  · exact h.disseminate_of_not_own (fun _ h => by cases h) (fun _ h => by cases h)
   · exact h
 
-theorem voteProposal (h : VoteInv i p) (f : Nat) (lead : View → Fin n) :
-    VoteInv i (voteProposal f lead i p).1 := by
+theorem voteProposal (h : LocalInv f i p) (lead : View → Fin n) :
+    LocalInv f i (voteProposal f lead i p).1 := by
   unfold Algo.voteProposal
   rcases proposals lead p.S p.view with _ | ⟨b, _ | ⟨b', l⟩⟩
   · exact h
   · simp only
     split_ifs with hg
-    · exact h.disseminate_vote hg.1.view (Or.inl hg.2.1)
+    · refine h.disseminate_vote hg.1.view (Or.inl hg.2.1) fun hw => ?_
+      have := h.null_flag hw
+      rw [hg.2.2] at this
+      cases this
     · exact h
   · exact h
 
-theorem nullifyTimeout (h : VoteInv i p) (Δ : Nat) : VoteInv i (nullifyTimeout Δ i p).1 := by
+theorem nullifyTimeout (h : LocalInv f i p) (Δ : Nat) : LocalInv f i (nullifyTimeout Δ i p).1 := by
   unfold Algo.nullifyTimeout
-  split_ifs
-  · exact h.disseminate_of_not_vote fun _ h => by cases h
+  split_ifs with hg
+  · exact h.disseminate_nullify (Or.inl hg.2.2)
   · exact h
 
-theorem advanceNull (h : VoteInv i p) (f : Nat) : VoteInv i (advanceNull f p).1 := by
+theorem advanceNull (h : LocalInv f i p) : LocalInv f i (advanceNull f p).1 := by
   unfold Algo.advanceNull
   split_ifs
   · exact h.progress
   · exact h
 
-theorem advanceM (h : VoteInv i p) (f : Nat) : VoteInv i (advanceM f i p).1 := by
+theorem advanceM (h : LocalInv f i p) : LocalInv f i (advanceM f i p).1 := by
   unfold Algo.advanceM
   rcases hm : mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
   · exact h
   · simp only
     split_ifs with hg
-    · exact (h.disseminate_vote (mem_mNotarisedAt (hm ▸ List.mem_cons_self ..)).1
-        (Or.inl hg.1)).progress
+    · refine (h.disseminate_vote (mem_mNotarisedAt (hm ▸ List.mem_cons_self ..)).1
+        (Or.inl hg.1) fun hw => ?_).progress
+      have := h.null_flag hw
+      rw [hg.2] at this
+      cases this
     · exact h.progress
 
-theorem nullifyNoProgress (h : VoteInv i p) (f : Nat) :
-    VoteInv i (nullifyNoProgress f i p).1 := by
+theorem nullifyNoProgress (h : LocalInv f i p) : LocalInv f i (nullifyNoProgress f i p).1 := by
   unfold Algo.nullifyNoProgress
-  split_ifs
-  · exact h.disseminate_of_not_vote fun _ h => by cases h
+  split_ifs with hg
+  · obtain ⟨c₀, hc₀⟩ := Option.ne_none_iff_exists'.mp hg.2.1
+    refine h.disseminate_nullify (Or.inr ⟨c₀, hc₀, ?_⟩)
+    rw [← hc₀]; exact hg.2.2
   · exact h
 
-omit [DecidableEq Tx] in
-/-- tick は不変量を保つ。 -/
-theorem tick (h : VoteInv i p) (S₀ : Finset (Msg n Tx)) : VoteInv i (p.tick S₀) :=
-  ⟨h.view_pos, fun c hc => h.notar c hc, fun c c' hc hc' hv => h.unique c c' hc hc' hv⟩
-
-omit [DecidableEq Tx] in
-/-- S が増えても、増えた分に自分の票が無ければ不変量は保たれる。 -/
-theorem of_sgrows (h : VoteInv i p) {q : Processor n Tx} (hg : p.SGrows q)
-    (hv : ∀ c, Msg.vote i c ∈ q.S → Msg.vote i c ∈ p.S) : VoteInv i q := by
-  refine ⟨by rw [hg.view]; exact h.view_pos, fun c hc => ?_,
-    fun c c' hc hc' hve => h.unique c c' (hv c hc) (hv c' hc') hve⟩
-  rw [hg.view, hg.notarised]
-  exact h.notar c (hv c hc)
-
 /-- Algorithm 1 の 1 スロット分の動作は不変量を保つ。 -/
-theorem stepPair (h : VoteInv i p) (f Δ : Nat) (lead : View → Fin n) :
-    VoteInv i (stepPair f Δ lead i p).1 :=
-  (((((((h.forwardNew f).propose f lead).voteProposal f lead).nullifyTimeout Δ).advanceNull f
-    ).advanceM f).nullifyNoProgress f)
+theorem stepPair (h : LocalInv f i p) (Δ : Nat) (lead : View → Fin n) :
+    LocalInv f i (stepPair f Δ lead i p).1 :=
+  ((((((h.forwardNew.propose lead).voteProposal lead).nullifyTimeout Δ).advanceNull
+    ).advanceM).nullifyNoProgress)
 
-end VoteInv
+end LocalInv
+
 
 end Algo
 

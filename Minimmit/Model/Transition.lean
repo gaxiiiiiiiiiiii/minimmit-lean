@@ -1,12 +1,13 @@
 import Mathlib.Data.Finset.Card
 
 /-!
-# Minimmit の形式化
+# 遷移系
 
-論文 arXiv:2508.10862 に基づく。
+§2・§4 の型（View・Time・Block・Msg・Packet・Processor・State）と、1 スロット分の指示
+（Action・Instr）、状態遷移の原始関数、スロット単位の遷移 `State.step` と実行 `State.run`。
 -/
 
-namespace Mine
+namespace Minimmit
 
 /-- view 番号（genesis のみ 0）。`Time` とは別の型。 -/
 structure View where
@@ -23,7 +24,7 @@ instance : Coe Time Nat := ⟨Time.val⟩
 
 variable {Tx : Type}
 
-/-- ブロック（§4.2）: genesis か、(view, 取引列, 親) の組。親はハッシュ値
+/-- ブロック（§4）: genesis か、(view, 取引列, 親) の組。親はハッシュ値
     でなく親ブロックそのもの。取引列が相異なることは型に含まない。 -/
 inductive Block (Tx : Type) : Type where
   | gen : Block Tx
@@ -50,7 +51,13 @@ def Block.trStar : Block Tx → List Tx
   | .gen => []
   | .node _ tr parent => parent.trStar ++ tr
 
-/-- メッセージ（§4.2）: 提案・票・nullify は署名者 q を持つ。取引（§2）は
+/-- `Ancestor a b`: a は b の祖先（§2）。b 自身か、b の親の祖先。 -/
+inductive Block.Ancestor : Block Tx → Block Tx → Prop where
+  | refl (b : Block Tx) : Block.Ancestor b b
+  | parent {a : Block Tx} (v : View) (tr : List Tx) (p : Block Tx) :
+      Block.Ancestor a p → Block.Ancestor a (.node v tr p)
+
+/-- メッセージ（§4）: 提案・票・nullify は署名者 q を持つ。取引（§2）は
     環境の署名を持たず、Tx 型の値はすべて取引として扱う。 -/
 inductive Msg (n : Nat) (Tx : Type) : Type where
   | block (q : Fin n) (b : Block Tx) : Msg n Tx
@@ -66,7 +73,7 @@ def Msg.signer {n : Nat} : Msg n Tx → Option (Fin n)
   | .nullify q _ => some q
   | .tx _        => none
 
-/-- プロセッサの局所状態（§4.3, Table 2）。自分の添字は持たない。 -/
+/-- プロセッサの局所状態（§4, Table 2）。自分の添字は持たない。 -/
 structure Processor (n : Nat) (Tx : Type) where
   /-- 現在の view。初期値 1。 -/
   view : View
@@ -113,13 +120,17 @@ structure Instr (n : Nat) (Tx : Type) where
   submits : List (Fin n × Tx)
   corrupts : List (Fin n)
 
-
 namespace Processor
 
 variable {n : Nat}
 
+/-- 初期値（Table 2）: view 1、T = 0、フラグは false、notarised は ⊥、S は空。 -/
+def init : Processor n Tx :=
+  { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
+    S := ∅, prevS := ∅ }
+
 /-! ### 自動遷移
-単独では起こらない遷移。動きかスロットに付随して呼ばれる。 -/
+単独では起こらない遷移。動作かスロット境界に付随して呼ばれる。 -/
 
 /-- 受信: S に m を入れる。到着と、自分の送信の即時受信（§4 冒頭）の両方が
     ここを通る。 -/
@@ -130,9 +141,13 @@ def receive [DecidableEq Tx] (p : Processor n Tx) (m : Msg n Tx) : Processor n T
 def tick (p : Processor n Tx) : Processor n Tx :=
   { p with timer := p.timer + 1, prevS := p.S }
 
-/-- m を j へ送った結果の局所状態への効果。`State.send` に付随する。m が自分の
-    署名付きなら種類に応じてフラグを立てる（§4「自分が既に何を送ったかを記録する」。
-    他人のものと取引では何もしない）。j が自分なら即時受信。 -/
+/-! ### 動作の局所効果
+`Action` の 2 つに対応する。`State.execute` から呼ばれるほか、`Algo.step` が動作の列を
+組み立てながら局所状態を追うのにも使う。 -/
+
+/-- m を j へ送った局所状態への効果。m が自分の署名付きなら種類に応じてフラグを
+    立てる（§4「自分が既に何を送ったかを記録する」。他人のものと取引では何もしない）。
+    j が自分なら即時受信。 -/
 def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
     Processor n Tx :=
   let p := match m with
@@ -141,9 +156,6 @@ def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : F
     | .nullify q _ => if q = i then { p with nullified := true } else p
     | .tx _        => p
   if j = i then p.receive m else p
-
-/-! ### 動き
-タイミングが入力になる遷移。 -/
 
 /-- 次の view へ（2 つの前進が共有するリセット）: v := v + 1、T := 0、
     nullified・proposed := false、notarised := ⊥。S は触らない。 -/
@@ -173,8 +185,9 @@ def transmit (s : State n Tx) (x : Packet n Tx) : State n Tx :=
 def tick (s : State n Tx) : State n Tx :=
   { s with procs := fun i => (s.procs i).tick, now := ⟨s.now.val + 1⟩ }
 
-/-! ### 入力
-タイミングが入力になる遷移。 -/
+/-! ### 指示が起こす遷移
+`Instr` の成分ごとに対応する。actions の各動作が send と progress、deliveries が deliver、
+submits が submit、corrupts が corrupt。 -/
 
 /-- p_i が m を j へ送る。局所状態への効果は `Processor.send`、網には now 付きの
     packet。署名の規則は `Instr.Valid` が課す。 -/
@@ -227,30 +240,10 @@ def run [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat
 
 end State
 
-/-! ## 制約
-遷移系が課さない規則。定理の仮定になる。 -/
+/-! ### 指示の列についての語彙 -/
 
-/-- 状態 s に対して指示 instr が規則を満たす。 -/
-structure Instr.Valid [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : Prop where
-  /-- 各 send の message は、送り手の署名付きか送り手が受信済み。 -/
-  send : ∀ i m j, Action.send m j ∈ instr.actions i →
-    m.signer = some i ∨ m ∈ (s.procs i).S
-  /-- 各 deliver の packet は、動作の後の pool にある。 -/
-  deliver : ∀ x ∈ instr.deliveries, x ∈ (s.step instr).pool
+/-- p_i が m を送る（§5.1 の "sends"）: 指示の列のどこかに、誰か宛に m を送る動作がある。 -/
+def Sends {n : Nat} (instrs : Nat → Instr n Tx) (i : Fin n) (m : Msg n Tx) : Prop :=
+  ∃ t j, Action.send m j ∈ (instrs t).actions i
 
-/-- 指示の列が全スロットで規則を満たす。 -/
-def Valid [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
-  ∀ t, (instrs t).Valid (State.run s₀ instrs t)
-
-/-- 状態 s で、期限 max(GST, sentAt) + Δ を過ぎた packet は宛先の S に入っている。 -/
-def State.Timely (Δ : Nat) (GST : Time) (s : State n Tx) : Prop :=
-  ∀ x ∈ s.pool, max GST.val x.sentAt.val + Δ ≤ s.now.val → x.msg ∈ (s.procs x.dst).S
-
-/-- 部分同期（§2）: ある GST があって、t に送られた packet は max(GST, t) + Δ までに
-    宛先の S に入る。Δ は既知、GST は敵が選ぶ。 -/
-structure PartialSync [DecidableEq Tx] (Δ : Nat) (s₀ : State n Tx)
-    (instrs : Nat → Instr n Tx) where
-  GST : Time
-  timely : ∀ t, (State.run s₀ instrs t).Timely Δ GST
-
-end Mine
+end Minimmit

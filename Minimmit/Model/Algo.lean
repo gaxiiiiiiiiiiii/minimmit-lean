@@ -1,93 +1,22 @@
-import Mine.Basic
-import Mathlib.Data.Fintype.Basic
+import Minimmit.Model.Certificate
 import Mathlib.Data.List.MinMax
 
 /-!
 # Algorithm 1
 
-§4 の用語を局所状態の S 上の述語として定義し、Algorithm 1 を「局所状態から 1 スロット分の
-動作の列を返す関数」として書く。
+局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。
 -/
 
-namespace Mine
+namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-
-/-- b への票を S に持つ署名者。 -/
-def voters (S : Finset (Msg n Tx)) (b : Block Tx) : Finset (Fin n) :=
-  Finset.univ.filter fun q => Msg.vote q b ∈ S
-
-/-- nullify(v) を S に持つ署名者。 -/
-def nullifiers (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
-  Finset.univ.filter fun q => Msg.nullify q v ∈ S
-
-/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む
-    （§5.1 の規約）。 -/
-def MNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
-  b = .gen ∨ 2 * f + 1 ≤ (voters S b).card
-
-instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Decidable (MNotarised f S b) :=
-  inferInstanceAs (Decidable (_ ∨ _))
-
-/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む
-    （§5.1 の規約）。 -/
-def LNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
-  b = .gen ∨ n - f ≤ (voters S b).card
-
-instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Decidable (LNotarised f S b) :=
-  inferInstanceAs (Decidable (_ ∨ _))
-
-/-- S が view v の nullification を含む（§4）: 異なる 2f + 1 人の nullify(v)。 -/
-def Nullified (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Prop :=
-  2 * f + 1 ≤ (nullifiers S v).card
-
-instance (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Decidable (Nullified f S v) :=
-  inferInstanceAs (Decidable (_ ≤ _))
-
-/-- S が view v の valid proposal b を含む（§4）。 -/
-structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View)
-    (b : Block Tx) : Prop where
-  /-- (i) b は view v のブロック。 -/
-  view : b.view = v
-  /-- (i) b は lead(v) の署名付きで S にある。 -/
-  signed : Msg.block (lead v) b ∈ S
-  /-- (i) lead(v) の署名付きの view v のブロックは S に b しかない。 -/
-  unique : ∀ b', b'.view = v → Msg.block (lead v) b' ∈ S → b' = b
-  /-- b は genesis でなく、親を持つ。 -/
-  ne_gen : b ≠ .gen
-  /-- (ii) 親の M-notarisation。 -/
-  parent : ∀ p ∈ b.parent, MNotarised f S p
-  /-- (iii) 親の view と v の間の各 view の nullification。 -/
-  gaps : ∀ p ∈ b.parent, ∀ w : View, p.view.val < w.val → w.val < v.val → Nullified f S w
-
-/-- q が view v の進捗のなさを証言する（Algorithm 1 の 24〜27 行）: nullify(v) を
-    送ったか、notarised 以外の view v のブロックに投票した。 -/
-inductive Dissents (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block Tx))
-    (q : Fin n) : Prop where
-  /-- (i) nullify(v) が S にある。 -/
-  | nullify (h : Msg.nullify q v ∈ S) : Dissents S v notarised q
-  /-- (ii) notarised 以外の view v のブロック b への票が S にある。 -/
-  | vote (b : Block Tx) (hv : b.view = v) (hne : some b ≠ notarised)
-      (h : Msg.vote q b ∈ S) : Dissents S v notarised q
-
-open Classical in
-/-- view v の進捗のなさを証言する署名者。 -/
-noncomputable def dissenters (S : Finset (Msg n Tx)) (v : View)
-    (notarised : Option (Block Tx)) : Finset (Fin n) :=
-  Finset.univ.filter (Dissents S v notarised)
-
-/-- view v で進捗がない証拠（Algorithm 1 の 24〜27 行）: 証言する署名者が 2f + 1 人以上。 -/
-def NoProgress (f : Nat) (S : Finset (Msg n Tx)) (v : View)
-    (notarised : Option (Block Tx)) : Prop :=
-  2 * f + 1 ≤ (dissenters S v notarised).card
-
 
 namespace Algo
 
 /-! ### 送信の局所効果
 動作の列を組み立てながら、`Processor.send` で局所状態にも同じ効果を与える。 -/
 
-/-- m を全員へ送る（disseminate）。 -/
+/-- m を全員へ送る（disseminate）。自分宛も含み、`Processor.send` が即時受信にする。 -/
 def disseminate (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
     Processor n Tx × List (Action n Tx) :=
   (List.finRange n).foldl
@@ -104,7 +33,8 @@ def disseminateAll (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
       (r.1, pa.2 ++ r.2))
     (p, [])
 
-/-! ### 2〜3 行と §4 の取引転送 -/
+/-! ### S の列挙
+`Finset.toList` の順に並べる。同じものが複数あるときの選択はこの順で決まる。 -/
 
 /-- S にある nullify message の view（重複なし）。 -/
 noncomputable def nullifyViews (S : Finset (Msg n Tx)) : List View :=
@@ -113,6 +43,21 @@ noncomputable def nullifyViews (S : Finset (Msg n Tx)) : List View :=
 /-- S にある票のブロック（重複なし）。 -/
 noncomputable def votedBlocks (S : Finset (Msg n Tx)) : List (Block Tx) :=
   (S.toList.filterMap fun m => match m with | .vote _ b => some b | _ => none).dedup
+
+/-- S にある、lead(v) の署名付きの view v のブロック（重複なし）。valid proposal の (i) は
+    これがちょうど 1 つであること。 -/
+noncomputable def proposals (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View) :
+    List (Block Tx) :=
+  (S.toList.filterMap fun m => match m with
+    | .block q b => if q = lead v ∧ b.view = v then some b else none
+    | _ => none).dedup
+
+/-- S にある、M-notarisation を持つ view v のブロック（重複なし）。 -/
+noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
+    List (Block Tx) :=
+  (votedBlocks S).filter fun b => decide (b.view = v ∧ MNotarised f S b)
+
+/-! ### 2〜3 行と §4 の取引転送 -/
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
     取引（§4 本文）。新しい = S に含まれ prevS に含まれない。
@@ -133,7 +78,7 @@ noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     ++ (p.S.toList.filter fun m => match m with | .tx _ => decide (m ∉ p.prevS) | _ => false)
   disseminateAll i p ms
 
-/-! ### 5〜7 行 -/
+/-! ### 5〜7 行（SelectParent と ProposeChild） -/
 
 /-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
     最大のもの。票のあるブロックに候補が無ければ genesis（view 0 で常に M-notarisation を
@@ -141,18 +86,6 @@ noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
 noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block Tx :=
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen
-
-/-- S にある、lead(v) の署名付きの view v のブロック（重複なし）。valid proposal の (i) は
-    これがちょうど 1 つであること。 -/
-noncomputable def proposals (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View) :
-    List (Block Tx) :=
-  (S.toList.filterMap fun m => match m with
-    | .block q b => if q = lead v ∧ b.view = v then some b else none
-    | _ => none).dedup
-
-/-- S にある、M-notarisation を持つ view v のブロック（重複なし）。 -/
-noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) : List (Block Tx) :=
-  (votedBlocks S).filter fun b => decide (b.view = v ∧ MNotarised f S b)
 
 /-- ProposeChild(b, v) の Tr（§4）: 受信済みで b の祖先に含まれない取引。 -/
 noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
@@ -214,4 +147,4 @@ noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
 
 end Algo
 
-end Mine
+end Minimmit

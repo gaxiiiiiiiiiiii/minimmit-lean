@@ -1,5 +1,5 @@
 name = "minimmit-lean"
-defaultTargets = ["Mine"]
+defaultTargets = ["Minimmit"]
 
 [[require]]
 name = "mathlib"
@@ -7,6 +7,6 @@ scope = "leanprover-community"
 rev = "v4.29.1"        # lean-toolchain (leanprover/lean4:v4.29.1) と一致させる
 
 [[lean_lib]]
-name = "Mine"
-# Mine/ 配下の全ファイルをビルドする（root module の import 有無によらず）
-globs = ["Mine", "Mine.+"]
+name = "Minimmit"
+# Minimmit/ 配下の全ファイルをビルドする（root module の import 有無によらず）
+globs = ["Minimmit", "Minimmit.+"]

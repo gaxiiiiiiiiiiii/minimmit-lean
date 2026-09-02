@@ -451,10 +451,12 @@ Lemma 5.1 の核。正直者 p_i の局所状態について、S にある自分
 
 /-- p_i の S にある自分の票についての不変量。 -/
 structure VoteInv (i : Fin n) (p : Processor n Tx) : Prop where
-  /-- 自分の票 (vote, c) が S にあれば、c は現在の view より前のブロックか、現在の view の
-      ブロックで notarised に記録されている。 -/
+  /-- view は 1 以上。 -/
+  view_pos : 1 ≤ p.view.val
+  /-- 自分の票 (vote, c) が S にあれば、c は view 1 以上のブロックで、現在の view より前の
+      ものか、現在の view のもので notarised に記録されている。 -/
   notar : ∀ c, Msg.vote i c ∈ p.S →
-    c.view.val < p.view.val ∨ (c.view = p.view ∧ p.notarised = some c)
+    1 ≤ c.view.val ∧ (c.view.val < p.view.val ∨ (c.view = p.view ∧ p.notarised = some c))
   /-- S にある自分の票で view が同じものは一致する。 -/
   unique : ∀ c c', Msg.vote i c ∈ p.S → Msg.vote i c' ∈ p.S → c.view = c'.view → c = c'
 
@@ -475,7 +477,8 @@ theorem send_of_not_vote (h : VoteInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg
     · exact hc
   have hn : (p.send i m j).notarised = p.notarised :=
     Processor.send_notarised_of_not_vote i p m j fun b hb => absurd hb (hm b)
-  refine ⟨fun c hc => ?_, fun c c' hc hc' hv => h.unique c c' (hS c hc) (hS c' hc') hv⟩
+  refine ⟨by rw [Processor.send_view]; exact h.view_pos, fun c hc => ?_,
+    fun c c' hc hc' hv => h.unique c c' (hS c hc) (hS c' hc') hv⟩
   rw [Processor.send_view, hn]
   exact h.notar c (hS c hc)
 
@@ -486,13 +489,13 @@ theorem send_of_mem (h : VoteInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n
     rw [Processor.send_S]; split_ifs <;> simp [Finset.insert_eq_of_mem hm]
   by_cases hv : ∃ b, m = Msg.vote i b
   · obtain ⟨b, rfl⟩ := hv
-    refine ⟨fun c hc => ?_, fun c c' hc hc' hv => h.unique c c' (hS ▸ hc) (hS ▸ hc') hv⟩
+    refine ⟨by rw [Processor.send_view]; exact h.view_pos, fun c hc => ?_,
+      fun c c' hc hc' hv => h.unique c c' (hS ▸ hc) (hS ▸ hc') hv⟩
     rw [hS] at hc
     rw [Processor.send_view, Processor.send_vote_notarised]
-    rcases h.notar c hc with hlt | ⟨hce, hcn⟩
-    · exact Or.inl hlt
-    · right
-      refine ⟨hce, ?_⟩
+    obtain ⟨hpos, hlt | ⟨hce, hcn⟩⟩ := h.notar c hc
+    · exact ⟨hpos, Or.inl hlt⟩
+    · refine ⟨hpos, Or.inr ⟨hce, ?_⟩⟩
       split_ifs with hb
       · exact congrArg some (h.unique b c hm hc (hb.trans hce.symm))
       · exact hcn
@@ -513,18 +516,19 @@ theorem send_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
   -- 現在の view の自分の票が S にあれば、それは b
   have hcur : ∀ c, Msg.vote i c ∈ p.S → c.view = p.view → c = b := by
     intro c hc hcv
-    rcases h.notar c hc with hlt | ⟨_, hcn⟩
+    rcases (h.notar c hc).2 with hlt | ⟨_, hcn⟩
     · rw [hcv] at hlt; exact absurd hlt (lt_irrefl _)
     · rcases hn with hn | hn
       · rw [hn] at hcn; cases hcn
       · rw [hn] at hcn; exact (Option.some.inj hcn).symm
-  refine ⟨fun c hc => ?_, fun c c' hc hc' hv => ?_⟩
+  refine ⟨by rw [Processor.send_view]; exact h.view_pos, fun c hc => ?_,
+    fun c c' hc hc' hv => ?_⟩
   · rw [Processor.send_view, Processor.send_vote_notarised, if_pos hb]
     rcases hS c hc with rfl | hc
-    · exact Or.inr ⟨hb, rfl⟩
-    · rcases h.notar c hc with hlt | ⟨hce, _⟩
-      · exact Or.inl hlt
-      · exact Or.inr ⟨hce, congrArg some (hcur c hc hce).symm⟩
+    · exact ⟨by rw [hb]; exact h.view_pos, Or.inr ⟨hb, rfl⟩⟩
+    · obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
+      · exact ⟨hpos, Or.inl hlt⟩
+      · exact ⟨hpos, Or.inr ⟨hce, congrArg some (hcur c hc hce).symm⟩⟩
   · rcases hS c hc with hcb | hc
     · rcases hS c' hc' with hcb' | hc'
       · exact hcb.trans hcb'.symm
@@ -538,12 +542,11 @@ theorem send_vote (h : VoteInv i p) {b : Block Tx} (hb : b.view = p.view)
 omit [DecidableEq Tx] in
 /-- 次の view へ進んでも不変量は保たれる。 -/
 theorem progress (h : VoteInv i p) : VoteInv i p.progress := by
-  refine ⟨fun c hc => ?_, fun c c' hc hc' hv => h.unique c c' hc hc' hv⟩
-  left
-  simp only [Processor.progress]
-  rcases h.notar c hc with hlt | ⟨hce, _⟩
-  · exact Nat.lt_succ_of_lt hlt
-  · rw [hce]; exact Nat.lt_succ_self _
+  refine ⟨Nat.le_succ_of_le h.view_pos, fun c hc => ?_,
+    fun c c' hc hc' hv => h.unique c c' hc hc' hv⟩
+  obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
+  · exact ⟨hpos, Or.inl (Nat.lt_succ_of_lt hlt)⟩
+  · exact ⟨hpos, Or.inl (by simp only [Processor.progress]; rw [hce]; exact Nat.lt_succ_self _)⟩
 
 /-! #### 全員への送信 -/
 
@@ -647,13 +650,14 @@ theorem nullifyNoProgress (h : VoteInv i p) (f : Nat) :
 omit [DecidableEq Tx] in
 /-- tick は不変量を保つ。 -/
 theorem tick (h : VoteInv i p) (S₀ : Finset (Msg n Tx)) : VoteInv i (p.tick S₀) :=
-  ⟨fun c hc => h.notar c hc, fun c c' hc hc' hv => h.unique c c' hc hc' hv⟩
+  ⟨h.view_pos, fun c hc => h.notar c hc, fun c c' hc hc' hv => h.unique c c' hc hc' hv⟩
 
 omit [DecidableEq Tx] in
 /-- S が増えても、増えた分に自分の票が無ければ不変量は保たれる。 -/
 theorem of_sgrows (h : VoteInv i p) {q : Processor n Tx} (hg : p.SGrows q)
     (hv : ∀ c, Msg.vote i c ∈ q.S → Msg.vote i c ∈ p.S) : VoteInv i q := by
-  refine ⟨fun c hc => ?_, fun c c' hc hc' hve => h.unique c c' (hv c hc) (hv c' hc') hve⟩
+  refine ⟨by rw [hg.view]; exact h.view_pos, fun c hc => ?_,
+    fun c c' hc hc' hve => h.unique c c' (hv c hc) (hv c' hc') hve⟩
   rw [hg.view, hg.notarised]
   exact h.notar c (hv c hc)
 

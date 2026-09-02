@@ -151,6 +151,29 @@ theorem mem_S_executeAll_of_signer_ne (k : Fin n) (p : Processor n Tx) (acts : L
       · exact h
     | progress => exact h
 
+/-- k の動作の後に S にある message は、前からあったか、k がこの動作の列で送ったもの。 -/
+theorem mem_S_executeAll (k : Fin n) (p : Processor n Tx) (acts : List (Action n Tx))
+    {m : Msg n Tx} (hm : m ∈ (p.executeAll k acts).S) :
+    m ∈ p.S ∨ ∃ j, Action.send m j ∈ acts := by
+  induction acts generalizing p with
+  | nil => exact Or.inl hm
+  | cons a acts ih =>
+    rw [executeAll_cons] at hm
+    rcases ih _ hm with h | ⟨j, hj⟩
+    · cases a with
+      | send m' j' =>
+        simp only [execute] at h
+        split_ifs at h
+        · rw [send_S] at h
+          split_ifs at h
+          · rcases Finset.mem_insert.mp h with rfl | h
+            · exact Or.inr ⟨j', List.mem_cons_self ..⟩
+            · exact Or.inl h
+          · exact Or.inl h
+        · exact Or.inl h
+      | progress => exact Or.inl h
+    · exact Or.inr ⟨j, List.mem_cons_of_mem _ hj⟩
+
 /-! ### receive は S 以外を変えない -/
 
 @[simp] theorem receive_view (p : Processor n Tx) (m : Msg n Tx) : (p.receive m).view = p.view := rfl
@@ -464,6 +487,55 @@ theorem mem_S_foldl_submit {s : State n Tx} {l : List (Fin n × Tx)} {k : Fin n}
       · exact Or.inr ⟨_, rfl⟩
     · exact Or.inr h
 
+/-! ### byz は腐敗でしか変わらず、増えるだけ -/
+
+theorem execute_byz (s : State n Tx) (i : Fin n) (a : Action n Tx) : (s.execute i a).byz = s.byz := by
+  cases a with
+  | send m j => simp only [execute, send]; split_ifs <;> rfl
+  | progress => rfl
+
+theorem foldl_execute_byz (s : State n Tx) (i : Fin n) (acts : List (Action n Tx)) :
+    (acts.foldl (fun s a => s.execute i a) s).byz = s.byz := by
+  induction acts generalizing s with
+  | nil => rfl
+  | cons a acts ih => rw [List.foldl_cons, ih, execute_byz]
+
+theorem act_byz (s : State n Tx) (instr : Instr n Tx) : (s.act instr).byz = s.byz := by
+  unfold act
+  induction List.finRange n generalizing s with
+  | nil => rfl
+  | cons k l ih => rw [List.foldl_cons, ih, foldl_execute_byz]
+
+@[simp] theorem deliver_byz (s : State n Tx) (x : Packet n Tx) : (s.deliver x).byz = s.byz := by
+  simp only [deliver]; split_ifs <;> rfl
+
+@[simp] theorem submit_byz (s : State n Tx) (j : Fin n) (tr : Tx) : (s.submit j tr).byz = s.byz := rfl
+
+omit [DecidableEq Tx] in
+@[simp] theorem tick_byz (s s₀ : State n Tx) : (s.tick s₀).byz = s.byz := rfl
+
+theorem foldl_deliver_byz (s : State n Tx) (xs : List (Packet n Tx)) :
+    (xs.foldl deliver s).byz = s.byz := by
+  induction xs generalizing s with
+  | nil => rfl
+  | cons x xs ih => rw [List.foldl_cons, ih, deliver_byz]
+
+theorem foldl_submit_byz (s : State n Tx) (l : List (Fin n × Tx)) :
+    (l.foldl (fun s x => s.submit x.1 x.2) s).byz = s.byz := by
+  induction l generalizing s with
+  | nil => rfl
+  | cons x l ih => rw [List.foldl_cons, ih, submit_byz]
+
+omit [DecidableEq Tx] in
+theorem byz_subset_foldl_corrupt (s : State n Tx) (l : List (Fin n)) :
+    s.byz ⊆ (l.foldl corrupt s).byz := by
+  induction l generalizing s with
+  | nil => exact Finset.Subset.refl _
+  | cons k l ih =>
+    rw [List.foldl_cons]
+    refine Finset.Subset.trans ?_ (ih (s.corrupt k))
+    exact Finset.subset_insert _ _
+
 /-! ### step の射影 -/
 
 omit [DecidableEq Tx] in
@@ -537,6 +609,14 @@ theorem mem_S_step {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {m : Msg n 
     · rw [tick_procs, Processor.tick_S] at hm; exact Or.inl hm
     · rw [tick_pool] at hxp; exact Or.inr (Or.inl ⟨x, hx, hxp, hxd, hxm⟩)
   · exact Or.inr (Or.inr h)
+
+theorem byz_subset_step (s : State n Tx) (instr : Instr n Tx) : s.byz ⊆ (s.step instr).byz := by
+  rw [step_eq]
+  have h : (instr.submits.foldl (fun s x => s.submit x.1 x.2)
+      (instr.deliveries.foldl deliver ((s.act instr).tick s))).byz = s.byz := by
+    rw [foldl_submit_byz, foldl_deliver_byz, tick_byz, act_byz]
+  rw [← h]
+  exact byz_subset_foldl_corrupt _ _
 
 /-- S は 1 スロットで減らない。 -/
 theorem S_subset_step (s : State n Tx) (instr : Instr n Tx) (k : Fin n) :

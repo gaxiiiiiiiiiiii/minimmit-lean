@@ -1,5 +1,4 @@
-import Minimmit.Model.Constraint
-import Minimmit.Analysis.Algo
+import Minimmit.Analysis.Run
 
 /-!
 # Consistency（§5.1）
@@ -92,9 +91,10 @@ theorem step (h : Inv i s) (hact : instr.actions i = Algo.step f Δ lead i (s.pr
 omit [DecidableEq Tx] in
 theorem init (hinit : Init s₀) (i : Fin n) : Inv i s₀ := by
   have hS : ∀ k, (s₀.procs k).S = ∅ := fun k => by rw [hinit.procs k]; rfl
-  refine ⟨⟨fun k c hc => ?_, fun x hx => ?_⟩, ⟨fun c hc => ?_, fun c c' hc => ?_⟩⟩
+  refine ⟨⟨fun k c hc => ?_, fun x hx => ?_⟩, ⟨?_, fun c hc => ?_, fun c c' hc => ?_⟩⟩
   · rw [hS] at hc; simp at hc
   · rw [hinit.pool] at hx; simp at hx
+  · rw [hinit.procs i]; exact le_refl 1
   · rw [hS] at hc; simp at hc
   · rw [hS] at hc; simp at hc
 
@@ -125,6 +125,14 @@ theorem mem_S_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi :
   rw [Processor.tick_S] at hsub
   exact hsub hm
 
+theorem mem_voteSenders {q : Fin n} {b : Block Tx} :
+    q ∈ voteSenders instrs b ↔ Sends instrs q (Msg.vote q b) := by
+  simp [voteSenders]
+
+theorem mem_nullifySenders {q : Fin n} {v : View} :
+    q ∈ nullifySenders instrs v ↔ Sends instrs q (Msg.nullify q v) := by
+  simp [nullifySenders]
+
 /-! ### Lemma 5.1〜5.4 -/
 
 /-- Lemma 5.1（One vote per view）: 正直者は各 view で高々 1 つのブロックに投票する。 -/
@@ -141,13 +149,41 @@ theorem one_vote_per_view (hinit : Init s₀)
   exact (Inv.run hinit hh hi (max (t + 1) (t' + 1))).vote.unique b b'
     (S_subset_run s₀ instrs i hle₁ h₁) (S_subset_run s₀ instrs i hle₂ h₂) hview
 
+/-- 正直者が投票するブロックの view は 1 以上。 -/
+theorem one_le_view_of_sends (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {b : Block Tx} (hb : Sends instrs i (Msg.vote i b)) :
+    1 ≤ b.view.val := by
+  obtain ⟨t, j, ht⟩ := hb
+  exact ((Inv.run hinit hh hi (t + 1)).vote.notar b (mem_S_succ_of_send hh hi ht)).1
+
 /-- Lemma 5.2（§3 の (X1)）: b が L-notarisation を受けるなら、同じ view の他のブロックは
     M-notarisation を受けない。 -/
 theorem x1 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {b b' : Block Tx} (hL : ReceivesL f instrs b) (hview : b'.view = b.view)
     (hM : ReceivesM f instrs b') : b' = b := by
-  sorry
+  rcases hM with rfl | hM
+  · rcases hL with rfl | hL
+    · rfl
+    · exfalso
+      have hlt : f < (voteSenders instrs b).card := lt_of_lt_of_le (by omega) hL
+      obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
+      have h1 := one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
+      rw [← hview] at h1
+      simp [Block.view] at h1
+  · rcases hL with rfl | hL
+    · exfalso
+      have hlt : f < (voteSenders instrs b').card := lt_of_lt_of_le (by omega) hM
+      obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
+      have h1 := one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
+      rw [hview] at h1
+      simp [Block.view] at h1
+    · have hinter := card_inter_add_n_ge (voteSenders instrs b) (voteSenders instrs b')
+      have hlt : f < (voteSenders instrs b ∩ voteSenders instrs b').card := by omega
+      obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
+      rw [Finset.mem_inter] at hq
+      exact (one_vote_per_view hinit hh hqc (mem_voteSenders.mp hq.1) (mem_voteSenders.mp hq.2)
+        hview.symm).symm
 
 /-- Lemma 5.3（§3 の (X2)）: b が L-notarisation を受けるなら、b の view は nullification を
     受けない。 -/

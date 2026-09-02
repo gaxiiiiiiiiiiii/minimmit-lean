@@ -91,6 +91,19 @@ structure State (n : Nat) (Tx : Type) where
   /-- 現在のタイムスロット。`State.tick` で進む。 -/
   now : Time
 
+/-- p_i が自分から起こす動作: m を j へ送る、または次の view へ進む。 -/
+inductive Action (n : Nat) (Tx : Type) : Type where
+  | send (m : Msg n Tx) (j : Fin n) : Action n Tx
+  | progress : Action n Tx
+
+/-- 1 スロット分の指示。プロトコルの外から与えられるもの: 各プロセッサの動作の列、
+    届く packet、環境が渡す取引、腐敗するプロセッサ。空のリストは「起きない」。 -/
+structure Instr (n : Nat) (Tx : Type) where
+  actions : Fin n → List (Action n Tx)
+  deliveries : List (Packet n Tx)
+  submits : List (Fin n × Tx)
+  corrupts : List (Fin n)
+
 
 namespace Processor
 
@@ -154,18 +167,18 @@ def tick (s : State n Tx) : State n Tx :=
 /-! ### 入力
 タイミングが入力になる遷移。 -/
 
-/-- p_i が m を j へ送る。m は自分の署名付きか、受信済みのもの。局所状態への
-    効果は `Processor.send`、網には now 付きの packet。 -/
-def send (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n)
-    (_h : m.signer = some i ∨ m ∈ (s.procs i).S) : State n Tx :=
+/-- p_i が m を j へ送る。局所状態への効果は `Processor.send`、網には now 付きの
+    packet。署名の規則は `Instr.Valid` が課す。 -/
+def send (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n) : State n Tx :=
   (s.update i (·.send i m j)).transmit ⟨m, j, s.now⟩
 
 /-- p_i が次の view へ。 -/
 def progress (s : State n Tx) (i : Fin n) : State n Tx :=
   s.update i Processor.progress
 
-/-- pool にある packet x のメッセージが宛先に届く。 -/
-def deliver (s : State n Tx) (x : Packet n Tx) (_hx : x ∈ s.pool) : State n Tx :=
+/-- packet x のメッセージが宛先に届く。x が pool にあるという規則は
+    `Instr.Valid` が課す。 -/
+def deliver (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   s.update x.dst (·.receive x.msg)
 
 /-- 環境が p_j に取引 tr を渡す。 -/
@@ -176,6 +189,47 @@ def submit (s : State n Tx) (j : Fin n) (tr : Tx) : State n Tx :=
 def corrupt (s : State n Tx) (i : Fin n) : State n Tx :=
   { s with byz := insert i s.byz }
 
+/-! ### スロット単位の遷移
+指示をスロット単位にまとめた遷移と、その繰り返し。 -/
+
+/-- p_i が動作 a を実行する。 -/
+def execute (s : State n Tx) (i : Fin n) : Action n Tx → State n Tx
+  | .send m j => s.send i m j
+  | .progress => s.progress i
+
+/-- 1 スロット分の遷移。原始関数の列を 動作 → tick → deliver → submit → corrupt の順に
+    固定している。任意の順の列がこの順の列と同じ状態に至ること、および固定順で
+    表せない挙動が t' > t を破る配送だけであることは、可換性による形式化の外の
+    議論に依っていて未証明。 -/
+def step (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
+  let s := (List.finRange n).foldl
+    (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s
+  let s := s.tick
+  let s := instr.deliveries.foldl deliver s
+  let s := instr.submits.foldl (fun s x => s.submit x.1 x.2) s
+  instr.corrupts.foldl corrupt s
+
+/-- 実行: 初期状態 s₀ に指示の列 instrs を順に行使する。`run s₀ instrs t` はスロット t
+    の冒頭、t に届いた message が S に入った状態。 -/
+def run (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
+  | 0 => s₀
+  | t + 1 => (run s₀ instrs t).step (instrs t)
+
 end State
+
+/-! ## 制約
+遷移系が課さない規則。定理の仮定になる。 -/
+
+/-- 状態 s に対して指示 instr が規則を満たす。 -/
+structure Instr.Valid (s : State n Tx) (instr : Instr n Tx) : Prop where
+  /-- 各 send の message は、送り手の署名付きか送り手が受信済み。 -/
+  send : ∀ i m j, Action.send m j ∈ instr.actions i →
+    m.signer = some i ∨ m ∈ (s.procs i).S
+  /-- 各 deliver の packet は、動作の後の pool にある。 -/
+  deliver : ∀ x ∈ instr.deliveries, x ∈ (s.step instr).pool
+
+/-- 指示の列が全スロットで規則を満たす。 -/
+def Valid (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
+  ∀ t, (instrs t).Valid (State.run s₀ instrs t)
 
 end Mine

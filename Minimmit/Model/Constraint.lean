@@ -27,11 +27,13 @@ def State.Timely (Δ : Nat) (GST : Time) (s : State n Tx) : Prop :=
   ∀ x ∈ s.pool, max GST.val x.sentAt.val + Δ ≤ s.now.val → x.msg ∈ (s.procs x.dst).S
 
 /-- 部分同期（§2）: ある GST があって、t に送られた packet は max(GST, t) + Δ までに
-    宛先の S に入る。Δ は既知、GST は敵が選ぶ。 -/
+    宛先の S に入る。Δ は既知、GST は敵が選ぶ。Δ ≥ 1 は、論文の「t に送った message は
+    t′ > t に届く」から従う条件で、`Timely` がスロット境界でしか判定しないため明示する。 -/
 structure PartialSync [DecidableEq Tx] (Δ : Nat) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) where
   GST : Time
   timely : ∀ t, (State.run s₀ instrs t).Timely Δ GST
+  one_le : 1 ≤ Δ
 
 /-! ### 腐敗 -/
 

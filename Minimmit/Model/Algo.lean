@@ -34,7 +34,8 @@ def disseminateAll (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
     (p, [])
 
 /-! ### S の列挙
-`Finset.toList` の順に並べる。同じものが複数あるときの選択はこの順で決まる。 -/
+`Finset.toList` の順に並べる。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、
+この順で先のものを取る。 -/
 
 /-- S にある nullify message の view（重複なし）。 -/
 noncomputable def nullifyViews (S : Finset (Msg n Tx)) : List View :=
@@ -82,7 +83,8 @@ noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
 
 /-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
     最大のもの。票のあるブロックに候補が無ければ genesis（view 0 で常に M-notarisation を
-    持つ）。同じ view に複数あれば `votedBlocks` の順で先のもの。 -/
+    持つ）。論文の「辞書順最小」の代わりに、同じ view に複数あれば `votedBlocks` の順で
+    先のもの。 -/
 noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block Tx :=
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen
@@ -96,7 +98,8 @@ noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
 
 open Classical in
 /-- Algorithm 1: p_i が 1 スロットで起こす動作の列。行の順に局所状態を更新しながら決める。
-    古典論理は `ValidProposal` の判定にだけ使う。 -/
+    `ValidProposal` の判定に古典論理を使う。31〜32 行の Finalise は動作を伴わないので無く、
+    finalise したことは S に L-notarisation があることで表す。 -/
 noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     List (Action n Tx) :=
   -- 2〜3 行

@@ -18,7 +18,7 @@ theorem one_vote_per_view (hinit : Init s₀) (hv : Valid s₀ instrs)
     (hview : b.view = b'.view) : b = b' := by
   sorry
 
-/-- Lemma 5.2（(X1)）: b が L-notarisation を受けるなら、同じ view の他のブロックは
+/-- Lemma 5.2（§3 の (X1)）: b が L-notarisation を受けるなら、同じ view の他のブロックは
     M-notarisation を受けない。 -/
 theorem x1 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
@@ -26,7 +26,7 @@ theorem x1 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
     (hM : ReceivesM f instrs b') : b' = b := by
   sorry
 
-/-- Lemma 5.3（(X2)）: b が L-notarisation を受けるなら、b の view は nullification を
+/-- Lemma 5.3（§3 の (X2)）: b が L-notarisation を受けるなら、b の view は nullification を
     受けない。 -/
 theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
@@ -42,7 +42,8 @@ theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Va
   sorry
 
 /-- Consistency（§2）をブロックの形で: 正直者が L-notarisation を持つ 2 つのブロックは、
-    一方が他方の祖先。log の両立はこの系。 -/
+    一方が他方の祖先。log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が
+    L-notarisation を持つブロックの Tr* に当たる。 -/
 theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hv : Valid s₀ instrs)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i) (hj : Correct s₀ instrs j)

@@ -9,7 +9,7 @@ import Mathlib.Data.Finset.Card
 
 namespace Minimmit
 
-/-- view 番号（genesis のみ 0）。`Time` とは別の型。 -/
+/-- view 番号。genesis のみ 0。 -/
 structure View where
   val : Nat
 deriving DecidableEq
@@ -46,7 +46,7 @@ def Block.parent : Block Tx → Option (Block Tx)
   | .gen => none
   | .node _ _ parent => some parent
 
-/-- `b.Tr*`（§2）: b と全祖先の payload を古い順に連結した列。 -/
+/-- `b.Tr*`（§2）: b と全祖先の payload を古い順に連結した列。論文と違い重複を除去しない。 -/
 def Block.trStar : Block Tx → List Tx
   | .gen => []
   | .node _ tr parent => parent.trStar ++ tr
@@ -57,7 +57,8 @@ inductive Block.Ancestor : Block Tx → Block Tx → Prop where
   | parent {a : Block Tx} (v : View) (tr : List Tx) (p : Block Tx) :
       Block.Ancestor a p → Block.Ancestor a (.node v tr p)
 
-/-- メッセージ（§4）: 提案・票・nullify は署名者 q を持つ。取引（§2）は
+/-- メッセージ（§4）: 提案・票・nullify は署名者 q を持つ。ブロックの署名はブロックで
+    なく message に付くので、票に埋め込まれた b は lead(v) の署名を運ばない。取引（§2）は
     環境の署名を持たず、Tx 型の値はすべて取引として扱う。 -/
 inductive Msg (n : Nat) (Tx : Type) : Type where
   | block (q : Fin n) (b : Block Tx) : Msg n Tx
@@ -73,7 +74,7 @@ def Msg.signer {n : Nat} : Msg n Tx → Option (Fin n)
   | .nullify q _ => some q
   | .tx _        => none
 
-/-- プロセッサの局所状態（§4, Table 2）。自分の添字は持たない。 -/
+/-- プロセッサの局所状態（§4, Table 2）。 -/
 structure Processor (n : Nat) (Tx : Type) where
   /-- 現在の view。初期値 1。 -/
   view : View
@@ -87,7 +88,7 @@ structure Processor (n : Nat) (Tx : Type) where
   notarised : Option (Block Tx)
   /-- 受信メッセージ全集合。 -/
   S : Finset (Msg n Tx)
-  /-- 前スロット末の S。`tick` で退避する。 -/
+  /-- 前スロットの動作を終えた時点の S。`tick` で退避する。 -/
   prevS : Finset (Msg n Tx)
 
 /-- 網に載る単位: どのメッセージが、誰宛に、いつ送られたか。 -/
@@ -124,13 +125,14 @@ namespace Processor
 
 variable {n : Nat}
 
-/-- 初期値（Table 2）: view 1、T = 0、フラグは false、notarised は ⊥、S は空。 -/
+/-! ### 初期値 -/
+
+/-- Table 2 の初期値: view 1、T = 0、フラグは false、notarised は ⊥、S は空。 -/
 def init : Processor n Tx :=
   { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
     S := ∅, prevS := ∅ }
 
-/-! ### 自動遷移
-単独では起こらない遷移。動作かスロット境界に付随して呼ばれる。 -/
+/-! ### 受信とスロット境界 -/
 
 /-- 受信: S に m を入れる。到着と、自分の送信の即時受信（§4 冒頭）の両方が
     ここを通る。 -/
@@ -146,8 +148,8 @@ def tick (p : Processor n Tx) : Processor n Tx :=
 組み立てながら局所状態を追うのにも使う。 -/
 
 /-- m を j へ送った局所状態への効果。m が自分の署名付きなら種類に応じてフラグを
-    立てる（§4「自分が既に何を送ったかを記録する」。他人のものと取引では何もしない）。
-    j が自分なら即時受信。 -/
+    立てる。§4 の nullified・proposed・notarised の記録に当たる。他人のものと取引では
+    何もしない。j が自分なら即時受信。 -/
 def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
     Processor n Tx :=
   let p := match m with
@@ -157,7 +159,7 @@ def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : F
     | .tx _        => p
   if j = i then p.receive m else p
 
-/-- 次の view へ（2 つの前進が共有するリセット）: v := v + 1、T := 0、
+/-- 次の view へ（Algorithm 1 の 17 行と 21 行）: v := v + 1、T := 0、
     nullified・proposed := false、notarised := ⊥。S は触らない。 -/
 def progress (p : Processor n Tx) : Processor n Tx :=
   { p with view := ⟨p.view.val + 1⟩, timer := 0,
@@ -169,21 +171,16 @@ namespace State
 
 variable {n : Nat}
 
-/-! ### 自動遷移
-単独では起こらない遷移、または配管。 -/
+/-! ### 補助 -/
 
-/-- procs i だけを f で置き換える（配管）。 -/
+/-- procs i だけを f で置き換える。 -/
 def update (s : State n Tx) (i : Fin n) (f : Processor n Tx → Processor n Tx) :
     State n Tx :=
   { s with procs := Function.update s.procs i (f (s.procs i)) }
 
-/-- packet x を網に載せる。send に付随する自動遷移。 -/
+/-- packet x を網に載せる。`send` から呼ぶ。 -/
 def transmit (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   { s with pool := insert x s.pool }
-
-/-- スロットを進める: 全プロセッサの `tick` と now + 1。 -/
-def tick (s : State n Tx) : State n Tx :=
-  { s with procs := fun i => (s.procs i).tick, now := ⟨s.now.val + 1⟩ }
 
 /-! ### 指示が起こす遷移
 `Instr` の成分ごとに対応する。actions の各動作が send と progress、deliveries が deliver、
@@ -215,15 +212,19 @@ def corrupt (s : State n Tx) (i : Fin n) : State n Tx :=
 /-! ### スロット単位の遷移
 指示をスロット単位にまとめた遷移と、その繰り返し。 -/
 
+/-- スロットを進める: 全プロセッサの `tick` と now + 1。 -/
+def tick (s : State n Tx) : State n Tx :=
+  { s with procs := fun i => (s.procs i).tick, now := ⟨s.now.val + 1⟩ }
+
 /-- p_i が動作 a を実行する。 -/
 def execute [DecidableEq Tx] (s : State n Tx) (i : Fin n) : Action n Tx → State n Tx
   | .send m j => s.send i m j
   | .progress => s.progress i
 
-/-- 1 スロット分の遷移。原始関数の列を 動作 → tick → deliver → submit → corrupt の順に
-    固定している。任意の順の列がこの順の列と同じ状態に至ること、および固定順で
-    表せない挙動が t' > t を破る配送だけであることは、可換性による形式化の外の
-    議論に依っていて未証明。 -/
+/-- 1 スロット分の遷移。原始関数を 動作 → tick → deliver → submit → corrupt の順に
+    固定している。tick と tick の間で原始関数がどの順に並んでも同じ状態に至ること、
+    およびこの固定順で表せない挙動が「送ったスロットの中で届く配送」だけであることは、
+    可換性による形式化の外の議論に依っていて未証明。 -/
 def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   let s := (List.finRange n).foldl
     (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s
@@ -232,8 +233,9 @@ def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   let s := instr.submits.foldl (fun s x => s.submit x.1 x.2) s
   instr.corrupts.foldl corrupt s
 
-/-- 実行: 初期状態 s₀ に指示の列 instrs を順に行使する。`run s₀ instrs t` はスロット t
-    の冒頭、t に届いた message が S に入った状態。 -/
+/-- 実行: 初期状態 s₀ に指示の列 instrs を順に適用する。`instrs t` の deliveries と
+    submits はスロット t + 1 に届く。`run s₀ instrs t` はスロット t の冒頭で、t に届いた
+    message が S に入った状態。 -/
 def run [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
   | 0 => s₀
   | t + 1 => (run s₀ instrs t).step (instrs t)

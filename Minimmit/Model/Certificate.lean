@@ -26,16 +26,16 @@ def voters (S : Finset (Msg n Tx)) (b : Block Tx) : Finset (Fin n) :=
 def nullifiers (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.nullify q v ∈ S
 
-/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む
-    （§5.1 の規約）。 -/
+/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む。
+    Table 2 の「S は初めから b_gen の M/L-notarisation を含む」に当たる。 -/
 def MNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
   b = .gen ∨ 2 * f + 1 ≤ (voters S b).card
 
 instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Decidable (MNotarised f S b) :=
   inferInstanceAs (Decidable (_ ∨ _))
 
-/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む
-    （§5.1 の規約）。 -/
+/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む。
+    Table 2 の「S は初めから b_gen の M/L-notarisation を含む」に当たる。 -/
 def LNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
   b = .gen ∨ n - f ≤ (voters S b).card
 
@@ -70,7 +70,8 @@ structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)
 /-! ### 進捗のなさの証拠 -/
 
 /-- q が view v の進捗のなさを証言する（Algorithm 1 の 24〜27 行）: nullify(v) を
-    送ったか、notarised 以外の view v のブロックに投票した。 -/
+    送ったか、notarised 以外の view v のブロックに投票した。論文はこの条件に名前を
+    付けていない。 -/
 inductive Dissents (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block Tx))
     (q : Fin n) : Prop where
   /-- (i) nullify(v) が S にある。 -/

@@ -1524,6 +1524,59 @@ theorem S_st6_subset_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (
     (st6 f Δ lead i p).S ⊆ (stepPair f Δ lead i p).1.S := by
   rw [stepPair_fst]; exact S_subset_nullifyNoProgress f i _
 
+/-- 送る message は全員へ送る。 -/
+theorem send_all {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) (j' : Fin n) :
+    Action.send m j' ∈ Algo.step f Δ lead i p := by
+  rw [step_eq_stepPair, stepPair_snd] at h ⊢
+  simp only [List.mem_append] at h ⊢
+  rcases h with ((((((h | h) | h) | h) | h) | h) | h)
+  · left; left; left; left; left; left
+    rw [forwardNew_eq] at h ⊢
+    obtain ⟨m', hm', _, hmm⟩ := mem_disseminateAll_snd.mp h
+    cases hmm
+    exact mem_disseminateAll_snd.mpr ⟨_, hm', j', rfl⟩
+  · left; left; left; left; left; right
+    unfold propose at h ⊢
+    split_ifs at h ⊢
+    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+    · simp at h
+  · left; left; left; left; right
+    unfold voteProposal at h ⊢
+    generalize proposals lead (st2 f lead i p).S (st2 f lead i p).view = l at h ⊢
+    rcases l with _ | ⟨b, _ | ⟨b', l⟩⟩
+    · simp at h
+    · simp only at h ⊢
+      split_ifs at h ⊢
+      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+      · simp at h
+    · simp at h
+  · left; left; left; right
+    unfold nullifyTimeout at h ⊢
+    split_ifs at h ⊢
+    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+    · simp at h
+  · exact absurd h send_advanceNull
+  · left; right
+    unfold advanceM at h ⊢
+    generalize mNotarisedAt f (st5 f Δ lead i p).S (st5 f Δ lead i p).view = l at h ⊢
+    rcases l with _ | ⟨b, l⟩
+    · simp at h
+    · simp only [List.mem_append, List.mem_singleton, reduceCtorEq, or_false] at h ⊢
+      split_ifs at h ⊢
+      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+      · simp at h
+  · right
+    unfold nullifyNoProgress at h ⊢
+    split_ifs at h ⊢
+    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+    · simp at h
+
 end Algo
 
 end Minimmit

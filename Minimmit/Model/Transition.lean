@@ -88,7 +88,7 @@ structure Processor (n : Nat) (Tx : Type) where
   notarised : Option (Block Tx)
   /-- 受信メッセージ全集合。 -/
   S : Finset (Msg n Tx)
-  /-- 前スロットの動作を終えた時点の S。`tick` で退避する。 -/
+  /-- 前スロット冒頭の S。`tick` で更新する。 -/
   prevS : Finset (Msg n Tx)
 
 /-- 網に載る単位: どのメッセージが、誰宛に、いつ送られたか。 -/
@@ -140,9 +140,9 @@ def init : Processor n Tx :=
 def receive [DecidableEq Tx] (p : Processor n Tx) (m : Msg n Tx) : Processor n Tx :=
   { p with S := insert m p.S }
 
-/-- スロット境界: タイマー T を 1 進め、S を prevS に退避する。 -/
-def tick (p : Processor n Tx) : Processor n Tx :=
-  { p with timer := p.timer + 1, prevS := p.S }
+/-- スロット境界: タイマー T を 1 進め、prevS をこのスロット冒頭の S（S₀）にする。 -/
+def tick (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) : Processor n Tx :=
+  { p with timer := p.timer + 1, prevS := S₀ }
 
 /-! ### 動作の局所効果
 `Action` の 2 つに対応する。`State.execute` から呼ばれるほか、`Algo.step` が動作の列を
@@ -217,9 +217,10 @@ def corrupt (s : State n Tx) (i : Fin n) : State n Tx :=
 /-! ### スロット単位の遷移
 指示をスロット単位にまとめた遷移と、その繰り返し。 -/
 
-/-- スロットを進める: 全プロセッサの `tick` と now + 1。 -/
-def tick (s : State n Tx) : State n Tx :=
-  { s with procs := fun i => (s.procs i).tick, now := ⟨s.now.val + 1⟩ }
+/-- スロットを進める: 全プロセッサの `tick` と now + 1。s₀ はこのスロット冒頭の状態で、
+    各プロセッサの prevS にその S を入れる。 -/
+def tick (s₀ s : State n Tx) : State n Tx :=
+  { s with procs := fun i => (s.procs i).tick (s₀.procs i).S, now := ⟨s.now.val + 1⟩ }
 
 /-- p_i が動作 a を実行する。 -/
 def execute [DecidableEq Tx] (s : State n Tx) (i : Fin n) : Action n Tx → State n Tx
@@ -230,10 +231,10 @@ def execute [DecidableEq Tx] (s : State n Tx) (i : Fin n) : Action n Tx → Stat
     固定している。tick と tick の間で原始関数がどの順に並んでも同じ状態に至ること、
     およびこの固定順で表せない挙動が「送ったスロットの中で届く配送」だけであることは、
     可換性による形式化の外の議論に依っていて未証明。 -/
-def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
+def step [DecidableEq Tx] (s₀ : State n Tx) (instr : Instr n Tx) : State n Tx :=
   let s := (List.finRange n).foldl
-    (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s
-  let s := s.tick
+    (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s₀
+  let s := s.tick s₀
   let s := instr.deliveries.foldl deliver s
   let s := instr.submits.foldl (fun s x => s.submit x.1 x.2) s
   instr.corrupts.foldl corrupt s

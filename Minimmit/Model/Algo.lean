@@ -61,7 +61,8 @@ noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
 /-! ### 2〜3 行と §4 の取引転送 -/
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
-    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。
+    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。prevS は前スロット冒頭の S
+    なので、前スロットに自分の送信で完成した証明書もここで送る。
 
     証明書は、それを構成する message を S にある分だけ全部送る。論文は「new」の第 2 条件で
     辞書順最小の 2f + 1 個を 1 つ選んで送る（§4）。§5 の証明が転送に使うのは「新しい証明書を

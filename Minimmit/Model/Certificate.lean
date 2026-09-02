@@ -4,7 +4,7 @@ import Mathlib.Data.Fintype.Basic
 /-!
 # 証明書
 
-§4 の用語（M/L-notarisation・nullification・valid proposal・進捗のなさの証拠）を
+§4 の用語（M/L-notarisation・nullification・valid proposal・proof of no progress）を
 message の集合 S 上の述語として定義し、§5.1 の「b が M-notarisation を受ける」などを
 実行上の述語として定義する。
 -/
@@ -67,29 +67,30 @@ structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)
   /-- (iii) 親の view と v の間の各 view の nullification。 -/
   gaps : ∀ p ∈ b.parent, ∀ w : View, p.view.val < w.val → w.val < v.val → Nullified f S w
 
-/-! ### 進捗のなさの証拠 -/
+/-! ### proof of no progress -/
 
-/-- q が view v の進捗のなさを証言する（Algorithm 1 の 24〜27 行）: nullify(v) を
-    送ったか、notarised 以外の view v のブロックに投票した。論文はこの条件に名前を
-    付けていない。 -/
-inductive Dissents (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block Tx))
+/-- q が view v の proof of no progress に寄与する（Algorithm 1 の 24〜27 行）: nullify(v)
+    を送ったか、notarised 以外の view v のブロックに投票した。論文はこの条件に名前を
+    付けておらず、29 行の注釈 "proof of no progress" から名付けた。 -/
+inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block Tx))
     (q : Fin n) : Prop where
   /-- (i) nullify(v) が S にある。 -/
-  | nullify (h : Msg.nullify q v ∈ S) : Dissents S v notarised q
+  | nullify (h : Msg.nullify q v ∈ S) : NoProgressWitness S v notarised q
   /-- (ii) notarised 以外の view v のブロック b への票が S にある。 -/
   | vote (b : Block Tx) (hv : b.view = v) (hne : some b ≠ notarised)
-      (h : Msg.vote q b ∈ S) : Dissents S v notarised q
+      (h : Msg.vote q b ∈ S) : NoProgressWitness S v notarised q
 
 open Classical in
-/-- view v の進捗のなさを証言する署名者。 -/
-noncomputable def dissenters (S : Finset (Msg n Tx)) (v : View)
+/-- view v の proof of no progress に寄与する署名者。 -/
+noncomputable def noProgressWitnesses (S : Finset (Msg n Tx)) (v : View)
     (notarised : Option (Block Tx)) : Finset (Fin n) :=
-  Finset.univ.filter (Dissents S v notarised)
+  Finset.univ.filter (NoProgressWitness S v notarised)
 
-/-- view v で進捗がない証拠（Algorithm 1 の 24〜27 行）: 証言する署名者が 2f + 1 人以上。 -/
+/-- view v の proof of no progress が S にある（Algorithm 1 の 24〜27 行）: 寄与する署名者が
+    2f + 1 人以上。 -/
 def NoProgress (f : Nat) (S : Finset (Msg n Tx)) (v : View)
     (notarised : Option (Block Tx)) : Prop :=
-  2 * f + 1 ≤ (dissenters S v notarised).card
+  2 * f + 1 ≤ (noProgressWitnesses S v notarised).card
 
 end
 

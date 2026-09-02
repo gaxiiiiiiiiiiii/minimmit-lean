@@ -5,6 +5,7 @@ import Minimmit.Model.Constraint
 import Minimmit.Analysis.Transition
 import Minimmit.Analysis.Algo
 import Minimmit.Analysis.Consistency
+import Minimmit.Analysis.Timing
 import Minimmit.Analysis.Liveness
 import Minimmit.Analysis.Responsiveness
 

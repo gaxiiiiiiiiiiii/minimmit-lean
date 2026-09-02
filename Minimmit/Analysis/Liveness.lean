@@ -1,4 +1,4 @@
-import Minimmit.Model.Constraint
+import Minimmit.Analysis.Timing
 
 /-!
 # Liveness（§5.2）
@@ -10,10 +10,6 @@ namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
-
-/-- スロット t の冒頭の p_i の view。 -/
-def viewAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : View :=
-  ((State.run s₀ instrs t).procs i).view
 
 /-- 「最初の正直者が view v に入るのはスロット t」: スロット t を終えて view が v 以上に
     なった正直者がいて、それより前のスロットではいない。v = 1 なら t = 0。 -/

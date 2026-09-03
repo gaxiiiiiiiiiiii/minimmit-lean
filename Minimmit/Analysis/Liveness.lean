@@ -324,6 +324,32 @@ theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     ∃ t, v.val ≤ (viewAt s₀ instrs i t).val :=
   progression_aux hn hinit hh hb hs v.val i hi
 
+/-- 有限個の存在は一様に押さえられる。 -/
+theorem exists_bound {α : Type} {Q : Finset α} {P : α → Nat → Prop} (h : ∀ q ∈ Q, ∃ s, P q s) :
+    ∃ T, ∀ q ∈ Q, ∃ s ≤ T, P q s := by
+  classical
+  induction Q using Finset.induction_on with
+  | empty => exact ⟨0, fun q hq => by simp at hq⟩
+  | @insert a Q ha ih =>
+    obtain ⟨T, hT⟩ := ih fun q hq => h q (Finset.mem_insert_of_mem hq)
+    obtain ⟨s, hs⟩ := h a (Finset.mem_insert_self a Q)
+    refine ⟨max T s, fun q hq => ?_⟩
+    rcases Finset.mem_insert.mp hq with rfl | hq
+    · exact ⟨s, le_max_right _ _, hs⟩
+    · obtain ⟨s', hs', hP⟩ := hT q hq
+      exact ⟨s', hs'.trans (le_max_left _ _), hP⟩
+
+/-- lead(v) の提案の Tr* には、その時点で受信済みの取引がすべて入る。 -/
+theorem mem_trStar_leaderBlock {f : Nat} {p : Processor n Tx} {tr : Tx} (h : Msg.tx tr ∈ p.S) :
+    tr ∈ (Algo.leaderBlock f p).trStar := by
+  simp only [Algo.leaderBlock, Block.trStar, List.mem_append]
+  by_cases hp : tr ∈ (Algo.selectParent f p.S p.view).trStar
+  · exact Or.inl hp
+  · right
+    simp only [Algo.payload, List.mem_filter, List.mem_filterMap, Finset.mem_toList,
+      decide_eq_true_eq]
+    exact ⟨⟨Msg.tx tr, h, rfl⟩, hp⟩
+
 /-! ### 5.6 の補題 -/
 
 /-- 正直者 r が view v 以上に達するなら、初めて達するスロット e がある。 -/
@@ -949,6 +975,20 @@ theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s�
 
 end CorrectLeader
 
+/-- Lemma 5.6 の設定は、lead(v) が正直で最初の正直者が GST 以降に v に入れば作れる。 -/
+theorem leader_round (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
+    {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v)) {t : Nat}
+    (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
+    ∃ e, LeaderRound f Δ lead s₀ instrs hs v t e := by
+  have hreach : ∃ s, v.val ≤ (viewAt s₀ instrs (lead v) (s + 1)).val :=
+    ⟨t + Δ, enter_all hinit hh hs hfirst hgst hi⟩
+  obtain ⟨e, hev, hemin, hstart⟩ := entry_slot hinit hv hreach
+  have he : e ≤ t + Δ := by
+    rcases Nat.lt_or_ge (t + Δ) e with h | h
+    · exact absurd (enter_all hinit hh hs hfirst hgst hi) (not_le.mpr (hemin (t + Δ) h))
+    · exact h
+  exact ⟨e, ⟨hv, hfirst, hgst, hi, he, hev, hemin, hstart⟩⟩
+
 /-- Lemma 5.6（Correct leaders finalise blocks）: lead(v) が正直で、最初の正直者が GST 以降に
     view v に入るなら、lead(v) はブロックを送り、それは L-notarisation を受ける。 -/
 theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
@@ -957,14 +997,7 @@ theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
     ∃ b : Block Tx, b.view = v ∧ Sends instrs (lead v) (.block (lead v) b)
       ∧ ReceivesL f instrs b := by
-  have hreach : ∃ s, v.val ≤ (viewAt s₀ instrs (lead v) (s + 1)).val :=
-    ⟨t + Δ, enter_all hinit hh hs hfirst hgst hi⟩
-  obtain ⟨e, hev, hemin, hstart⟩ := entry_slot hinit hv hreach
-  have he : e ≤ t + Δ := by
-    rcases Nat.lt_or_ge (t + Δ) e with h | h
-    · exact absurd (enter_all hinit hh hs hfirst hgst hi) (not_le.mpr (hemin (t + Δ) h))
-    · exact h
-  have R : LeaderRound f Δ lead s₀ instrs hs v t e := ⟨hv, hfirst, hgst, hi, he, hev, hemin, hstart⟩
+  obtain ⟨e, R⟩ := leader_round hinit hh hs hv hi hfirst hgst
   refine ⟨leaderBlockAt f lead s₀ instrs v e, leaderBlockAt_view hinit hh hb hs R,
     ⟨e, lead v, leader_proposes hinit hh hb hs R (lead v)⟩, ?_⟩
   right
@@ -979,6 +1012,51 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     {i j : Fin n} (hi : Correct s₀ instrs i) (hj : Correct s₀ instrs j)
     {t : Nat} {tr : Tx} (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S) :
     ∃ t' b, LNotarised f ((State.run s₀ instrs t').procs j).S b ∧ tr ∈ b.trStar := by
-  sorry
+  classical
+  have hΔ := hs.one_le
+  -- max(GST, t) より後に始まる view v' で lead v' = i
+  obtain ⟨v', hv'V, hlv'⟩ := hlead i
+    ⟨(Finset.univ.sup fun r => (viewAt s₀ instrs r (max hs.GST.val t + 1)).val) + 1⟩
+  have hbound : ∀ r, (viewAt s₀ instrs r (max hs.GST.val t + 1)).val < v'.val := fun r =>
+    lt_of_lt_of_le (Nat.lt_succ_of_le
+      (Finset.le_sup (f := fun r => (viewAt s₀ instrs r (max hs.GST.val t + 1)).val)
+        (Finset.mem_univ r))) hv'V
+  have hv'1 : 1 ≤ v'.val := le_trans (Nat.succ_le_succ (Nat.zero_le _)) hv'V
+  have hreach : ∃ s, ∃ r, Correct s₀ instrs r ∧ v'.val ≤ (viewAt s₀ instrs r (s + 1)).val := by
+    obtain ⟨s, hs'⟩ := progression hn hinit hh hb hs hi v'
+    exact ⟨s, i, hi, hs'.trans (viewAt_le_succ i s)⟩
+  have hfirst : FirstEntry s₀ instrs v' (Nat.find hreach) :=
+    ⟨Nat.find_spec hreach, fun r t' hr h => Nat.find_min' hreach ⟨r, hr, h⟩⟩
+  have hgst : max hs.GST.val t < Nat.find hreach := by
+    obtain ⟨r, hr, h⟩ := Nat.find_spec hreach
+    by_contra hle
+    have h1 := viewAt_mono (s₀ := s₀) (instrs := instrs) r (Nat.add_le_add_right (not_lt.mp hle) 1)
+    have h2 := hbound r
+    omega
+  have hlc : Correct s₀ instrs (lead v') := hlv' ▸ hi
+  obtain ⟨e, R⟩ := leader_round hinit hh hs hv'1 hlc hfirst (by omega)
+  have hte := t_le_e hinit hh hb hs R
+  -- 取引はブロックの Tr* に入る
+  have htr' : tr ∈ (leaderBlockAt f lead s₀ instrs v' e).trStar := by
+    apply mem_trStar_leaderBlock
+    apply Algo.S_subset_st1 f (lead v') _
+    rw [hlv']
+    exact S_subset_run s₀ instrs i (by omega) htr
+  -- 全正直者の票が j に届く
+  have hvotes : ∀ r ∈ correctSet s₀ instrs, ∃ s, ∃ j',
+      Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v' e)) j' ∈ (instrs s).actions r :=
+    fun r hr => all_vote_leaderBlock hinit hh hb hs R hn (mem_correctSet.mp hr)
+  obtain ⟨T, hT⟩ := exists_bound hvotes
+  refine ⟨T + hs.GST.val + Δ + 1, leaderBlockAt f lead s₀ instrs v' e, ?_, htr'⟩
+  right
+  refine (card_correctSet hb).trans (Finset.card_le_card fun r hr => ?_)
+  obtain ⟨s, hsT, j', hj'⟩ := hT r hr
+  have hrc := mem_correctSet.mp hr
+  have hj'' : Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v' e)) j
+      ∈ (instrs s).actions r := by
+    rw [hh s r (hrc s)] at hj' ⊢
+    exact Algo.send_all hj' j
+  rw [mem_voters]
+  exact delivered hinit hh hs hrc hj'' (by omega) (by omega)
 
 end Minimmit

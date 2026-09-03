@@ -16,17 +16,17 @@ namespace Processor
 
 /-! ### tick -/
 
-@[simp] theorem tick_view (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) : (p.tick S₀).view = p.view := rfl
-@[simp] theorem tick_timer (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) :
-    (p.tick S₀).timer = p.timer + 1 := rfl
-@[simp] theorem tick_nullified (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) :
-    (p.tick S₀).nullified = p.nullified := rfl
-@[simp] theorem tick_proposed (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) :
-    (p.tick S₀).proposed = p.proposed := rfl
-@[simp] theorem tick_notarised (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) :
-    (p.tick S₀).notarised = p.notarised := rfl
-@[simp] theorem tick_S (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) : (p.tick S₀).S = p.S := rfl
-@[simp] theorem tick_prevS (p : Processor n Tx) (S₀ : Finset (Msg n Tx)) : (p.tick S₀).prevS = S₀ := rfl
+@[simp] theorem tick_view (p : Processor n Tx) : p.tick.view = p.view := rfl
+@[simp] theorem tick_timer (p : Processor n Tx) :
+    p.tick.timer = p.timer + 1 := rfl
+@[simp] theorem tick_nullified (p : Processor n Tx) :
+    p.tick.nullified = p.nullified := rfl
+@[simp] theorem tick_proposed (p : Processor n Tx) :
+    p.tick.proposed = p.proposed := rfl
+@[simp] theorem tick_notarised (p : Processor n Tx) :
+    p.tick.notarised = p.notarised := rfl
+@[simp] theorem tick_S (p : Processor n Tx) : p.tick.S = p.S := rfl
+@[simp] theorem tick_prevS (p : Processor n Tx) : p.tick.prevS = p.S := rfl
 
 /-! ### S だけが増える関係 -/
 
@@ -430,7 +430,7 @@ omit [DecidableEq Tx] in
 @[simp] theorem corrupt_pool (s : State n Tx) (k : Fin n) : (s.corrupt k).pool = s.pool := rfl
 
 omit [DecidableEq Tx] in
-@[simp] theorem tick_pool (s s₀ : State n Tx) : (s.tick s₀).pool = s.pool := rfl
+@[simp] theorem tick_pool (s : State n Tx) : s.tick.pool = s.pool := rfl
 
 theorem foldl_deliver_pool (s : State n Tx) (xs : List (Packet n Tx)) :
     (xs.foldl deliver s).pool = s.pool := by
@@ -528,7 +528,7 @@ theorem act_byz (s : State n Tx) (instr : Instr n Tx) : (s.act instr).byz = s.by
 @[simp] theorem submit_byz (s : State n Tx) (j : Fin n) (tr : Tx) : (s.submit j tr).byz = s.byz := rfl
 
 omit [DecidableEq Tx] in
-@[simp] theorem tick_byz (s s₀ : State n Tx) : (s.tick s₀).byz = s.byz := rfl
+@[simp] theorem tick_byz (s : State n Tx) : s.tick.byz = s.byz := rfl
 
 theorem foldl_deliver_byz (s : State n Tx) (xs : List (Packet n Tx)) :
     (xs.foldl deliver s).byz = s.byz := by
@@ -555,23 +555,21 @@ theorem byz_subset_foldl_corrupt (s : State n Tx) (l : List (Fin n)) :
 /-! ### step の射影 -/
 
 omit [DecidableEq Tx] in
-theorem tick_procs (s s₀ : State n Tx) (i : Fin n) :
-    (s.tick s₀).procs i = (s.procs i).tick (s₀.procs i).S := rfl
+theorem tick_procs (s : State n Tx) (i : Fin n) : s.tick.procs i = (s.procs i).tick := rfl
 
 /-- `step` を段ごとに書いたもの。 -/
 theorem step_eq (s : State n Tx) (instr : Instr n Tx) :
     s.step instr = instr.corrupts.foldl corrupt
       (instr.submits.foldl (fun s x => s.submit x.1 x.2)
-        (instr.deliveries.foldl deliver ((s.act instr).tick s))) := rfl
+        (instr.deliveries.foldl deliver (s.act instr).tick)) := rfl
 
 /-- 1 スロット後の p_i の局所状態は、i の動作を畳み込んで tick したものから、S だけが
     増えたもの。 -/
 theorem step_procs (s : State n Tx) (instr : Instr n Tx) (i : Fin n) :
-    (((s.procs i).executeAll i (instr.actions i)).tick (s.procs i).S).SGrows
-      ((s.step instr).procs i) := by
+    ((s.procs i).executeAll i (instr.actions i)).tick.SGrows ((s.step instr).procs i) := by
   rw [step_eq, foldl_corrupt_procs]
-  have h₁ := foldl_deliver_sgrows ((s.act instr).tick s) instr.deliveries i
-  have h₂ := foldl_submit_sgrows (instr.deliveries.foldl deliver ((s.act instr).tick s))
+  have h₁ := foldl_deliver_sgrows (s.act instr).tick instr.deliveries i
+  have h₂ := foldl_submit_sgrows (instr.deliveries.foldl deliver (s.act instr).tick)
     instr.submits i
   rw [tick_procs, act_procs] at h₁
   exact h₁.trans h₂
@@ -588,7 +586,7 @@ omit [DecidableEq Tx] in
 @[simp] theorem corrupt_now (s : State n Tx) (k : Fin n) : (s.corrupt k).now = s.now := rfl
 
 omit [DecidableEq Tx] in
-@[simp] theorem tick_now (s s₀ : State n Tx) : (s.tick s₀).now = ⟨s.now.val + 1⟩ := rfl
+@[simp] theorem tick_now (s : State n Tx) : s.tick.now = ⟨s.now.val + 1⟩ := rfl
 
 theorem foldl_deliver_now (s : State n Tx) (xs : List (Packet n Tx)) :
     (xs.foldl deliver s).now = s.now := by
@@ -629,7 +627,7 @@ theorem mem_S_step {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {m : Msg n 
 theorem byz_subset_step (s : State n Tx) (instr : Instr n Tx) : s.byz ⊆ (s.step instr).byz := by
   rw [step_eq]
   have h : (instr.submits.foldl (fun s x => s.submit x.1 x.2)
-      (instr.deliveries.foldl deliver ((s.act instr).tick s))).byz = s.byz := by
+      (instr.deliveries.foldl deliver (s.act instr).tick)).byz = s.byz := by
     rw [foldl_submit_byz, foldl_deliver_byz, tick_byz, act_byz]
   rw [← h]
   exact byz_subset_foldl_corrupt _ _

@@ -216,13 +216,13 @@ noncomputable def nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
 /-- `Algo.step` と同じ計算で、最後の局所状態も返す。 -/
 noncomputable def stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
-  let r₁ := forwardNew f i p
-  let r₂ := propose f lead i r₁.1
-  let r₃ := voteProposal f lead i r₂.1
-  let r₄ := nullifyTimeout Δ i r₃.1
-  let r₅ := advanceNull f r₄.1
-  let r₆ := advanceM f i r₅.1
-  let r₇ := nullifyNoProgress f i r₆.1
+  let r₁ := advanceNull f p
+  let r₂ := advanceM f i r₁.1
+  let r₃ := propose f lead i r₂.1
+  let r₄ := voteProposal f lead i r₃.1
+  let r₅ := nullifyTimeout Δ i r₄.1
+  let r₆ := nullifyNoProgress f i r₅.1
+  let r₇ := forwardNew f i r₆.1
   (r₇.1, r₁.2 ++ r₂.2 ++ r₃.2 ++ r₄.2 ++ r₅.2 ++ r₆.2 ++ r₇.2)
 
 theorem step_eq_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
@@ -433,19 +433,18 @@ theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   rw [step_eq_stepPair] at h
   simp only [stepPair, List.mem_append] at h ⊢
   rcases h with ((((((h | h) | h) | h) | h) | h) | h)
-  · exact S_subset_nullifyNoProgress _ _ _ (S_subset_advanceM _ _ _ (S_subset_advanceNull _ _
-      (S_subset_nullifyTimeout _ _ _ (S_subset_voteProposal _ _ _ _ (S_subset_propose _ _ _ _
-      (mem_S_of_send_forwardNew h))))))
-  · exact S_subset_nullifyNoProgress _ _ _ (S_subset_advanceM _ _ _ (S_subset_advanceNull _ _
-      (S_subset_nullifyTimeout _ _ _ (S_subset_voteProposal _ _ _ _
-      (mem_S_of_send_propose h)))))
-  · exact S_subset_nullifyNoProgress _ _ _ (S_subset_advanceM _ _ _ (S_subset_advanceNull _ _
-      (S_subset_nullifyTimeout _ _ _ (mem_S_of_send_voteProposal h))))
-  · exact S_subset_nullifyNoProgress _ _ _ (S_subset_advanceM _ _ _ (S_subset_advanceNull _ _
-      (mem_S_of_send_nullifyTimeout h)))
-  · exact S_subset_nullifyNoProgress _ _ _ (S_subset_advanceM _ _ _ (mem_S_of_send_advanceNull h))
-  · exact S_subset_nullifyNoProgress _ _ _ (mem_S_of_send_advanceM h)
-  · exact mem_S_of_send_nullifyNoProgress h
+  · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (S_subset_nullifyTimeout _ _ _
+      (S_subset_voteProposal _ _ _ _ (S_subset_propose _ _ _ _ (S_subset_advanceM _ _ _
+      (mem_S_of_send_advanceNull h))))))
+  · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (S_subset_nullifyTimeout _ _ _
+      (S_subset_voteProposal _ _ _ _ (S_subset_propose _ _ _ _ (mem_S_of_send_advanceM h)))))
+  · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (S_subset_nullifyTimeout _ _ _
+      (S_subset_voteProposal _ _ _ _ (mem_S_of_send_propose h))))
+  · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (S_subset_nullifyTimeout _ _ _
+      (mem_S_of_send_voteProposal h)))
+  · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (mem_S_of_send_nullifyTimeout h))
+  · exact S_subset_forwardNew _ _ _ (mem_S_of_send_nullifyNoProgress h)
+  · exact mem_S_of_send_forwardNew h
 
 /-! ### 正直者の局所状態の不変量
 Lemma 5.1・5.3 の核。S にある自分の票・nullify と、view・notarised・nullified の関係。 -/
@@ -777,7 +776,7 @@ theorem of_sgrows (h : LocalInv f i p) {q : Processor n Tx} (hg : p.SGrows q)
   h.of_grow hg.view hg.notarised hg.nullified hg.S hvote hnull
 
 omit [DecidableEq Tx] in
-theorem tick (h : LocalInv f i p) (S₀ : Finset (Msg n Tx)) : LocalInv f i (p.tick S₀) :=
+theorem tick (h : LocalInv f i p) : LocalInv f i p.tick :=
   h.of_grow rfl rfl rfl (Finset.Subset.refl _) (fun _ hc => hc) (fun _ hw => hw)
 
 omit [DecidableEq Tx] in
@@ -897,8 +896,8 @@ theorem nullifyNoProgress (h : LocalInv f i p) : LocalInv f i (nullifyNoProgress
 /-- Algorithm 1 の 1 スロット分の動作は不変量を保つ。 -/
 theorem stepPair (h : LocalInv f i p) (Δ : Nat) (lead : View → Fin n) :
     LocalInv f i (stepPair f Δ lead i p).1 :=
-  ((((((h.forwardNew.propose lead).voteProposal lead).nullifyTimeout Δ).advanceNull
-    ).advanceM).nullifyNoProgress)
+  (((((h.advanceNull.advanceM.propose lead).voteProposal lead).nullifyTimeout Δ
+    ).nullifyNoProgress).forwardNew)
 
 end LocalInv
 
@@ -909,19 +908,30 @@ section Stages
 
 variable (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
 
-/-- 各段の入力となる局所状態。st1 は 2〜3 行の後、st2 は 5〜7 行の後、…、st6 は 19〜21 行の後。 -/
-noncomputable def st1 : Processor n Tx := (forwardNew f i p).1
-noncomputable def st2 : Processor n Tx := (propose f lead i (st1 f i p)).1
-noncomputable def st3 : Processor n Tx := (voteProposal f lead i (st2 f lead i p)).1
-noncomputable def st4 : Processor n Tx := (nullifyTimeout Δ i (st3 f lead i p)).1
-noncomputable def st5 : Processor n Tx := (advanceNull f (st4 f Δ lead i p)).1
-noncomputable def st6 : Processor n Tx := (advanceM f i (st5 f Δ lead i p)).1
+/-- 各段の入力となる局所状態。st1 は 16〜17 行の後、st2 は 19〜21 行の後、st3 は 5〜7 行の後、
+    st4 は 9〜11 行の後、st5 は 13〜14 行の後、st6 は 24〜28 行の後。最後に 2〜3 行。 -/
+noncomputable def st1 : Processor n Tx := (advanceNull f p).1
+noncomputable def st2 : Processor n Tx := (advanceM f i (st1 f p)).1
+noncomputable def st3 : Processor n Tx := (propose f lead i (st2 f i p)).1
+noncomputable def st4 : Processor n Tx := (voteProposal f lead i (st3 f lead i p)).1
+noncomputable def st5 : Processor n Tx := (nullifyTimeout Δ i (st4 f lead i p)).1
+noncomputable def st6 : Processor n Tx := (nullifyNoProgress f i (st5 f Δ lead i p)).1
 
 theorem stepPair_snd : (stepPair f Δ lead i p).2 =
-    (forwardNew f i p).2 ++ (propose f lead i (st1 f i p)).2
-      ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
-      ++ (advanceNull f (st4 f Δ lead i p)).2 ++ (advanceM f i (st5 f Δ lead i p)).2
-      ++ (nullifyNoProgress f i (st6 f Δ lead i p)).2 := rfl
+    (advanceNull f p).2 ++ (advanceM f i (st1 f p)).2 ++ (propose f lead i (st2 f i p)).2
+      ++ (voteProposal f lead i (st3 f lead i p)).2 ++ (nullifyTimeout Δ i (st4 f lead i p)).2
+      ++ (nullifyNoProgress f i (st5 f Δ lead i p)).2 ++ (forwardNew f i (st6 f Δ lead i p)).2 := rfl
+
+theorem stepPair_fst : (stepPair f Δ lead i p).1 = (forwardNew f i (st6 f Δ lead i p)).1 := rfl
+
+/-- 2〜3 行の転送を除いた動作の列。 -/
+noncomputable def innerActs : List (Action n Tx) :=
+  (advanceNull f p).2 ++ (advanceM f i (st1 f p)).2 ++ (propose f lead i (st2 f i p)).2
+    ++ (voteProposal f lead i (st3 f lead i p)).2 ++ (nullifyTimeout Δ i (st4 f lead i p)).2
+    ++ (nullifyNoProgress f i (st5 f Δ lead i p)).2
+
+theorem stepPair_snd' : (stepPair f Δ lead i p).2 =
+    innerActs f Δ lead i p ++ (forwardNew f i (st6 f Δ lead i p)).2 := rfl
 
 end Stages
 
@@ -998,29 +1008,153 @@ theorem advanceM_view (f : Nat) (i : Fin n) (p : Processor n Tx) :
     · right; simp [Processor.progress, disseminate_view]
     · right; simp [Processor.progress]
 
-theorem st3_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (st3 f lead i p).view = p.view := by
-  simp only [st3, st2, st1, voteProposal_view, propose_view, forwardNew_view]
+theorem disseminate_S_of_mem (i : Fin n) (q : Processor n Tx) {m : Msg n Tx} (hm : m ∈ q.S) :
+    (disseminate i q m).1.S = q.S := by
+  rw [disseminate_fst]
+  generalize List.finRange n = l
+  induction l generalizing q with
+  | nil => rfl
+  | cons j l ih =>
+    rw [List.foldl_cons]
+    have hS : (q.send i m j).S = q.S := by
+      rw [Processor.send_S]; split_ifs <;> simp [Finset.insert_eq_of_mem hm]
+    rw [ih _ (hS ▸ hm), hS]
 
-theorem st4_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (st4 f Δ lead i p).view = p.view := by
-  simp only [st4, nullifyTimeout_view, st3_view]
+theorem forwardNew_S (f : Nat) (i : Fin n) (p : Processor n Tx) : (forwardNew f i p).1.S = p.S := by
+  rw [forwardNew_eq, disseminateAll_fst]
+  have key : ∀ (ms : List (Msg n Tx)) (q : Processor n Tx), (∀ m ∈ ms, m ∈ q.S) →
+      (ms.foldl (fun p m => (disseminate i p m).1) q).S = q.S := by
+    intro ms
+    induction ms with
+    | nil => intro q _; rfl
+    | cons m ms ih =>
+      intro q hq
+      rw [List.foldl_cons]
+      have hS := disseminate_S_of_mem i q (hq m (List.mem_cons_self ..))
+      rw [ih _ (fun m' hm' => hS ▸ hq m' (List.mem_cons_of_mem _ hm')), hS]
+  exact key _ p fun m hm => mem_S_of_mem_forwardMsgs hm
+
+/-- 各段の view。5〜7 行以降は view を変えない。 -/
+theorem st3_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st3 f lead i p).view = (st2 f i p).view := propose_view f lead i _
+
+theorem st4_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st4 f lead i p).view = (st2 f i p).view := by
+  simp only [st4]; rw [voteProposal_view, st3_view]
+
+theorem st5_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st5 f Δ lead i p).view = (st2 f i p).view := by
+  simp only [st5]; rw [nullifyTimeout_view, st4_view]
+
+theorem st6_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st6 f Δ lead i p).view = (st2 f i p).view := by
+  simp only [st6]; rw [nullifyNoProgress_view, st5_view]
+
+theorem stepPair_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (stepPair f Δ lead i p).1.view = (st2 f i p).view := by
+  rw [stepPair_fst, forwardNew_view, st6_view]
+
+theorem view_le_st1 (f : Nat) (p : Processor n Tx) : p.view.val ≤ (st1 f p).view.val := by
+  rcases advanceNull_eq f p with h | h
+  · show p.view.val ≤ (advanceNull f p).1.view.val; rw [h]
+  · show p.view.val ≤ (advanceNull f p).1.view.val
+    rw [h]; simp only [Processor.progress]; exact Nat.le_succ _
+
+theorem view_le_st2 (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    p.view.val ≤ (st2 f i p).view.val := by
+  refine (view_le_st1 f p).trans ?_
+  rcases advanceM_view f i (st1 f p) with h | h
+  · show _ ≤ (advanceM f i _).1.view.val; rw [h]
+  · show _ ≤ (advanceM f i _).1.view.val; rw [h]; exact Nat.le_succ _
+
+theorem advanceM_eq_of_nil {f : Nat} {i : Fin n} {q : Processor n Tx}
+    (h : mNotarisedAt f q.S q.view = []) : (advanceM f i q).1 = q := by
+  unfold advanceM; rw [h]
+
+theorem advanceM_view_succ_of_ne_nil {f : Nat} {i : Fin n} {q : Processor n Tx}
+    (h : mNotarisedAt f q.S q.view ≠ []) : (advanceM f i q).1.view.val = q.view.val + 1 := by
+  unfold advanceM
+  generalize hl : mNotarisedAt f q.S q.view = l at h ⊢
+  rcases l with _ | ⟨b, l⟩
+  · exact absurd rfl h
+  · simp only
+    split_ifs
+    · simp [Processor.progress, disseminate_view]
+    · simp [Processor.progress]
+
+theorem advanceM_eq_of_view {f : Nat} {i : Fin n} {q : Processor n Tx}
+    (h : (advanceM f i q).1.view = q.view) : (advanceM f i q).1 = q := by
+  by_cases hl : mNotarisedAt f q.S q.view = []
+  · exact advanceM_eq_of_nil hl
+  · exfalso
+    have := advanceM_view_succ_of_ne_nil (i := i) hl
+    rw [h] at this
+    omega
+
+/-- view が変わらなければ、16〜21 行は何もしていない。 -/
+theorem st2_eq_of_view {f : Nat} {i : Fin n} {p : Processor n Tx}
+    (h : (st2 f i p).view = p.view) : st2 f i p = p := by
+  have h1 : (st1 f p).view = p.view := by
+    apply View.val_injective
+    have h1 := view_le_st1 f p
+    have h2 : (st1 f p).view.val ≤ (st2 f i p).view.val := by
+      rcases advanceM_view f i (st1 f p) with h' | h'
+      · show _ ≤ (advanceM f i _).1.view.val; rw [h']
+      · show _ ≤ (advanceM f i _).1.view.val; rw [h']; exact Nat.le_succ _
+    rw [h] at h2
+    omega
+  have hs1 : st1 f p = p := advanceNull_eq_of_view f p h1
+  show (advanceM f i (st1 f p)).1 = p
+  rw [advanceM_eq_of_view (by rw [h1]; exact h)]
+  exact hs1
 
 /-- 段を進めても S は減らない。 -/
+theorem S_subset_st1 (f : Nat) (p : Processor n Tx) : p.S ⊆ (st1 f p).S :=
+  S_subset_advanceNull f p
+
+theorem S_subset_st2 (f : Nat) (i : Fin n) (p : Processor n Tx) : p.S ⊆ (st2 f i p).S :=
+  (S_subset_st1 f p).trans (S_subset_advanceM f i _)
+
 theorem S_subset_st3 (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     p.S ⊆ (st3 f lead i p).S :=
-  (S_subset_forwardNew f i p).trans ((S_subset_propose f lead i _).trans
-    (S_subset_voteProposal f lead i _))
+  (S_subset_st2 f i p).trans (S_subset_propose f lead i _)
+
+theorem S_subset_st4 (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    p.S ⊆ (st4 f lead i p).S :=
+  (S_subset_st3 f lead i p).trans (S_subset_voteProposal f lead i _)
+
+theorem S_subset_st5 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    p.S ⊆ (st5 f Δ lead i p).S :=
+  (S_subset_st4 f lead i p).trans (S_subset_nullifyTimeout Δ i _)
 
 theorem S_subset_st6 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     p.S ⊆ (st6 f Δ lead i p).S :=
-  (S_subset_st3 f lead i p).trans ((S_subset_nullifyTimeout Δ i _).trans
-    ((S_subset_advanceNull f _).trans (S_subset_advanceM f i _)))
+  (S_subset_st5 f Δ lead i p).trans (S_subset_nullifyNoProgress f i _)
+
+theorem S_st4_subset_st5 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st4 f lead i p).S ⊆ (st5 f Δ lead i p).S :=
+  S_subset_nullifyTimeout Δ i _
+
+theorem S_st5_subset_st6 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st5 f Δ lead i p).S ⊆ (st6 f Δ lead i p).S :=
+  S_subset_nullifyNoProgress f i _
+
+theorem S_st4_subset_st6 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st4 f lead i p).S ⊆ (st6 f Δ lead i p).S :=
+  (S_st4_subset_st5 f Δ lead i p).trans (S_st5_subset_st6 f Δ lead i p)
 
 theorem S_st3_subset_st6 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (st3 f lead i p).S ⊆ (st6 f Δ lead i p).S :=
-  (S_subset_nullifyTimeout Δ i _).trans
-    ((S_subset_advanceNull f _).trans (S_subset_advanceM f i _))
+  (S_subset_voteProposal f lead i _).trans (S_st4_subset_st6 f Δ lead i p)
+
+theorem S_st2_subset_st6 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st2 f i p).S ⊆ (st6 f Δ lead i p).S :=
+  (S_subset_propose f lead i _).trans ((S_subset_voteProposal f lead i _).trans
+    (S_st4_subset_st6 f Δ lead i p))
+
+theorem stepPair_S (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (stepPair f Δ lead i p).1.S = (st6 f Δ lead i p).S := by
+  rw [stepPair_fst, forwardNew_S]
 
 /-! #### 各段の後の S にある message は、前からあったか自分の署名付き -/
 
@@ -1043,99 +1177,18 @@ theorem mem_S_disseminate_or (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) {m'
     · exact mem_S_send_or_signer i p m j h
     · exact Or.inr h
 
-theorem mem_S_stage_or (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
-    {m : Msg n Tx} (h : m ∈ (st6 f Δ lead i p).S) : m ∈ p.S ∨ m.signer = some i := by
-  -- 各段で、S に入る message は前からあったか、自分の署名付き
-  have h1 : ∀ q : Processor n Tx, ∀ m ∈ (forwardNew f i q).1.S, m ∈ q.S := by
-    intro q m hm
-    rw [forwardNew_eq, disseminateAll_fst] at hm
-    have key : ∀ (ms : List (Msg n Tx)) (q : Processor n Tx), (∀ m ∈ ms, m ∈ q.S) →
-        ∀ m ∈ (ms.foldl (fun p m => (disseminate i p m).1) q).S, m ∈ q.S := by
-      intro ms
-      induction ms with
-      | nil => intro q _ m hm; exact hm
-      | cons m' ms ih =>
-        intro q hq m hm
-        rw [List.foldl_cons] at hm
-        have hm' := ih _ (fun m'' hm'' => S_subset_disseminate_fst i q m'
-          (hq m'' (List.mem_cons_of_mem _ hm''))) m hm
-        rcases mem_S_disseminate_or i q m' hm' with h | rfl
-        · exact h
-        · exact hq m (List.mem_cons_self ..)
-    exact key _ q (fun m hm => mem_S_of_mem_forwardMsgs hm) m hm
-  have h2 : ∀ q : Processor n Tx, ∀ m ∈ (propose f lead i q).1.S, m ∈ q.S ∨ m.signer = some i := by
-    intro q m hm
-    unfold propose at hm
-    split_ifs at hm
-    · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => by rw [h]; rfl
-    · exact Or.inl hm
-  have h3 : ∀ q : Processor n Tx, ∀ m ∈ (voteProposal f lead i q).1.S,
-      m ∈ q.S ∨ m.signer = some i := by
-    intro q m hm
-    unfold voteProposal at hm
-    generalize proposals lead q.S q.view = l at hm
-    rcases l with _ | ⟨b, _ | ⟨b', l⟩⟩
-    · exact Or.inl hm
-    · simp only at hm
-      split_ifs at hm
-      · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => by rw [h]; rfl
-      · exact Or.inl hm
-    · exact Or.inl hm
-  have h4 : ∀ q : Processor n Tx, ∀ m ∈ (nullifyTimeout Δ i q).1.S, m ∈ q.S ∨ m.signer = some i := by
-    intro q m hm
-    unfold nullifyTimeout at hm
-    split_ifs at hm
-    · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => by rw [h]; rfl
-    · exact Or.inl hm
-  have h5 : ∀ q : Processor n Tx, ∀ m ∈ (advanceNull f q).1.S, m ∈ q.S := by
-    intro q m hm
-    rcases advanceNull_eq f q with h | h <;> rw [h] at hm <;> exact hm
-  have h6 : ∀ q : Processor n Tx, ∀ m ∈ (advanceM f i q).1.S, m ∈ q.S ∨ m.signer = some i := by
-    intro q m hm
-    unfold advanceM at hm
-    generalize mNotarisedAt f q.S q.view = l at hm
-    rcases l with _ | ⟨b, l⟩
-    · exact Or.inl hm
-    · simp only at hm
-      split_ifs at hm
-      · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => by rw [h]; rfl
-      · exact Or.inl hm
-  simp only [st6, st5, st4, st3, st2, st1] at h
-  rcases h6 _ _ h with h | h
-  · rcases h4 _ _ (h5 _ _ h) with h | h
-    · rcases h3 _ _ h with h | h
-      · rcases h2 _ _ h with h | h
-        · exact Or.inl (h1 _ _ h)
-        · exact Or.inr h
-      · exact Or.inr h
-    · exact Or.inr h
-  · exact Or.inr h
-
 /-! #### 各段の後の S の中身 -/
 
 theorem mem_S_forwardNew {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (forwardNew f i q).1.S) : m ∈ q.S := by
-  rw [forwardNew_eq, disseminateAll_fst] at hm
-  have key : ∀ (ms : List (Msg n Tx)) (q : Processor n Tx), (∀ m ∈ ms, m ∈ q.S) →
-      ∀ m ∈ (ms.foldl (fun p m => (disseminate i p m).1) q).S, m ∈ q.S := by
-    intro ms
-    induction ms with
-    | nil => intro q _ m hm; exact hm
-    | cons m' ms ih =>
-      intro q hq m hm
-      rw [List.foldl_cons] at hm
-      have hm' := ih _ (fun m'' hm'' => S_subset_disseminate_fst i q m'
-        (hq m'' (List.mem_cons_of_mem _ hm''))) m hm
-      rcases mem_S_disseminate_or i q m' hm' with h | rfl
-      · exact h
-      · exact hq m (List.mem_cons_self ..)
-  exact key _ q (fun m hm => mem_S_of_mem_forwardMsgs hm) m hm
+  rw [forwardNew_S] at hm; exact hm
 
 theorem mem_S_propose {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
-    {m : Msg n Tx} (hm : m ∈ (propose f lead i q).1.S) : m ∈ q.S ∨ ∃ b, m = Msg.block i b := by
-  unfold propose at hm
-  split_ifs at hm
-  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h⟩
+    {m : Msg n Tx} (hm : m ∈ (propose f lead i q).1.S) :
+    m ∈ q.S ∨ ∃ b, m = Msg.block i b ∧ Action.send (Msg.block i b) i ∈ (propose f lead i q).2 := by
+  unfold propose at hm ⊢
+  split_ifs at hm ⊢
+  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
   · exact Or.inl hm
 
 theorem mem_S_voteProposal {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
@@ -1152,29 +1205,91 @@ theorem mem_S_voteProposal {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Pr
   · exact Or.inl hm
 
 theorem mem_S_nullifyTimeout {Δ : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
-    (hm : m ∈ (nullifyTimeout Δ i q).1.S) : m ∈ q.S ∨ ∃ v, m = Msg.nullify i v := by
-  unfold nullifyTimeout at hm
-  split_ifs at hm
-  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h⟩
+    (hm : m ∈ (nullifyTimeout Δ i q).1.S) :
+    m ∈ q.S ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyTimeout Δ i q).2 := by
+  unfold nullifyTimeout at hm ⊢
+  split_ifs at hm ⊢
+  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+  · exact Or.inl hm
+
+theorem mem_S_nullifyNoProgress {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (nullifyNoProgress f i q).1.S) :
+    m ∈ q.S ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyNoProgress f i q).2 := by
+  unfold nullifyNoProgress at hm ⊢
+  split_ifs at hm ⊢
+  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
   · exact Or.inl hm
 
 theorem mem_S_advanceNull {f : Nat} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (advanceNull f q).1.S) : m ∈ q.S := by
   rcases advanceNull_eq f q with h | h <;> rw [h] at hm <;> exact hm
 
-theorem mem_S_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
-    (hm : m ∈ (st2 f lead i p).S) : m ∈ p.S ∨ ∃ b, m = Msg.block i b :=
-  (mem_S_propose hm).imp_left mem_S_forwardNew
+theorem mem_S_advanceM {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (advanceM f i q).1.S) :
+    m ∈ q.S ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (advanceM f i q).2 := by
+  unfold advanceM at hm ⊢
+  generalize mNotarisedAt f q.S q.view = l at hm ⊢
+  rcases l with _ | ⟨b, l⟩
+  · exact Or.inl hm
+  · simp only at hm ⊢
+    split_ifs at hm ⊢
+    · simp only [Processor.progress] at hm
+      exact (mem_S_disseminate_or i q _ hm).imp_right fun h =>
+        ⟨b, h, List.mem_append_left _ (mem_disseminate_snd.mpr ⟨i, rfl⟩)⟩
+    · exact Or.inl hm
+
+theorem mem_S_st1 {f : Nat} {p : Processor n Tx} {m : Msg n Tx} (hm : m ∈ (st1 f p).S) : m ∈ p.S :=
+  mem_S_advanceNull hm
+
+theorem mem_S_st2 {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} (hm : m ∈ (st2 f i p).S) :
+    m ∈ p.S ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (advanceM f i (st1 f p)).2 :=
+  (mem_S_advanceM hm).imp_left mem_S_st1
 
 theorem mem_S_st3 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st3 f lead i p).S) :
-    m ∈ (st2 f lead i p).S
-      ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (voteProposal f lead i (st2 f lead i p)).2 :=
+    m ∈ (st2 f i p).S
+      ∨ ∃ b, m = Msg.block i b ∧ Action.send (Msg.block i b) i ∈ (propose f lead i (st2 f i p)).2 :=
+  mem_S_propose hm
+
+theorem mem_S_st4 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (st4 f lead i p).S) :
+    m ∈ (st3 f lead i p).S
+      ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (voteProposal f lead i (st3 f lead i p)).2 :=
   mem_S_voteProposal hm
 
 theorem mem_S_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
-    (hm : m ∈ (st5 f Δ lead i p).S) : m ∈ (st3 f lead i p).S ∨ ∃ v, m = Msg.nullify i v :=
-  mem_S_nullifyTimeout (mem_S_advanceNull hm)
+    (hm : m ∈ (st5 f Δ lead i p).S) :
+    m ∈ (st4 f lead i p).S
+      ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyTimeout Δ i (st4 f lead i p)).2 :=
+  mem_S_nullifyTimeout hm
+
+theorem mem_S_st6 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    (hm : m ∈ (st6 f Δ lead i p).S) :
+    m ∈ (st5 f Δ lead i p).S
+      ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyNoProgress f i (st5 f Δ lead i p)).2 :=
+  mem_S_nullifyNoProgress hm
+
+/-- 動作を終えた後の S にある message は、前からあったか、このスロットの転送以外の段で
+    自分が送った自分の署名付きの message。 -/
+theorem mem_S_stage_or_sent (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
+    {m : Msg n Tx} (h : m ∈ (st6 f Δ lead i p).S) :
+    m ∈ p.S ∨ (m.signer = some i ∧ ∃ j, Action.send m j ∈ innerActs f Δ lead i p) := by
+  simp only [innerActs, List.mem_append]
+  rcases mem_S_st6 h with h | ⟨v, rfl, hs⟩
+  · rcases mem_S_st5 h with h | ⟨v, rfl, hs⟩
+    · rcases mem_S_st4 h with h | ⟨b, rfl, hs⟩
+      · rcases mem_S_st3 h with h | ⟨b, rfl, hs⟩
+        · rcases mem_S_st2 h with h | ⟨b, rfl, hs⟩
+          · exact Or.inl h
+          · exact Or.inr ⟨rfl, i, by left; left; left; left; right; exact hs⟩
+        · exact Or.inr ⟨rfl, i, by left; left; left; right; exact hs⟩
+      · exact Or.inr ⟨rfl, i, by left; left; right; exact hs⟩
+    · exact Or.inr ⟨rfl, i, by left; right; exact hs⟩
+  · exact Or.inr ⟨rfl, i, by right; exact hs⟩
+
+theorem mem_S_stage_or (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
+    {m : Msg n Tx} (h : m ∈ (st6 f Δ lead i p).S) : m ∈ p.S ∨ m.signer = some i :=
+  (mem_S_stage_or_sent f Δ lead i p h).imp_right And.left
 
 /-! #### 各段が送る message とそのときの条件 -/
 
@@ -1271,19 +1386,114 @@ theorem send_nullifyNoProgress_eq {f : Nat} {i : Fin n} {p : Processor n Tx} {m 
     exact ⟨rfl, hg.1, c₀, hc₀, by rw [← hc₀]; exact hg.2.2⟩
   · simp at h
 
+/-- 送る message は全員へ送る。 -/
+theorem send_all {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) (j' : Fin n) :
+    Action.send m j' ∈ Algo.step f Δ lead i p := by
+  rw [step_eq_stepPair, stepPair_snd] at h ⊢
+  simp only [List.mem_append] at h ⊢
+  rcases h with ((((((h | h) | h) | h) | h) | h) | h)
+  · exact absurd h send_advanceNull
+  · left; left; left; left; left; right
+    unfold advanceM at h ⊢
+    generalize mNotarisedAt f (st1 f p).S (st1 f p).view = l at h ⊢
+    rcases l with _ | ⟨b, l⟩
+    · simp at h
+    · simp only [List.mem_append, List.mem_singleton, reduceCtorEq, or_false] at h ⊢
+      split_ifs at h ⊢
+      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+      · simp at h
+  · left; left; left; left; right
+    unfold propose at h ⊢
+    split_ifs at h ⊢
+    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+    · simp at h
+  · left; left; left; right
+    unfold voteProposal at h ⊢
+    generalize proposals lead (st3 f lead i p).S (st3 f lead i p).view = l at h ⊢
+    rcases l with _ | ⟨b, _ | ⟨b', l⟩⟩
+    · simp at h
+    · simp only at h ⊢
+      split_ifs at h ⊢
+      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+      · simp at h
+    · simp at h
+  · left; left; right
+    unfold nullifyTimeout at h ⊢
+    split_ifs at h ⊢
+    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+    · simp at h
+  · left; right
+    unfold nullifyNoProgress at h ⊢
+    split_ifs at h ⊢
+    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+    · simp at h
+  · right
+    rw [forwardNew_eq] at h ⊢
+    obtain ⟨m', hm', _, hmm⟩ := mem_disseminateAll_snd.mp h
+    cases hmm
+    exact mem_disseminateAll_snd.mpr ⟨_, hm', j', rfl⟩
+
 /-! #### 票と nullify の出所 -/
 
+theorem localInv_st1 {f : Nat} {i : Fin n} {p : Processor n Tx} (h : LocalInv f i p) :
+    LocalInv f i (st1 f p) := h.advanceNull
+
+theorem localInv_st2 {f : Nat} {i : Fin n} {p : Processor n Tx} (h : LocalInv f i p) :
+    LocalInv f i (st2 f i p) := h.advanceNull.advanceM
+
 theorem localInv_st3 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
-    (h : LocalInv f i p) : LocalInv f i (st3 f lead i p) :=
-  (h.forwardNew.propose lead).voteProposal lead
+    (h : LocalInv f i p) : LocalInv f i (st3 f lead i p) := (localInv_st2 h).propose lead
+
+theorem localInv_st4 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
+    (h : LocalInv f i p) : LocalInv f i (st4 f lead i p) := (localInv_st3 h).voteProposal lead
+
+theorem localInv_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
+    (h : LocalInv f i p) : LocalInv f i (st5 f Δ lead i p) :=
+  (localInv_st4 (lead := lead) h).nullifyTimeout Δ
 
 theorem localInv_st6 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) : LocalInv f i (st6 f Δ lead i p) :=
-  ((localInv_st3 (lead := lead) h).nullifyTimeout Δ).advanceNull.advanceM
+  (localInv_st5 (Δ := Δ) (lead := lead) h).nullifyNoProgress
 
-/-- 自分の票の出所: S にあった（転送）か、9〜11 行か 19〜21 行で、その段の入力 q は現在の
-    view が b の view で、notarised = ⊥、nullified = false、S に valid proposal か
-    M-notarisation がある。 -/
+/-- 転送以外の段で自分の票を出す条件。 -/
+theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
+    (h : LocalInv f i p) {b : Block Tx} {j : Fin n}
+    (hv : Action.send (Msg.vote i b) j ∈ innerActs f Δ lead i p) :
+    ∃ q : Processor n Tx, LocalInv f i q ∧ q.view = b.view
+      ∧ q.notarised = none ∧ q.nullified = false ∧ p.S ⊆ q.S
+      ∧ (∀ m ∈ q.S, m ∈ p.S ∨ m.signer = some i)
+      ∧ (ValidProposal f lead q.S q.view b ∨ MNotarised f q.S b) := by
+  have hst6 : ∀ m ∈ (st6 f Δ lead i p).S, m ∈ p.S ∨ m.signer = some i :=
+    fun m hm => mem_S_stage_or f Δ lead i p hm
+  simp only [innerActs, List.mem_append] at hv
+  rcases hv with (((((hv | hv) | hv) | hv) | hv) | hv)
+  · exact absurd hv send_advanceNull
+  · obtain ⟨b', hm, hbv, hM, hnot, hnl, _⟩ := send_advanceM_eq hv
+    injection hm with _ hbb
+    subst hbb
+    refine ⟨st1 f p, localInv_st1 h, hbv.symm, hnot, hnl, S_subset_st1 f p, ?_, Or.inr hM⟩
+    intro m hm
+    exact hst6 m ((S_subset_advanceM f i _).trans (S_st2_subset_st6 f Δ lead i p) hm)
+  · obtain ⟨_, hm⟩ := send_propose_eq hv; cases hm
+  · obtain ⟨b', hm, hbv, hnot, hnl, hvp, _⟩ := send_voteProposal_eq hv
+    injection hm with _ hbb
+    subst hbb
+    refine ⟨st3 f lead i p, localInv_st3 h, hbv.symm, hnot, hnl, S_subset_st3 f lead i p, ?_,
+      Or.inl hvp⟩
+    intro m hm
+    exact hst6 m ((S_subset_voteProposal f lead i _).trans (S_st4_subset_st6 f Δ lead i p) hm)
+  · obtain ⟨hm, _⟩ := send_nullifyTimeout_eq hv; cases hm
+  · obtain ⟨hm, _⟩ := send_nullifyNoProgress_eq hv; cases hm
+
+/-- 自分の票の出所: S にあった（転送）か、19〜21 行か 9〜11 行で、その段の入力 q は現在の
+    view が b の view で、notarised = ⊥、nullified = false、S に M-notarisation か
+    valid proposal がある。 -/
 theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) {b : Block Tx} {j : Fin n}
     (hv : Action.send (Msg.vote i b) j ∈ Algo.step f Δ lead i p) :
@@ -1291,109 +1501,98 @@ theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proc
       ∧ q.notarised = none ∧ q.nullified = false ∧ p.S ⊆ q.S
       ∧ (∀ m ∈ q.S, m ∈ p.S ∨ m.signer = some i)
       ∧ (ValidProposal f lead q.S q.view b ∨ MNotarised f q.S b) := by
-  have hst6 : ∀ m ∈ (st6 f Δ lead i p).S, m ∈ p.S ∨ m.signer = some i :=
-    fun m hm => mem_S_stage_or f Δ lead i p hm
-  rw [step_eq_stepPair, stepPair_snd] at hv
-  simp only [List.mem_append] at hv
-  rcases hv with ((((((hv | hv) | hv) | hv) | hv) | hv) | hv)
-  · exact Or.inl (send_forwardNew_mem hv)
-  · obtain ⟨_, hm⟩ := send_propose_eq hv; cases hm
-  · obtain ⟨b', hm, hbv, hnot, hnl, hvp, _⟩ := send_voteProposal_eq hv
-    injection hm with _ hbb
-    subst hbb
-    refine Or.inr ⟨st2 f lead i p, h.forwardNew.propose lead, hbv.symm, hnot, hnl, ?_, ?_,
-      Or.inl hvp⟩
-    · exact (S_subset_forwardNew f i p).trans (S_subset_propose f lead i _)
-    · intro m hm
-      exact hst6 m ((S_subset_voteProposal f lead i _).trans (S_st3_subset_st6 f Δ lead i p) hm)
-  · obtain ⟨hm, _⟩ := send_nullifyTimeout_eq hv; cases hm
-  · exact absurd hv send_advanceNull
-  · obtain ⟨b', hm, hbv, hM, hnot, hnl, _⟩ := send_advanceM_eq hv
-    injection hm with _ hbb
-    subst hbb
-    refine Or.inr ⟨st5 f Δ lead i p, ((localInv_st3 (lead := lead) h).nullifyTimeout Δ).advanceNull,
-      hbv.symm, hnot, hnl, ?_, ?_, Or.inr hM⟩
-    · exact (S_subset_st3 f lead i p).trans ((S_subset_nullifyTimeout Δ i _).trans
-        (S_subset_advanceNull f _))
-    · intro m hm
-      exact hst6 m (S_subset_advanceM f i _ hm)
-  · obtain ⟨hm, _⟩ := send_nullifyNoProgress_eq hv; cases hm
+  rw [step_eq_stepPair, stepPair_snd'] at hv
+  rcases List.mem_append.mp hv with hv | hv
+  · exact Or.inr (vote_emission_core h hv)
+  · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hv) with hm | ⟨_, j', hs⟩
+    · exact Or.inl hm
+    · exact Or.inr (vote_emission_core h hs)
 
 /-- 自分の nullify(b.view) を出し、b への自分の票が S にあるか同じスロットで出すなら、
-    nullify は 24〜28 行で、その段の入力 st6 には b 以外への進捗のなさの証拠がある。 -/
+    nullify は 24〜28 行で、その段の入力 st5 には b 以外への進捗のなさの証拠がある。 -/
 theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) {b : Block Tx} {j j' : Fin n}
     (hb : Msg.vote i b ∈ p.S ∨ Action.send (Msg.vote i b) j ∈ Algo.step f Δ lead i p)
     (hn : Action.send (Msg.nullify i b.view) j' ∈ Algo.step f Δ lead i p)
     (hno : Msg.nullify i b.view ∉ p.S) :
-    LocalInv f i (st6 f Δ lead i p) ∧ (st6 f Δ lead i p).view = b.view
-      ∧ (st6 f Δ lead i p).nullified = false ∧ Msg.vote i b ∈ (st6 f Δ lead i p).S
-      ∧ NoProgress f (st6 f Δ lead i p).S b.view (some b) := by
-  have h3 : LocalInv f i (st3 f lead i p) := localInv_st3 h
-  have h6 : LocalInv f i (st6 f Δ lead i p) := localInv_st6 h
-  -- 票の出所（同じスロットで出す場合）を先に整理する
+    LocalInv f i (st5 f Δ lead i p) ∧ (st5 f Δ lead i p).view = b.view
+      ∧ (st5 f Δ lead i p).nullified = false ∧ Msg.vote i b ∈ (st5 f Δ lead i p).S
+      ∧ NoProgress f (st5 f Δ lead i p).S b.view (some b) := by
+  have h4 : LocalInv f i (st4 f lead i p) := localInv_st4 h
+  have h5 : LocalInv f i (st5 f Δ lead i p) := localInv_st5 h
+  -- 転送以外の段で票を出す場合の整理
+  have hcore : ∀ {j : Fin n}, Action.send (Msg.vote i b) j ∈ innerActs f Δ lead i p →
+      (b.view = (st1 f p).view ∧ (st2 f i p).view.val = (st1 f p).view.val + 1)
+      ∨ (Msg.vote i b ∈ (st4 f lead i p).S ∧ (st4 f lead i p).notarised = some b) := by
+    intro j hb
+    simp only [innerActs, List.mem_append] at hb
+    rcases hb with (((((hb | hb) | hb) | hb) | hb) | hb)
+    · exact absurd hb send_advanceNull
+    · obtain ⟨b', hm, hbv, _, _, _, hv2⟩ := send_advanceM_eq hb
+      injection hm with _ hbb
+      subst hbb
+      exact Or.inl ⟨hbv, hv2⟩
+    · obtain ⟨_, hm⟩ := send_propose_eq hb; cases hm
+    · obtain ⟨b', hm, _, _, _, _, hnot⟩ := send_voteProposal_eq hb
+      injection hm with _ hbb
+      subst hbb
+      exact Or.inr ⟨mem_S_of_send_voteProposal hb, hnot⟩
+    · obtain ⟨hm, _⟩ := send_nullifyTimeout_eq hb; cases hm
+    · obtain ⟨hm, _⟩ := send_nullifyNoProgress_eq hb; cases hm
+  -- 票の出所
   have hvote : Msg.vote i b ∈ p.S
-      ∨ (Msg.vote i b ∈ (st3 f lead i p).S ∧ (st3 f lead i p).notarised = some b)
-      ∨ (b.view = (st5 f Δ lead i p).view ∧ (st5 f Δ lead i p).nullified = false
-          ∧ (st6 f Δ lead i p).view.val = (st5 f Δ lead i p).view.val + 1) := by
+      ∨ (b.view = (st1 f p).view ∧ (st2 f i p).view.val = (st1 f p).view.val + 1)
+      ∨ (Msg.vote i b ∈ (st4 f lead i p).S ∧ (st4 f lead i p).notarised = some b) := by
     rcases hb with hb | hb
     · exact Or.inl hb
-    · rw [step_eq_stepPair, stepPair_snd] at hb
-      simp only [List.mem_append] at hb
-      rcases hb with ((((((hb | hb) | hb) | hb) | hb) | hb) | hb)
-      · exact Or.inl (send_forwardNew_mem hb)
-      · obtain ⟨_, hm⟩ := send_propose_eq hb; cases hm
-      · obtain ⟨b', hm, _, _, _, _, hnot⟩ := send_voteProposal_eq hb
-        injection hm with _ hbb
-        subst hbb
-        exact Or.inr (Or.inl ⟨mem_S_of_send_voteProposal hb, hnot⟩)
-      · obtain ⟨hm, _⟩ := send_nullifyTimeout_eq hb; cases hm
-      · exact absurd hb send_advanceNull
-      · obtain ⟨b', hm, hbv, _, _, hnl, hv6⟩ := send_advanceM_eq hb
-        injection hm with _ hbb
-        subst hbb
-        exact Or.inr (Or.inr ⟨hbv, hnl, hv6⟩)
-      · obtain ⟨hm, _⟩ := send_nullifyNoProgress_eq hb; cases hm
-  rw [step_eq_stepPair, stepPair_snd] at hn
-  simp only [List.mem_append] at hn
-  rcases hn with ((((((hn | hn) | hn) | hn) | hn) | hn) | hn)
-  · exact absurd (send_forwardNew_mem hn) hno
-  · obtain ⟨_, hm⟩ := send_propose_eq hn; cases hm
-  · obtain ⟨_, hm, _⟩ := send_voteProposal_eq hn; cases hm
-  · -- 13〜14 行: st3 で notarised = ⊥ だが、b への票が st3 の S にあるか、同時に出せない
-    exfalso
-    obtain ⟨hm, hnl3, hnot3, hnl4⟩ := send_nullifyTimeout_eq hn
-    injection hm with _ hv3
-    rcases hvote with hb | ⟨hb, hnot⟩ | ⟨hbv5, hnl5, _⟩
-    · have := ((h3.notar b (S_subset_st3 f lead i p hb)).2.resolve_left
-        (by rw [hv3]; exact lt_irrefl _)).2
-      rw [hnot3] at this; cases this
-    · rw [hnot3] at hnot; cases hnot
-    · have h45 : (advanceNull f (st4 f Δ lead i p)).1.view = (st4 f Δ lead i p).view := by
-        change (st5 f Δ lead i p).view = _
-        rw [← hbv5, hv3, st4_view, st3_view]
-      have h5eq : st5 f Δ lead i p = st4 f Δ lead i p := advanceNull_eq_of_view f _ h45
-      rw [h5eq] at hnl5
-      change (nullifyTimeout Δ i (st3 f lead i p)).1.nullified = false at hnl5
-      rw [hnl4] at hnl5; cases hnl5
+    · rw [step_eq_stepPair, stepPair_snd'] at hb
+      rcases List.mem_append.mp hb with hb | hb
+      · exact Or.inr (hcore hb)
+      · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hb) with hm | ⟨_, _, hs⟩
+        · exact Or.inl hm
+        · exact Or.inr (hcore hs)
+  -- nullify の出所（転送なら転送以外の段に遡る）
+  obtain ⟨j'', hn'⟩ : ∃ j, Action.send (Msg.nullify i b.view) j ∈ innerActs f Δ lead i p := by
+    rw [step_eq_stepPair, stepPair_snd'] at hn
+    rcases List.mem_append.mp hn with hn | hn
+    · exact ⟨j', hn⟩
+    · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hn) with hm | ⟨_, j'', hs⟩
+      · exact absurd hm hno
+      · exact ⟨j'', hs⟩
+  simp only [innerActs, List.mem_append] at hn'
+  rcases hn' with (((((hn | hn) | hn) | hn) | hn) | hn)
   · exact absurd hn send_advanceNull
   · obtain ⟨_, hm, _⟩ := send_advanceM_eq hn; cases hm
+  · obtain ⟨_, hm⟩ := send_propose_eq hn; cases hm
+  · obtain ⟨_, hm, _⟩ := send_voteProposal_eq hn; cases hm
+  · -- 13〜14 行: st4 で notarised = ⊥
+    exfalso
+    obtain ⟨hm, _, hnot4, _⟩ := send_nullifyTimeout_eq hn
+    injection hm with _ hv4
+    rcases hvote with hb | ⟨hbv1, hv2⟩ | ⟨_, hnot⟩
+    · have := ((h4.notar b (S_subset_st4 f lead i p hb)).2.resolve_left
+        (by rw [hv4]; exact lt_irrefl _)).2
+      rw [hnot4] at this; cases this
+    · have h1 : b.view.val = (st2 f i p).view.val := by rw [hv4, st4_view]
+      have h2 := congrArg View.val hbv1
+      omega
+    · rw [hnot4] at hnot; cases hnot
   · -- 24〜28 行
-    obtain ⟨hm, hnl6, c₀, hc₀, hnp⟩ := send_nullifyNoProgress_eq hn
-    injection hm with _ hv6
-    have hvote6 : Msg.vote i b ∈ (st6 f Δ lead i p).S := by
-      rcases hvote with hb | ⟨hb, _⟩ | ⟨hbv5, _, hv6'⟩
-      · exact S_subset_st6 f Δ lead i p hb
-      · exact S_st3_subset_st6 f Δ lead i p hb
+    obtain ⟨hm, hnl5, c₀, hc₀, hnp⟩ := send_nullifyNoProgress_eq hn
+    injection hm with _ hv5
+    have hvote5 : Msg.vote i b ∈ (st5 f Δ lead i p).S := by
+      rcases hvote with hb | ⟨hbv1, hv2⟩ | ⟨hb4, _⟩
+      · exact S_subset_st5 f Δ lead i p hb
       · exfalso
-        have : b.view.val = (st5 f Δ lead i p).view.val := by rw [hbv5]
-        rw [hv6] at this
+        have h1 : b.view.val = (st2 f i p).view.val := by rw [hv5, st5_view]
+        have h2 := congrArg View.val hbv1
         omega
-    have hnot6 := ((h6.notar b hvote6).2.resolve_left (by rw [hv6]; exact lt_irrefl _)).2
-    rw [hc₀] at hnot6
-    obtain rfl := Option.some.inj hnot6
-    refine ⟨h6, hv6.symm, hnl6, hvote6, ?_⟩
-    rw [hv6]; exact hnp
+      · exact S_st4_subset_st5 f Δ lead i p hb4
+    have hnot5 := ((h5.notar b hvote5).2.resolve_left (by rw [hv5]; exact lt_irrefl _)).2
+    rw [hc₀] at hnot5
+    obtain rfl := Option.some.inj hnot5
+    refine ⟨h5, hv5.symm, hnl5, hvote5, ?_⟩
+    rw [hv5]; exact hnp
 
 /-! #### 転送と反応のための補題 -/
 
@@ -1427,11 +1626,10 @@ theorem mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Blo
   exact ⟨b, ⟨mem_votedBlocks hm, h1, h2⟩, hm, q, rfl⟩
 
 theorem send_mem_step_of_mem_forwardMsgs {f Δ : Nat} {lead : View → Fin n} {i : Fin n}
-    {p : Processor n Tx} {m : Msg n Tx} (h : m ∈ forwardMsgs f p) (j : Fin n) :
+    {p : Processor n Tx} {m : Msg n Tx} (h : m ∈ forwardMsgs f (st6 f Δ lead i p)) (j : Fin n) :
     Action.send m j ∈ Algo.step f Δ lead i p := by
-  rw [step_eq_stepPair, stepPair_snd]
-  simp only [List.mem_append]
-  left; left; left; left; left; left
+  rw [step_eq_stepPair, stepPair_snd']
+  apply List.mem_append_right
   rw [forwardNew_eq]
   exact mem_disseminateAll_snd.mpr ⟨m, h, j, rfl⟩
 
@@ -1451,23 +1649,88 @@ theorem disseminateAll_timer (i : Fin n) (p : Processor n Tx) (ms : List (Msg n 
   | nil => rfl
   | cons m ms ih => rw [List.foldl_cons, ih, disseminate_timer]
 
-theorem st3_timer (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (st3 f lead i p).timer = p.timer := by
-  have h1 : (st1 f i p).timer = p.timer := by
-    simp only [st1]; rw [forwardNew_eq]; exact disseminateAll_timer i p _
-  have h2 : (st2 f lead i p).timer = (st1 f i p).timer := by
-    simp only [st2]; unfold propose; split_ifs
+theorem propose_timer (f : Nat) (lead : View → Fin n) (i : Fin n) (q : Processor n Tx) :
+    (propose f lead i q).1.timer = q.timer := by
+  unfold propose; split_ifs
+  · exact disseminate_timer i _ _
+  · rfl
+
+theorem voteProposal_timer (f : Nat) (lead : View → Fin n) (i : Fin n) (q : Processor n Tx) :
+    (voteProposal f lead i q).1.timer = q.timer := by
+  unfold voteProposal
+  rcases proposals lead q.S q.view with _ | ⟨b, _ | ⟨b', l⟩⟩
+  · rfl
+  · simp only; split_ifs
     · exact disseminate_timer i _ _
     · rfl
-  have h3 : (st3 f lead i p).timer = (st2 f lead i p).timer := by
-    simp only [st3]; unfold voteProposal
-    rcases proposals lead (st2 f lead i p).S (st2 f lead i p).view with _ | ⟨b, _ | ⟨b', l⟩⟩
-    · rfl
-    · simp only; split_ifs
-      · exact disseminate_timer i _ _
+  · rfl
+
+theorem nullifyTimeout_timer (Δ : Nat) (i : Fin n) (q : Processor n Tx) :
+    (nullifyTimeout Δ i q).1.timer = q.timer := by
+  unfold nullifyTimeout; split_ifs
+  · exact disseminate_timer i _ _
+  · rfl
+
+theorem nullifyNoProgress_timer (f : Nat) (i : Fin n) (q : Processor n Tx) :
+    (nullifyNoProgress f i q).1.timer = q.timer := by
+  unfold nullifyNoProgress; split_ifs
+  · exact disseminate_timer i _ _
+  · rfl
+
+theorem forwardNew_timer (f : Nat) (i : Fin n) (q : Processor n Tx) :
+    (forwardNew f i q).1.timer = q.timer := by
+  rw [forwardNew_eq]; exact disseminateAll_timer i q _
+
+/-- prevS は動作で変わらない。 -/
+theorem disseminate_prevS (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
+    (disseminate i p m).1.prevS = p.prevS := by
+  rw [disseminate_fst]
+  generalize List.finRange n = l
+  induction l generalizing p with
+  | nil => rfl
+  | cons j l ih => rw [List.foldl_cons, ih, Processor.send_prevS]
+
+theorem disseminateAll_prevS (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
+    (disseminateAll i p ms).1.prevS = p.prevS := by
+  rw [disseminateAll_fst]
+  induction ms generalizing p with
+  | nil => rfl
+  | cons m ms ih => rw [List.foldl_cons, ih, disseminate_prevS]
+
+theorem forwardNew_prevS (f : Nat) (i : Fin n) (q : Processor n Tx) :
+    (forwardNew f i q).1.prevS = q.prevS := by
+  rw [forwardNew_eq]; exact disseminateAll_prevS i q _
+
+theorem _root_.Minimmit.Processor.executeAll_prevS (i : Fin n) (p : Processor n Tx)
+    (acts : List (Action n Tx)) : (p.executeAll i acts).prevS = p.prevS := by
+  induction acts generalizing p with
+  | nil => rfl
+  | cons a acts ih =>
+    show ((p.execute i a).executeAll i acts).prevS = p.prevS
+    rw [ih]
+    cases a with
+    | send m j =>
+      simp only [Processor.execute]
+      split_ifs
+      · rw [Processor.send_prevS]
       · rfl
-    · rfl
-  rw [h3, h2, h1]
+    | progress => rfl
+
+theorem st6_prevS (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st6 f Δ lead i p).prevS = p.prevS := by
+  rw [← forwardNew_prevS f i, ← stepPair_fst, ← executeAll_step, Processor.executeAll_prevS]
+
+/-- 5〜11 行は timer を変えない。 -/
+theorem st4_timer (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (st4 f lead i p).timer = (st2 f i p).timer := by
+  simp only [st4, st3]; rw [voteProposal_timer, propose_timer]
+
+/-- 5〜28 行と転送は timer を変えない。 -/
+theorem stepPair_timer (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (stepPair f Δ lead i p).1.timer = (st2 f i p).timer := by
+  rw [stepPair_fst, forwardNew_timer]
+  simp only [st6, st5]
+  rw [nullifyNoProgress_timer, nullifyTimeout_timer, st4_timer]
 
 theorem advanceNull_progress_of {f : Nat} {q : Processor n Tx} (h : Nullified f q.S q.view) :
     (advanceNull f q).1 = q.progress := by
@@ -1476,21 +1739,6 @@ theorem advanceNull_progress_of {f : Nat} {q : Processor n Tx} (h : Nullified f 
 theorem advanceNull_eq_of_not {f : Nat} {q : Processor n Tx} (h : ¬ Nullified f q.S q.view) :
     (advanceNull f q).1 = q := by
   unfold advanceNull; rw [if_neg h]
-
-theorem advanceM_view_succ_of_ne_nil {f : Nat} {i : Fin n} {q : Processor n Tx}
-    (h : mNotarisedAt f q.S q.view ≠ []) : (advanceM f i q).1.view.val = q.view.val + 1 := by
-  unfold advanceM
-  generalize hl : mNotarisedAt f q.S q.view = l at h ⊢
-  rcases l with _ | ⟨b, l⟩
-  · exact absurd rfl h
-  · simp only
-    split_ifs
-    · simp [Processor.progress, disseminate_view]
-    · simp [Processor.progress]
-
-theorem advanceM_eq_of_nil {f : Nat} {i : Fin n} {q : Processor n Tx}
-    (h : mNotarisedAt f q.S q.view = []) : (advanceM f i q).1 = q := by
-  unfold advanceM; rw [h]
 
 theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx} (hb : b ∈ votedBlocks S)
     (hM : MNotarised f S b) : b ∈ mNotarisedAt f S b.view := by
@@ -1512,70 +1760,9 @@ theorem nullifyNoProgress_fires {f : Nat} {i : Fin n} {q : Processor n Tx} {c : 
   rw [if_pos ⟨hnl, by rw [hnot]; exact Option.some_ne_none c, by rw [hnot]; exact hnp⟩]
   exact mem_S_disseminate_fst i q _
 
-/-- 1 スロットの動作の後の局所状態は、st6 に 24〜28 行を適用したもの。 -/
-theorem stepPair_fst (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (stepPair f Δ lead i p).1 = (nullifyNoProgress f i (st6 f Δ lead i p)).1 := rfl
-
-theorem stepPair_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (stepPair f Δ lead i p).1.view = (st6 f Δ lead i p).view := by
-  rw [stepPair_fst, nullifyNoProgress_view]
-
 theorem S_st6_subset_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (st6 f Δ lead i p).S ⊆ (stepPair f Δ lead i p).1.S := by
-  rw [stepPair_fst]; exact S_subset_nullifyNoProgress f i _
-
-/-- 送る message は全員へ送る。 -/
-theorem send_all {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) (j' : Fin n) :
-    Action.send m j' ∈ Algo.step f Δ lead i p := by
-  rw [step_eq_stepPair, stepPair_snd] at h ⊢
-  simp only [List.mem_append] at h ⊢
-  rcases h with ((((((h | h) | h) | h) | h) | h) | h)
-  · left; left; left; left; left; left
-    rw [forwardNew_eq] at h ⊢
-    obtain ⟨m', hm', _, hmm⟩ := mem_disseminateAll_snd.mp h
-    cases hmm
-    exact mem_disseminateAll_snd.mpr ⟨_, hm', j', rfl⟩
-  · left; left; left; left; left; right
-    unfold propose at h ⊢
-    split_ifs at h ⊢
-    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
-      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
-    · simp at h
-  · left; left; left; left; right
-    unfold voteProposal at h ⊢
-    generalize proposals lead (st2 f lead i p).S (st2 f lead i p).view = l at h ⊢
-    rcases l with _ | ⟨b, _ | ⟨b', l⟩⟩
-    · simp at h
-    · simp only at h ⊢
-      split_ifs at h ⊢
-      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
-        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
-      · simp at h
-    · simp at h
-  · left; left; left; right
-    unfold nullifyTimeout at h ⊢
-    split_ifs at h ⊢
-    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
-      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
-    · simp at h
-  · exact absurd h send_advanceNull
-  · left; right
-    unfold advanceM at h ⊢
-    generalize mNotarisedAt f (st5 f Δ lead i p).S (st5 f Δ lead i p).view = l at h ⊢
-    rcases l with _ | ⟨b, l⟩
-    · simp at h
-    · simp only [List.mem_append, List.mem_singleton, reduceCtorEq, or_false] at h ⊢
-      split_ifs at h ⊢
-      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
-        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
-      · simp at h
-  · right
-    unfold nullifyNoProgress at h ⊢
-    split_ifs at h ⊢
-    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
-      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
-    · simp at h
+  rw [stepPair_fst, forwardNew_S]
 
 end Algo
 

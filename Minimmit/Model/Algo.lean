@@ -61,8 +61,8 @@ noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
 /-! ### 2〜3 行と §4 の取引転送 -/
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
-    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。prevS は前スロット冒頭の S
-    なので、前スロットに自分の送信で完成した証明書もここで送る。
+    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。スロットの最後に評価するので、
+    このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
 
     証明書は、それを構成する message を S にある分だけ全部送る。論文は「new」の第 2 条件で
     辞書順最小の 2f + 1 個を 1 つ選んで送る（§4）。§5 の証明が転送に使うのは「新しい証明書を
@@ -100,40 +100,21 @@ noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
 open Classical in
 /-- Algorithm 1: p_i が 1 スロットで起こす動作の列。行の順に局所状態を更新しながら決める。
     `ValidProposal` の判定に古典論理を使う。31〜32 行の Finalise は動作を伴わないので無く、
-    finalise したことは S に L-notarisation があることで表す。 -/
+    finalise したことは S に L-notarisation があることで表す。
+
+    行の評価順は論文の Algorithm 1 と 2 か所で違う。16〜21 行の view の前進を 5〜11 行の
+    提案と投票より先に評価し、2〜3 行の転送をスロットの最後に置く。論文の行順では、
+    view に入ったスロットで提案できず、そのスロットで完成した証明書を同じスロットで
+    転送できないので、Lemma 5.6 以降の時間の議論（入った時点で提案し、届いた時点で転送
+    する）が 1〜2 スロットずれる。 -/
 noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     List (Action n Tx) :=
-  -- 2〜3 行
-  let r₁ := forwardNew f i p
-  let p := r₁.1
-  -- 5〜7 行
-  let r₂ :=
-    if lead p.view = i ∧ p.proposed = false then
-      let parent := selectParent f p.S p.view
-      disseminate i p (.block i (.node p.view (payload p.S parent) parent))
-    else (p, [])
-  let p := r₂.1
-  -- 9〜11 行
-  let r₃ :=
-    match proposals lead p.S p.view with
-    | [b] =>
-      if ValidProposal f lead p.S p.view b ∧ p.notarised = none ∧ p.nullified = false then
-        disseminate i p (.vote i b)
-      else (p, [])
-    | _ => (p, [])
-  let p := r₃.1
-  -- 13〜14 行
-  let r₄ :=
-    if p.timer = 2 * Δ ∧ p.nullified = false ∧ p.notarised = none then
-      disseminate i p (.nullify i p.view)
-    else (p, [])
-  let p := r₄.1
   -- 16〜17 行
-  let r₅ : Processor n Tx × List (Action n Tx) :=
+  let r₁ : Processor n Tx × List (Action n Tx) :=
     if Nullified f p.S p.view then (p.progress, [Action.progress]) else (p, [])
-  let p := r₅.1
+  let p := r₁.1
   -- 19〜21 行。複数あれば `mNotarisedAt` の順で先のブロックに投票する
-  let r₆ : Processor n Tx × List (Action n Tx) :=
+  let r₂ : Processor n Tx × List (Action n Tx) :=
     match mNotarisedAt f p.S p.view with
     | b :: _ =>
       let r :=
@@ -141,12 +122,37 @@ noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
         else (p, [])
       (r.1.progress, r.2 ++ [Action.progress])
     | [] => (p, [])
-  let p := r₆.1
+  let p := r₂.1
+  -- 5〜7 行
+  let r₃ :=
+    if lead p.view = i ∧ p.proposed = false then
+      let parent := selectParent f p.S p.view
+      disseminate i p (.block i (.node p.view (payload p.S parent) parent))
+    else (p, [])
+  let p := r₃.1
+  -- 9〜11 行
+  let r₄ :=
+    match proposals lead p.S p.view with
+    | [b] =>
+      if ValidProposal f lead p.S p.view b ∧ p.notarised = none ∧ p.nullified = false then
+        disseminate i p (.vote i b)
+      else (p, [])
+    | _ => (p, [])
+  let p := r₄.1
+  -- 13〜14 行
+  let r₅ :=
+    if p.timer = 2 * Δ ∧ p.nullified = false ∧ p.notarised = none then
+      disseminate i p (.nullify i p.view)
+    else (p, [])
+  let p := r₅.1
   -- 24〜28 行
-  let r₇ :=
+  let r₆ :=
     if p.nullified = false ∧ p.notarised ≠ none ∧ NoProgress f p.S p.view p.notarised then
       disseminate i p (.nullify i p.view)
     else (p, [])
+  let p := r₆.1
+  -- 2〜3 行
+  let r₇ := forwardNew f i p
   r₁.2 ++ r₂.2 ++ r₃.2 ++ r₄.2 ++ r₅.2 ++ r₆.2 ++ r₇.2
 
 end Algo

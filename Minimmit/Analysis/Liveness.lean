@@ -132,7 +132,13 @@ theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (h
     omega
   refine ⟨Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)), ?_, ?_⟩
   · rw [hstay, he]
-  · exact timeout hinit hh hj (View.val_injective (by rw [hstay, he])) h2
+  · rcases timeout hinit hh hj (v := ⟨k⟩) (View.val_injective (by rw [hstay, he])) h2 with h | h | h
+    · exact Or.inl h
+    · exact Or.inr h
+    · exfalso
+      have h' : k < (viewAt s₀ instrs j (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)) + 1)).val := h
+      have := hstuck (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)) + 1)
+      omega
 
 /-- 5.5 の本体: すべての正直者が、すべての k について view k 以上に達する。 -/
 theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)

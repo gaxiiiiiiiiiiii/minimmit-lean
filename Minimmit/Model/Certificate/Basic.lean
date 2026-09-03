@@ -1,4 +1,4 @@
-import Minimmit.Model.Transition
+import Minimmit.Model.Transition.Basic
 import Mathlib.Data.Fintype.Basic
 
 /-!

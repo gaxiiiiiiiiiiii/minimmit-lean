@@ -1,4 +1,4 @@
-import Minimmit.Model.Algo
+import Minimmit.Model.Algo.Basic
 
 /-!
 # 制約

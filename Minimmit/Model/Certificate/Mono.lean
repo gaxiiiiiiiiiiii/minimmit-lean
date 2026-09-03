@@ -1,4 +1,4 @@
-import Minimmit.Model.Certificate
+import Minimmit.Model.Certificate.Basic
 
 /-!
 # 証明書の補題

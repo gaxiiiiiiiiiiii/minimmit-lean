@@ -1,4 +1,4 @@
-import Minimmit.Model.Certificate
+import Minimmit.Model.Certificate.Basic
 import Mathlib.Data.List.MinMax
 import Mathlib.Data.Finset.Lattice.Fold
 

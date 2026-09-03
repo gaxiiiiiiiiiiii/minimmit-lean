@@ -1,4 +1,4 @@
-import Minimmit.Analysis.Consistency
+import Minimmit.Model.Constraint.Run
 
 /-!
 # 時間についての補題

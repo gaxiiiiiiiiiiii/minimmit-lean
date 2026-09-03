@@ -10,16 +10,16 @@ Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依�
 
 | 論文 | 定理 | ファイル |
 |---|---|---|
-| Lemma 5.1 One vote per view | `one_vote_per_view` | Analysis/Consistency |
-| Lemma 5.2 (X1) | `x1` | Analysis/Consistency |
-| Lemma 5.3 (X2) | `x2` | Analysis/Consistency |
-| Lemma 5.4 Consistency | `finalised_compatible`, `consistency` | Analysis/Consistency |
-| Lemma 5.5 Progression through views | `progression` | Analysis/Liveness |
-| Lemma 5.6 Correct leaders finalise blocks | `correct_leader_finalises` | Analysis/Liveness |
-| Lemma 5.7 Liveness | `liveness` | Analysis/Liveness |
-| Lemma 5.8 | `correct_leader_finalises_fast` | Analysis/Responsiveness |
-| Lemma 5.9 | `leave_view` | Analysis/Responsiveness |
-| Lemma 5.10 Optimistic responsiveness | `optimistic_responsiveness` | Analysis/Responsiveness |
+| Lemma 5.1 One vote per view | `one_vote_per_view` | Analysis/Consistency/Lemma5_1 |
+| Lemma 5.2 (X1) | `x1` | Analysis/Consistency/Lemma5_2 |
+| Lemma 5.3 (X2) | `x2` | Analysis/Consistency/Lemma5_3 |
+| Lemma 5.4 Consistency | `finalised_compatible`, `consistency` | Analysis/Consistency/Lemma5_4 |
+| Lemma 5.5 Progression through views | `progression` | Analysis/Liveness/Lemma5_5 |
+| Lemma 5.6 Correct leaders finalise blocks | `correct_leader_finalises` | Analysis/Liveness/Lemma5_6 |
+| Lemma 5.7 Liveness | `liveness` | Analysis/Liveness/Lemma5_7 |
+| Lemma 5.8 | `correct_leader_finalises_fast` | Analysis/Responsiveness/Lemma5_8 |
+| Lemma 5.9 | `leave_view` | Analysis/Responsiveness/Lemma5_9 |
+| Lemma 5.10 Optimistic responsiveness | `optimistic_responsiveness` | Analysis/Responsiveness/Lemma5_10 |
 
 ## ビルド
 
@@ -48,22 +48,44 @@ lake build
 
 ## ファイル構成
 
+`Model/` が §4、`Analysis/` が §5。`Model/` の各ディレクトリでは `Basic.lean` が定義で、他のファイルは補題。定義を確かめるには 4 つの `Basic.lean` を読めばよい。
+
 ```
-Minimmit/
-  Model/
-    Transition.lean     状態、message、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.run
-    Certificate.lean    §4 の述語（M/L-notarisation、nullification、valid proposal、proof of no progress）
-    Algo.lean           Algorithm 1（Algo.step）と部品（SelectParent、ProposeChild、転送、登り）
-    Constraint.lean     Init、PartialSync、Correct、ByzBound、Fair、Honest
-  Analysis/
-    Transition.lean     原始関数の局所効果、動作列の畳み込み、1 スロット後の状態との関係
-    Certificate.lean    述語の単調性、投票者・nullify 送信者の集合
-    Run.lean            署名付き message の遡り（S にあれば署名者が前に送った）、腐敗の数え上げ
-    Algo.lean           Algo.step の段ごとの分解、各段の送信条件、局所不変量（LocalInv・PropInv）、登りの補題
-    Consistency.lean    局所不変量の実行への持ち上げ、Lemma 5.1〜5.4
-    Timing.lean         view と timer の推移、部分同期による配送、証明書の転送、証明書への反応
-    Liveness.lean       Lemma 5.5〜5.7 と、5.6 の補題群（LeaderRound）
-    Responsiveness.lean Lemma 5.8〜5.10
+Minimmit
+├── Model
+│   ├── Transition
+│   │   ├── Basic.lean          状態、message、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.run
+│   │   └── Execute.lean        原始関数の局所効果、動作列の畳み込み、1 スロット後の状態との関係
+│   ├── Certificate
+│   │   ├── Basic.lean          §4 の述語（M/L-notarisation、nullification、valid proposal、proof of no progress）
+│   │   └── Mono.lean           述語の単調性、投票者・nullify 送信者の集合
+│   ├── Algo
+│   │   ├── Basic.lean          Algorithm 1（Algo.step）と部品（SelectParent、ProposeChild、転送、登り）
+│   │   ├── Disseminate.lean    全員への送信の補題
+│   │   ├── Stage.lean          Algo.step の段ごとの分解、各段の入力状態 st1〜st5、各段の S と view
+│   │   ├── LocalInv.lean       局所不変量（LocalInv・PropInv）と各段での保存
+│   │   ├── Climb.lean          登り（16〜21 行の繰り返し）の補題
+│   │   ├── Send.lean           各段の S の中身、各段が送る message とその条件、票と nullify の出所
+│   │   └── Forward.lean        転送と反応の補題、SelectParent と valid proposal
+│   └── Constraint
+│       ├── Basic.lean          Init、PartialSync、Correct、ByzBound、Fair、Honest
+│       └── Run.lean            署名の遡り（S にあれば署名者が前に送った）、腐敗の数え上げ、不変量の実行への持ち上げ
+└── Analysis
+    ├── Consistency
+    │   ├── Lemma5_1.lean
+    │   ├── Lemma5_2.lean
+    │   ├── Lemma5_3.lean
+    │   └── Lemma5_4.lean
+    ├── Liveness
+    │   ├── Timing.lean         view と timer の推移、部分同期による配送、証明書の転送、証明書への反応
+    │   ├── Lemma5_5.lean
+    │   ├── LeaderRound.lean    Lemma 5.6 の補題群
+    │   ├── Lemma5_6.lean
+    │   └── Lemma5_7.lean
+    └── Responsiveness
+        ├── Lemma5_8.lean
+        ├── Lemma5_9.lean
+        └── Lemma5_10.lean
 ```
 
 ## 論文からの差異

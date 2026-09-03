@@ -1,20 +1,32 @@
-import Minimmit.Model.Transition
-import Minimmit.Model.Certificate
-import Minimmit.Model.Algo
-import Minimmit.Model.Constraint
-import Minimmit.Analysis.Transition
-import Minimmit.Analysis.Algo
-import Minimmit.Analysis.Consistency
-import Minimmit.Analysis.Timing
-import Minimmit.Analysis.Liveness
-import Minimmit.Analysis.Responsiveness
+import Minimmit.Model.Transition.Basic
+import Minimmit.Model.Transition.Execute
+import Minimmit.Model.Certificate.Basic
+import Minimmit.Model.Certificate.Mono
+import Minimmit.Model.Algo.Basic
+import Minimmit.Model.Algo.Disseminate
+import Minimmit.Model.Algo.Stage
+import Minimmit.Model.Algo.LocalInv
+import Minimmit.Model.Algo.Climb
+import Minimmit.Model.Algo.Send
+import Minimmit.Model.Algo.Forward
+import Minimmit.Model.Constraint.Basic
+import Minimmit.Model.Constraint.Run
+import Minimmit.Analysis.Consistency.Lemma5_1
+import Minimmit.Analysis.Consistency.Lemma5_2
+import Minimmit.Analysis.Consistency.Lemma5_3
+import Minimmit.Analysis.Consistency.Lemma5_4
+import Minimmit.Analysis.Liveness.Timing
+import Minimmit.Analysis.Liveness.Lemma5_5
+import Minimmit.Analysis.Liveness.LeaderRound
+import Minimmit.Analysis.Liveness.Lemma5_6
+import Minimmit.Analysis.Liveness.Lemma5_7
+import Minimmit.Analysis.Responsiveness.Lemma5_8
+import Minimmit.Analysis.Responsiveness.Lemma5_9
+import Minimmit.Analysis.Responsiveness.Lemma5_10
 
 /-!
 # Minimmit の形式化
 
-論文 arXiv:2508.10862 に基づく。`Model/` が定義、`Analysis/` が補題と定理。`Analysis/Transition`
-と `Analysis/Algo` は遷移系と Algorithm 1 についての補題、残りが §5。
-import は `Transition`（遷移系）、`Certificate`（§4 の述語）、`Algo`（Algorithm 1）、
-`Constraint`（制約）、`Consistency`・`Liveness`・`Responsiveness` の順で、後のファイルが
-前のファイルを import する。
+論文 arXiv:2508.10862 に基づく。`Model/` が §4（定義と、モデルについての補題）、`Analysis/` が
+§5（Lemma 5.1〜5.10）。`Model/` の各ディレクトリでは `Basic.lean` が定義で、他のファイルは補題。
 -/

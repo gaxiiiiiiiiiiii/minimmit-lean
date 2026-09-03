@@ -19,9 +19,6 @@ structure Time where
   val : Nat
 deriving DecidableEq
 
-instance : Coe View Nat := ⟨View.val⟩
-instance : Coe Time Nat := ⟨Time.val⟩
-
 variable {Tx : Type}
 
 /-- ブロック（§4）: genesis か、(view, 取引列, 親) の組。親はハッシュ値

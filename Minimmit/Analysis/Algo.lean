@@ -2342,6 +2342,14 @@ theorem mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Blo
   simp only [List.mem_flatMap, List.mem_filter, Finset.mem_toList, decide_eq_true_eq]
   exact ⟨b, ⟨mem_votedBlocks hm, h1, h2⟩, hm, q, rfl⟩
 
+/-- 新しい取引は転送される。 -/
+theorem mem_forwardMsgs_tx {f : Nat} {p : Processor n Tx} {tr : Tx} (h : Msg.tx tr ∈ p.S)
+    (hnew : Msg.tx tr ∉ p.prevS) : Msg.tx tr ∈ forwardMsgs f p := by
+  simp only [forwardMsgs, List.mem_append]
+  right
+  simp only [List.mem_filter, Finset.mem_toList]
+  exact ⟨h, by simp [hnew]⟩
+
 theorem send_mem_step_of_mem_forwardMsgs {f Δ : Nat} {lead : View → Fin n} {i : Fin n}
     {p : Processor n Tx} {m : Msg n Tx} (h : m ∈ forwardMsgs f (st5 f Δ lead i p)) (j : Fin n) :
     Action.send m j ∈ Algo.step f Δ lead i p := by

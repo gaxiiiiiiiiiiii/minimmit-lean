@@ -96,22 +96,50 @@ theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs 
     rw [← hbv]
     exact Algo.hasCert_of_mnotarised hg this
 
-/-- Lemma 5.6 の第 1 段: 最初の正直者が t ≥ GST に view v に入れば、正直者は全員 t + δ までに
-    view v に入る。 -/
-theorem enter_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) {q : Fin n}
-    (hq : Correct s₀ instrs q) : v.val ≤ (viewAt s₀ instrs q (t + δ + 1)).val := by
+/-- Lemma 5.6 の第 1 段: 最初の正直者が t に view v に入れば、正直者は全員
+    max(t, GST) + δ までに view v に入る。T₀ は t 以上で GST 以上の任意の時刻。 -/
+theorem enter_all_anchor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync δ s₀ instrs) {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t)
+    {T₀ : Nat} (ht : t ≤ T₀) (hgst : hs.GST.val ≤ T₀) {q : Fin n} (hq : Correct s₀ instrs q) :
+    v.val ≤ (viewAt s₀ instrs q (T₀ + δ + 1)).val := by
   obtain ⟨j, hj, hjv⟩ := hfirst.entered
-  have hΔ := hs.one_le
-  rw [viewAt_succ_eq hh hq (t + δ)]
+  have hδ1 := hs.one_le
+  rw [viewAt_succ_eq hh hq (T₀ + δ)]
   apply Algo.st1_reaches q
   intro w h1 h2
-  have hw1 : 1 ≤ w.val := le_trans (viewAt_pos hinit hh hq (t + δ)) h1
+  have hw1 : 1 ≤ w.val := le_trans (viewAt_pos hinit hh hq (T₀ + δ)) h1
   obtain ⟨s, hs_lt, hs1, hs2⟩ := exists_leave_slot hinit hw1 (lt_of_lt_of_le h2 hjv)
   have hcert : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w := by
     rw [viewAt_succ_eq hh hj s] at hs2
     exact Algo.st1_certs hs1 hs2
   exact hasCert_all hinit hh hs hj hw1 hcert hq (by omega) (by omega)
+
+/-- 最初の正直者が t ≥ GST に view v に入れば、正直者は全員 t + δ までに view v に入る。 -/
+theorem enter_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
+    {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) {q : Fin n}
+    (hq : Correct s₀ instrs q) : v.val ≤ (viewAt s₀ instrs q (t + δ + 1)).val :=
+  enter_all_anchor hinit hh hs hfirst (le_refl t) hgst hq
+
+/-- 初めて受け取った取引は、そのスロットの終わりに全員へ転送される。 -/
+theorem tx_forwarded (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {tr : Tx}
+    (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
+    (hfirst : ∀ t' < t, Msg.tx tr ∉ ((State.run s₀ instrs t').procs i).S) (j : Fin n) :
+    Action.send (Msg.tx tr) j ∈ (instrs t).actions i := by
+  have hnew : Msg.tx tr ∉ (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).prevS := by
+    rw [Algo.st5_prevS]
+    cases t with
+    | zero => rw [prevS_zero hinit]; simp
+    | succ t' =>
+      rw [prevS_run_honest hh hi]
+      intro hm
+      rcases Algo.mem_S_stage_or f Δ lead i _ hm with hm | hsig
+      · exact hfirst t' (Nat.lt_succ_self t') hm
+      · exact absurd hsig (by simp [Msg.signer])
+  have hmem : Msg.tx tr ∈ (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S :=
+    Algo.S_subset_st5 f Δ lead i _ htr
+  rw [hh t i (hi t)]
+  exact Algo.send_mem_step_of_mem_forwardMsgs (Algo.mem_forwardMsgs_tx hmem hnew) j
 
 /-- 正直者 p_i が view k で止まり続けるなら、他の正直者も view k を越えない。越えたなら
     その証明書が p_i に届いて p_i も進むから。 -/

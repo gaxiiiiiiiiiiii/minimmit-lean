@@ -218,7 +218,7 @@ theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         cases this
   obtain ⟨h6, hv6, hnl6, hvote6, hnp⟩ := Algo.nullify_after_vote hp hbvote hj₀ hno
   -- 証拠の署名者 W を数える
-  set W := noProgressWitnesses (Algo.st5 f Δ lead q₀ ((State.run s₀ instrs (T q₀)).procs q₀)).S
+  set W := noProgressWitnesses (Algo.st4 f Δ lead q₀ ((State.run s₀ instrs (T q₀)).procs q₀)).S
     b.view (some b) with hW
   have hWcard : 2 * f + 1 ≤ W.card := hnp
   have hWsub : W ⊆ Pᶜ ∪ W.filter (fun w => ¬ Correct s₀ instrs w) := by
@@ -235,7 +235,7 @@ theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
             have := h6.null_flag (by rw [hv6]; exact hm)
             rw [hnl6] at this
             cases this
-          · rcases Algo.mem_S_stage_or f Δ lead q₀ _ (Algo.S_st5_subset_st6 f Δ lead q₀ _ hm)
+          · rcases Algo.mem_S_stage_or f Δ lead q₀ _ (Algo.S_st4_subset_st5 f Δ lead q₀ _ hm)
               with hm' | hs
             · obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm' rfl
               have hwC : w ∈ C := Finset.mem_filter.mpr
@@ -249,7 +249,7 @@ theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
           by_cases hwq : w = q₀
           · subst hwq
             exact hne (congrArg some (h6.unique b'' b hm hvote6 hbv))
-          · rcases Algo.mem_S_stage_or f Δ lead q₀ _ (Algo.S_st5_subset_st6 f Δ lead q₀ _ hm)
+          · rcases Algo.mem_S_stage_or f Δ lead q₀ _ (Algo.S_st4_subset_st5 f Δ lead q₀ _ hm)
               with hm' | hs
             · have hs'' := sends_of_mem_S hinit hm' rfl
               have := one_vote_per_view hinit hh hwc (mem_voteSenders.mp hwP) hs'' hbv.symm
@@ -280,9 +280,9 @@ theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
 
 /-- 正直者の各段の S にある message は、その正直者が実行上で送ったものか、そのスロットの
     自分の送信。 -/
-theorem sends_of_mem_S_st6 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
+theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {m : Msg n Tx}
-    (hm : m ∈ (Algo.st6 f Δ lead q ((State.run s₀ instrs t).procs q)).S) {w : Fin n}
+    (hm : m ∈ (Algo.st5 f Δ lead q ((State.run s₀ instrs t).procs q)).S) {w : Fin n}
     (hw : m.signer = some w) : Sends instrs w m := by
   rcases Algo.mem_S_stage_or_sent f Δ lead q _ hm with hm' | ⟨hs, j, hj⟩
   · exact sends_of_mem_S hinit hm' hw
@@ -293,13 +293,13 @@ theorem sends_of_mem_S_st6 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
     exact List.mem_append_left _ hj
 
 /-- M-notarisation を受けた genesis でないブロックには、9〜11 行で投票した正直者がいる。
-    その段の入力 st3 の S に valid proposal がある。 -/
+    その段の入力 st2 の S に valid proposal がある。 -/
 theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hb : ByzBound f s₀ instrs) {b₂ : Block Tx} (hg : b₂ ≠ .gen) (hM : ReceivesM f instrs b₂) :
     ∃ q t, Correct s₀ instrs q
-      ∧ (Algo.st3 f lead q ((State.run s₀ instrs t).procs q)).view = b₂.view
-      ∧ ValidProposal f lead (Algo.st3 f lead q ((State.run s₀ instrs t).procs q)).S
-          (Algo.st3 f lead q ((State.run s₀ instrs t).procs q)).view b₂ := by
+      ∧ (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view = b₂.view
+      ∧ ValidProposal f lead (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S
+          (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view b₂ := by
   classical
   have hex : ∃ t, ∃ q, Correct s₀ instrs q ∧ ∃ j, Action.send (Msg.vote q b₂) j ∈ (instrs t).actions q := by
     rcases hM with rfl | hM
@@ -329,17 +329,22 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
       · exact absurd hm (hnoS q hqc)
       · exact ⟨j', hs⟩
   simp only [Algo.innerActs, List.mem_append] at hj'
-  rcases hj' with (((((hj' | hj') | hj') | hj') | hj') | hj')
-  · exact absurd hj' Algo.send_advanceNull
+  rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
   · -- 19〜21 行: S に M-notarisation があるので、それより前に正直者が投票している
     exfalso
-    obtain ⟨b', hm, _, hM1, _, _, _⟩ := Algo.send_advanceM_eq hj'
+    obtain ⟨b', q', hm, _, hqv, hM1, _, _, _, _, hnew, _⟩ :=
+      Algo.send_climb (localInv_run hinit hh hqc _) hj'
     injection hm with _ hbb
     subst hbb
     rcases hM1 with hg' | hM1
     · exact hg hg'
     obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM1)
-    exact hnoS w hwc (Algo.mem_S_st1 (mem_voters.mp hw))
+    rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt⟩
+    · exact hnoS w hwc hw'
+    · injection hb'' with _ hbb
+      subst hbb
+      rw [hqv] at hlt
+      exact absurd hlt (lt_irrefl _)
   · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj'; cases hm
   · obtain ⟨b', hm, hbv, _, _, hvp, _⟩ := Algo.send_voteProposal_eq hj'
     injection hm with _ hbb
@@ -348,10 +353,10 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
   · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq hj'; cases hm
   · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq hj'; cases hm
 
-/-- 正直者の st3 の S にある M-notarisation は、実行上の M-notarisation。 -/
-theorem receivesM_of_MNotarised_st3 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
+/-- 正直者の st2 の S にある M-notarisation は、実行上の M-notarisation。 -/
+theorem receivesM_of_MNotarised_st2 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {b₀ : Block Tx}
-    (h : MNotarised f (Algo.st3 f lead q ((State.run s₀ instrs t).procs q)).S b₀) :
+    (h : MNotarised f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S b₀) :
     ReceivesM f instrs b₀ := by
   rcases h with rfl | h
   · exact Or.inl rfl
@@ -359,16 +364,16 @@ theorem receivesM_of_MNotarised_st3 (hinit : Init s₀) (hh : Honest f Δ lead s
     refine h.trans (Finset.card_le_card fun w hw => ?_)
     rw [mem_voters] at hw
     rw [mem_voteSenders]
-    exact sends_of_mem_S_st6 hinit hh hqc (Algo.S_st3_subset_st6 f Δ lead q _ hw) rfl
+    exact sends_of_mem_S_st5 hinit hh hqc (Algo.S_st2_subset_st5 f Δ lead q _ hw) rfl
 
-theorem receivesNullification_of_Nullified_st3 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+theorem receivesNullification_of_Nullified_st2 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     {q : Fin n} (hqc : Correct s₀ instrs q) {t : Nat} {w : View}
-    (h : Nullified f (Algo.st3 f lead q ((State.run s₀ instrs t).procs q)).S w) :
+    (h : Nullified f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S w) :
     ReceivesNullification f instrs w := by
   refine h.trans (Finset.card_le_card fun x hx => ?_)
   rw [mem_nullifiers] at hx
   rw [mem_nullifySenders]
-  exact sends_of_mem_S_st6 hinit hh hqc (Algo.S_st3_subset_st6 f Δ lead q _ hx) rfl
+  exact sends_of_mem_S_st5 hinit hh hqc (Algo.S_st2_subset_st5 f Δ lead q _ hx) rfl
 
 /-- M-notarisation を受けたブロックの親は M-notarisation を受け、親の view と自分の view の
     間の view は nullification を受ける。 -/
@@ -379,8 +384,8 @@ theorem receivesM_parent (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
       ∧ ∀ w : View, p₀.view.val < w.val → w.val < v.val → ReceivesNullification f instrs w := by
   obtain ⟨q, t, hqc, hview, hvp⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hM
   have hpar : p₀ ∈ (Block.node v tr p₀).parent := by simp [Block.parent]
-  refine ⟨receivesM_of_MNotarised_st3 hinit hh hqc (hvp.parent p₀ hpar), fun w h1 h2 => ?_⟩
-  refine receivesNullification_of_Nullified_st3 hinit hh hqc (hvp.gaps p₀ hpar w h1 ?_)
+  refine ⟨receivesM_of_MNotarised_st2 hinit hh hqc (hvp.parent p₀ hpar), fun w h1 h2 => ?_⟩
+  refine receivesNullification_of_Nullified_st2 hinit hh hqc (hvp.gaps p₀ hpar w h1 ?_)
   rw [hview]; exact h2
 
 /-- M-notarisation を受けたブロックの祖先は M-notarisation を受ける。 -/

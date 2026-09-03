@@ -141,9 +141,10 @@ theorem Algo.send_guard {p : Processor n Tx} {i : Fin n} {m : Msg n Tx} {j : Fin
   rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at h
   rcases List.mem_append.mp h with h | h
   · simp only [Algo.innerActs, List.mem_append] at h
-    rcases h with (((((h | h) | h) | h) | h) | h)
-    · exact absurd h Algo.send_advanceNull
-    · obtain ⟨_, rfl, _⟩ := Algo.send_advanceM_eq h; exact Or.inl rfl
+    rcases h with ((((h | h) | h) | h) | h)
+    · rcases Algo.mem_S_climb (Algo.mem_S_of_send_climb h) with hm | ⟨b, rfl, _⟩
+      · exact Or.inr hm
+      · exact Or.inl rfl
     · obtain ⟨_, rfl⟩ := Algo.send_propose_eq h; exact Or.inl rfl
     · obtain ⟨_, rfl, _⟩ := Algo.send_voteProposal_eq h; exact Or.inl rfl
     · obtain ⟨rfl, _⟩ := Algo.send_nullifyTimeout_eq h; exact Or.inl rfl
@@ -226,7 +227,7 @@ theorem prevS_run (i : Fin n) (t : Nat) :
 theorem prevS_run_honest (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     (t : Nat) :
     ((State.run s₀ instrs (t + 1)).procs i).prevS
-      = (Algo.st6 f Δ lead i ((State.run s₀ instrs t).procs i)).S := by
+      = (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S := by
   rw [prevS_run, hh t i (hi t), Algo.executeAll_step, Algo.stepPair_S]
 
 theorem prevS_zero (hinit : Init s₀) (i : Fin n) : ((State.run s₀ instrs 0).procs i).prevS = ∅ := by
@@ -237,17 +238,17 @@ theorem prevS_zero (hinit : Init s₀) (i : Fin n) : ((State.run s₀ instrs 0).
 theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f ((State.run s₀ instrs t).procs i).S v) :
-    ∃ t' ≤ t, Nullified f (Algo.st6 f Δ lead i ((State.run s₀ instrs t').procs i)).S v
-      ∧ ∀ q ∈ nullifiers (Algo.st6 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
+    ∃ t' ≤ t, Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v
+      ∧ ∀ q ∈ nullifiers (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
         Action.send (Msg.nullify q v) j ∈ (instrs t').actions i := by
   classical
-  have ht : Nullified f (Algo.st6 f Δ lead i ((State.run s₀ instrs t).procs i)).S v :=
-    h.mono (Algo.S_subset_st6 f Δ lead i _)
-  have hex : ∃ t', Nullified f (Algo.st6 f Δ lead i ((State.run s₀ instrs t').procs i)).S v := ⟨t, ht⟩
+  have ht : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v :=
+    h.mono (Algo.S_subset_st5 f Δ lead i _)
+  have hex : ∃ t', Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
   rw [mem_nullifiers] at hq
-  have hnew : ¬ Nullified f (Algo.st6 f Δ lead i ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS v := by
-    rw [Algo.st6_prevS]
+  have hnew : ¬ Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS v := by
+    rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
       simp [Nullified, nullifiers]
@@ -263,17 +264,17 @@ theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
 theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
-    ∃ t' ≤ t, MNotarised f (Algo.st6 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
-      ∧ ∀ q ∈ voters (Algo.st6 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
+    ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
+      ∧ ∀ q ∈ voters (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i := by
   classical
-  have ht : MNotarised f (Algo.st6 f Δ lead i ((State.run s₀ instrs t).procs i)).S b :=
-    h.mono (Algo.S_subset_st6 f Δ lead i _)
-  have hex : ∃ t', MNotarised f (Algo.st6 f Δ lead i ((State.run s₀ instrs t').procs i)).S b := ⟨t, ht⟩
+  have ht : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b :=
+    h.mono (Algo.S_subset_st5 f Δ lead i _)
+  have hex : ∃ t', MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
   rw [mem_voters] at hq
-  have hnew : ¬ MNotarised f (Algo.st6 f Δ lead i ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS b := by
-    rw [Algo.st6_prevS]
+  have hnew : ¬ MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS b := by
+    rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
       intro hM
@@ -318,7 +319,7 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (
 /-- 次のスロットの冒頭の view は、16〜21 行を評価した後の view。 -/
 theorem viewAt_succ_eq (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     (t : Nat) :
-    viewAt s₀ instrs i (t + 1) = (Algo.st2 f i ((State.run s₀ instrs t).procs i)).view := by
+    viewAt s₀ instrs i (t + 1) = (Algo.st1 f i ((State.run s₀ instrs t).procs i)).view := by
   unfold viewAt
   rw [run_succ, (State.step_procs _ _ i).view, Processor.tick_view, hh t i (hi t),
     Algo.executeAll_step, Algo.stepPair_view]
@@ -333,73 +334,46 @@ theorem S_stepPair_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
   rw [Processor.tick_S] at h2
   rw [run_succ]; exact h2 hm
 
-theorem S_st6_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
+theorem S_st5_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     (t : Nat) :
-    (Algo.st6 f Δ lead i ((State.run s₀ instrs t).procs i)).S
+    (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S
       ⊆ ((State.run s₀ instrs (t + 1)).procs i).S :=
-  (Algo.S_st6_subset_stepPair f Δ lead i _).trans (S_stepPair_subset_succ hh hi t)
+  (Algo.S_st5_subset_stepPair f Δ lead i _).trans (S_stepPair_subset_succ hh hi t)
 
-theorem Algo.advanceNull_cases (f : Nat) (q : Processor n Tx) :
-    ((Algo.advanceNull f q).1 = q ∧ ¬ Nullified f q.S q.view)
-      ∨ ((Algo.advanceNull f q).1 = q.progress ∧ Nullified f q.S q.view) := by
-  by_cases h : Nullified f q.S q.view
-  · exact Or.inr ⟨Algo.advanceNull_progress_of h, h⟩
-  · exact Or.inl ⟨Algo.advanceNull_eq_of_not h, h⟩
+theorem Algo.hasCert_of_mnotarised {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx} (hg : b ≠ .gen)
+    (h : MNotarised f S b) : Algo.HasCert f S b.view := by
+  right
+  rcases h with h' | h'
+  · exact absurd h' hg
+  · obtain ⟨q, hq⟩ := Finset.card_pos.mp (lt_of_lt_of_le (Nat.succ_pos _) h')
+    exact List.ne_nil_of_mem
+      (Algo.mem_mNotarisedAt_of (Algo.mem_votedBlocks (mem_voters.mp hq)) (Or.inr h'))
 
-/-- 現在の view の nullification を持つ正直者は、次のスロットには view を進めている。 -/
-theorem leave_of_nullified (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
+/-- 現在の view の証明書を持つ正直者は、次のスロットには view を進めている。 -/
+theorem leave_of_hasCert (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {v : View} (hv : viewAt s₀ instrs i t = v)
-    (h : Nullified f ((State.run s₀ instrs t).procs i).S v) :
+    (h : Algo.HasCert f ((State.run s₀ instrs t).procs i).S v) :
     v.val < (viewAt s₀ instrs i (t + 1)).val := by
   rw [viewAt_succ_eq hh hi t]
   have hpv : ((State.run s₀ instrs t).procs i).view = v := hv
-  have h1 : (Algo.st1 f ((State.run s₀ instrs t).procs i)).view.val = v.val + 1 := by
-    show (Algo.advanceNull f _).1.view.val = _
-    rw [Algo.advanceNull_progress_of (by rw [hpv]; exact h)]
-    simp only [Processor.progress]
-    rw [hpv]
-  rcases Algo.advanceM_view f i (Algo.st1 f ((State.run s₀ instrs t).procs i)) with h2 | h2
-  · show v.val < (Algo.advanceM f i _).1.view.val
-    rw [h2, h1]; exact Nat.lt_succ_self _
-  · show v.val < (Algo.advanceM f i _).1.view.val
-    rw [h2, h1]; omega
+  rw [← hpv] at h ⊢
+  exact Algo.view_lt_st1_of_hasCert i h
 
-/-- 現在の view のブロックの M-notarisation を持つ正直者は、次のスロットには view を進めている。 -/
+theorem leave_of_nullified (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
+    {t : Nat} {v : View} (hv : viewAt s₀ instrs i t = v)
+    (h : Nullified f ((State.run s₀ instrs t).procs i).S v) :
+    v.val < (viewAt s₀ instrs i (t + 1)).val :=
+  leave_of_hasCert hh hi hv (Or.inl h)
+
 theorem leave_of_mnotarised (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {b : Block Tx} (hv : viewAt s₀ instrs i t = b.view) (hg : b ≠ .gen)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
-    b.view.val < (viewAt s₀ instrs i (t + 1)).val := by
-  rw [viewAt_succ_eq hh hi t]
-  have hvote : ∃ q, Msg.vote q b ∈ ((State.run s₀ instrs t).procs i).S := by
-    rcases h with h' | h'
-    · exact absurd h' hg
-    · obtain ⟨q, hq⟩ := Finset.card_pos.mp (lt_of_lt_of_le (by omega) h')
-      exact ⟨q, mem_voters.mp hq⟩
-  obtain ⟨q, hq⟩ := hvote
-  have hpv : ((State.run s₀ instrs t).procs i).view = b.view := hv
-  rcases Algo.advanceNull_cases f ((State.run s₀ instrs t).procs i) with ⟨h1, _⟩ | ⟨h1, _⟩
-  · -- st1 = p、view は b.view。M-notarisation で進む
-    have h1v : (Algo.st1 f ((State.run s₀ instrs t).procs i)).view = b.view := by
-      show (Algo.advanceNull f _).1.view = _; rw [h1, hpv]
-    have h1S : (Algo.st1 f ((State.run s₀ instrs t).procs i)).S = ((State.run s₀ instrs t).procs i).S := by
-      show (Algo.advanceNull f _).1.S = _; rw [h1]
-    have hne : Algo.mNotarisedAt f (Algo.st1 f ((State.run s₀ instrs t).procs i)).S
-        (Algo.st1 f ((State.run s₀ instrs t).procs i)).view ≠ [] := by
-      rw [h1v, h1S]
-      exact List.ne_nil_of_mem (Algo.mem_mNotarisedAt_of (Algo.mem_votedBlocks hq) h)
-    show b.view.val < (Algo.advanceM f i _).1.view.val
-    rw [Algo.advanceM_view_succ_of_ne_nil hne, h1v]; exact Nat.lt_succ_self _
-  · have h1v : (Algo.st1 f ((State.run s₀ instrs t).procs i)).view.val = b.view.val + 1 := by
-      show (Algo.advanceNull f _).1.view.val = _
-      rw [h1]; simp only [Processor.progress]; rw [hpv]
-    show b.view.val < (Algo.advanceM f i _).1.view.val
-    rcases Algo.advanceM_view f i (Algo.st1 f ((State.run s₀ instrs t).procs i)) with h2 | h2
-    · rw [h2, h1v]; exact Nat.lt_succ_self _
-    · rw [h2, h1v]; omega
+    b.view.val < (viewAt s₀ instrs i (t + 1)).val :=
+  leave_of_hasCert hh hi hv (Algo.hasCert_of_mnotarised hg h)
 
-theorem Algo.view_le_st6 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    p.view.val ≤ (Algo.st6 f Δ lead i p).view.val := by
-  rw [Algo.st6_view]; exact Algo.view_le_st2 f i p
+theorem Algo.view_le_st5 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    p.view.val ≤ (Algo.st5 f Δ lead i p).view.val := by
+  rw [Algo.st5_view]; exact Algo.view_le_st1 f i p
 
 /-- 正直者が view v を越えて進んだなら、スロット冒頭の S に view v の nullification か
     view v のブロックの M-notarisation がある。 -/
@@ -409,49 +383,20 @@ theorem leave_view_cert (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Co
     Nullified f ((State.run s₀ instrs t).procs i).S v
       ∨ ∃ b, b.view = v ∧ MNotarised f ((State.run s₀ instrs t).procs i).S b := by
   rw [viewAt_succ_eq hh hi t] at h2
-  -- 19〜21 行で進んだ場合の共通部分
-  have hM : (Algo.st1 f ((State.run s₀ instrs t).procs i)).view.val ≤ v.val →
-      ∃ b, b.view = v ∧ MNotarised f ((State.run s₀ instrs t).procs i).S b := by
-    intro h1v
-    have hne : Algo.mNotarisedAt f (Algo.st1 f ((State.run s₀ instrs t).procs i)).S
-        (Algo.st1 f ((State.run s₀ instrs t).procs i)).view ≠ [] := by
-      intro hnil
-      have h6 := Algo.advanceM_eq_of_nil (i := i) hnil
-      have h2' : v.val < (Algo.advanceM f i (Algo.st1 f ((State.run s₀ instrs t).procs i))).1.view.val := h2
-      rw [h6] at h2'
-      omega
-    obtain ⟨b, hb⟩ := List.exists_mem_of_ne_nil _ hne
-    have hb' := Algo.mem_mNotarisedAt hb
-    have h6 := Algo.advanceM_view_succ_of_ne_nil (i := i) hne
-    have h2' : v.val < (Algo.advanceM f i (Algo.st1 f ((State.run s₀ instrs t).procs i))).1.view.val := h2
-    rw [h6] at h2'
-    have hv1 : (Algo.st1 f ((State.run s₀ instrs t).procs i)).view = v :=
-      View.val_injective (by omega)
-    exact ⟨b, hb'.1.trans hv1, hb'.2.mono fun m hm => Algo.mem_S_st1 hm⟩
-  rcases Algo.advanceNull_cases f ((State.run s₀ instrs t).procs i) with ⟨h1', _⟩ | ⟨h1', hN⟩
+  rcases Algo.st1_certs h1 h2 with h | h
+  · exact Or.inl h
   · right
-    apply hM
-    show (Algo.advanceNull f _).1.view.val ≤ v.val
-    rw [h1']; exact h1
-  · by_cases hvt : (viewAt s₀ instrs i t).val = v.val
-    · left
-      have hpv : ((State.run s₀ instrs t).procs i).view = v := View.val_injective hvt
-      rw [hpv] at hN
-      exact hN
-    · right
-      apply hM
-      show (Algo.advanceNull f _).1.view.val ≤ v.val
-      rw [h1']; simp only [Processor.progress]
-      exact lt_of_le_of_ne h1 hvt
+    obtain ⟨b, hb⟩ := List.exists_mem_of_ne_nil _ h
+    exact ⟨b, (Algo.mem_mNotarisedAt hb).1, (Algo.mem_mNotarisedAt hb).2⟩
 
 /-- view を進めなかった正直者の 16〜21 行は何もしない。 -/
-theorem st2_eq_of_not_leave (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
+theorem st1_eq_of_not_leave (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} (h : ¬ (viewAt s₀ instrs i t).val < (viewAt s₀ instrs i (t + 1)).val) :
-    Algo.st2 f i ((State.run s₀ instrs t).procs i) = (State.run s₀ instrs t).procs i := by
-  apply Algo.st2_eq_of_view
+    Algo.st1 f i ((State.run s₀ instrs t).procs i) = (State.run s₀ instrs t).procs i := by
+  apply Algo.st1_eq_of_view
   apply View.val_injective
   rw [viewAt_succ_eq hh hi t] at h
-  have := Algo.view_le_st2 f i ((State.run s₀ instrs t).procs i)
+  have := Algo.view_le_st1 f i ((State.run s₀ instrs t).procs i)
   exact le_antisymm (not_lt.mp h) this
 
 /-- timer が 2Δ に達した正直者は、そのスロットの終わりまでに現在の view のブロックに投票して
@@ -465,23 +410,23 @@ theorem timeout (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin
   by_cases hlt : v.val < (viewAt s₀ instrs i (t + 1)).val
   · exact Or.inr (Or.inr hlt)
   have hpv : ((State.run s₀ instrs t).procs i).view = v := hv
-  have h2 : Algo.st2 f i ((State.run s₀ instrs t).procs i) = (State.run s₀ instrs t).procs i :=
-    st2_eq_of_not_leave hh hi (by rw [hv]; exact hlt)
-  have hL : Algo.LocalInv f i (Algo.st4 f lead i ((State.run s₀ instrs t).procs i)) :=
-    Algo.localInv_st4 (localInv_run hinit hh hi t)
-  have h4v : (Algo.st4 f lead i ((State.run s₀ instrs t).procs i)).view = v := by
-    rw [Algo.st4_view, h2, hpv]
-  have h4t : (Algo.st4 f lead i ((State.run s₀ instrs t).procs i)).timer = 2 * Δ := by
-    rw [Algo.st4_timer, h2]; exact ht
-  have hsub : (Algo.st4 f lead i ((State.run s₀ instrs t).procs i)).S
+  have h2 : Algo.st1 f i ((State.run s₀ instrs t).procs i) = (State.run s₀ instrs t).procs i :=
+    st1_eq_of_not_leave hh hi (by rw [hv]; exact hlt)
+  have hL : Algo.LocalInv f i (Algo.st3 f lead i ((State.run s₀ instrs t).procs i)) :=
+    Algo.localInv_st3 (localInv_run hinit hh hi t)
+  have h4v : (Algo.st3 f lead i ((State.run s₀ instrs t).procs i)).view = v := by
+    rw [Algo.st3_view, h2, hpv]
+  have h4t : (Algo.st3 f lead i ((State.run s₀ instrs t).procs i)).timer = 2 * Δ := by
+    rw [Algo.st3_timer, h2]; exact ht
+  have hsub : (Algo.st3 f lead i ((State.run s₀ instrs t).procs i)).S
       ⊆ ((State.run s₀ instrs (t + 1)).procs i).S :=
-    (Algo.S_st4_subset_st6 f Δ lead i _).trans (S_st6_subset_succ hh hi t)
-  rcases hnot : (Algo.st4 f lead i ((State.run s₀ instrs t).procs i)).notarised with _ | b
-  · cases hnl : (Algo.st4 f lead i ((State.run s₀ instrs t).procs i)).nullified
+    (Algo.S_st3_subset_st5 f Δ lead i _).trans (S_st5_subset_succ hh hi t)
+  rcases hnot : (Algo.st3 f lead i ((State.run s₀ instrs t).procs i)).notarised with _ | b
+  · cases hnl : (Algo.st3 f lead i ((State.run s₀ instrs t).procs i)).nullified
     · right; left
       have := Algo.nullifyTimeout_fires (i := i) h4t hnl hnot
       rw [h4v] at this
-      exact ((Algo.S_st5_subset_st6 f Δ lead i _).trans (S_st6_subset_succ hh hi t)) this
+      exact ((Algo.S_st4_subset_st5 f Δ lead i _).trans (S_st5_subset_succ hh hi t)) this
     · right; left
       have := hL.null_mem hnl
       rw [h4v] at this
@@ -501,27 +446,27 @@ theorem noprogress_reaction (hinit : Init s₀) (hh : Honest f Δ lead s₀ inst
   · exact Or.inr hlt
   left
   have hpv : ((State.run s₀ instrs t).procs i).view = v := hv
-  have h2 : Algo.st2 f i ((State.run s₀ instrs t).procs i) = (State.run s₀ instrs t).procs i :=
-    st2_eq_of_not_leave hh hi (by rw [hv]; exact hlt)
+  have h2 : Algo.st1 f i ((State.run s₀ instrs t).procs i) = (State.run s₀ instrs t).procs i :=
+    st1_eq_of_not_leave hh hi (by rw [hv]; exact hlt)
   have hLp := localInv_run hinit hh hi t
-  have hL5 : Algo.LocalInv f i (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)) :=
-    Algo.localInv_st5 hLp
-  have h5v : (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).view = v := by
-    rw [Algo.st5_view, h2, hpv]
-  have hvote : Msg.vote i b ∈ (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S :=
-    Algo.S_subset_st5 f Δ lead i _ (hLp.notar_mem b hb)
+  have hL5 : Algo.LocalInv f i (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)) :=
+    Algo.localInv_st4 hLp
+  have h5v : (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).view = v := by
+    rw [Algo.st4_view, h2, hpv]
+  have hvote : Msg.vote i b ∈ (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).S :=
+    Algo.S_subset_st4 f Δ lead i _ (hLp.notar_mem b hb)
   have hbv : b.view = v := (hLp.notar_view b hb).trans hv
-  have hnot5 : (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).notarised = some b :=
+  have hnot5 : (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).notarised = some b :=
     ((hL5.notar b hvote).2.resolve_left (by rw [hbv, h5v]; exact lt_irrefl _)).2
-  have hnp5 : NoProgress f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S
-      (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).view (some b) := by
-    rw [h5v]; exact h.mono (Algo.S_subset_st5 f Δ lead i _)
-  cases hnl : (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).nullified
+  have hnp5 : NoProgress f (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).S
+      (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).view (some b) := by
+    rw [h5v]; exact h.mono (Algo.S_subset_st4 f Δ lead i _)
+  cases hnl : (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).nullified
   · have := Algo.nullifyNoProgress_fires (i := i) hnl hnot5 hnp5
     rw [h5v] at this
-    exact S_st6_subset_succ hh hi t this
+    exact S_st5_subset_succ hh hi t this
   · have := hL5.null_mem hnl
     rw [h5v] at this
-    exact (Algo.S_st5_subset_st6 f Δ lead i _).trans (S_st6_subset_succ hh hi t) this
+    exact (Algo.S_st4_subset_st5 f Δ lead i _).trans (S_st5_subset_succ hh hi t) this
 
 end Minimmit

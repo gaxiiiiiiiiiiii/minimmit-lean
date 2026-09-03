@@ -74,6 +74,13 @@ def Msg.signer {n : Nat} : Msg n Tx → Option (Fin n)
   | .nullify q _ => some q
   | .tx _        => none
 
+/-- message が言及する view の番号。取引は 0。 -/
+def Msg.viewNum {n : Nat} : Msg n Tx → Nat
+  | .block _ b   => b.view.val
+  | .vote _ b    => b.view.val
+  | .nullify _ v => v.val
+  | .tx _        => 0
+
 /-- プロセッサの局所状態（§4, Table 2）。 -/
 structure Processor (n : Nat) (Tx : Type) where
   /-- 現在の view。初期値 1。 -/

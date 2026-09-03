@@ -20,12 +20,46 @@ variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : N
     全員 t + 3δ までに view v のブロックを finalise し、view v を離れる。 -/
 theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View} (hi : Correct s₀ instrs (lead v))
+    (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j →
       (∃ b : Block Tx, b.view = v ∧ LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
       ∧ v.val < (viewAt s₀ instrs j (t + 3 * δ + 1)).val := by
-  sorry
+  intro j hj
+  have hδ1 := hs.one_le
+  obtain ⟨e, R⟩ := leader_round hinit hh hs hδ hv hi hfirst hgst
+  have hbLv := leaderBlockAt_view hinit hh hb hs R
+  have hLN : LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
+      (leaderBlockAt f lead s₀ instrs v e) := by
+    right
+    refine (card_correctSet hb).trans (Finset.card_le_card fun r hr => ?_)
+    have hrc := mem_correctSet.mp hr
+    have hle : v.val ≤ (viewAt s₀ instrs r (t + 2 * δ + 1)).val :=
+      (enter_all hinit hh hs hfirst hgst hrc).trans (viewAt_mono r (by omega))
+    obtain ⟨s, hsT, j', hj'⟩ := vote_by hinit hh hb hs R hrc (s := t + 2 * δ) (le_refl _) hle
+    have hj'' : Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
+        ∈ (instrs s).actions r := by
+      rw [hh s r (hrc s)] at hj' ⊢
+      exact Algo.send_all hj' j
+    rw [mem_voters]
+    exact delivered hinit hh hs hrc hj'' (by omega) (by omega)
+  refine ⟨⟨leaderBlockAt f lead s₀ instrs v e, hbLv, hLN⟩, ?_⟩
+  have hM : MNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
+      (leaderBlockAt f lead s₀ instrs v e) := by
+    rcases hLN with h | h
+    · exact Or.inl h
+    · right; omega
+  have hcert : Algo.HasCert f ((State.run s₀ instrs (t + 3 * δ)).procs j).S v := by
+    rw [← hbLv]
+    exact Algo.hasCert_of_mnotarised (Algo.leaderBlock_ne_gen _ _) hM
+  have henter := enter_all hinit hh hs hfirst hgst hj
+  rcases lt_trichotomy (viewAt s₀ instrs j (t + 3 * δ)).val v.val with hlt | heq | hgt
+  · exfalso
+    have := viewAt_mono (s₀ := s₀) (instrs := instrs) j (show t + δ + 1 ≤ t + 3 * δ by omega)
+    omega
+  · exact leave_of_hasCert hh hj (View.val_injective heq) hcert
+  · exact lt_of_lt_of_le hgt (viewAt_le_succ j _)
 
 /-- Lemma 5.9: 最初の正直者が t ≥ GST に view v に入るなら、lead(v) が正直かどうかに
     よらず、正直者は全員 t + 2Δ + 3δ までに view v を離れる。 -/

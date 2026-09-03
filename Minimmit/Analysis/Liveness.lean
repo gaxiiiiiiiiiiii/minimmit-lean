@@ -934,11 +934,12 @@ theorem no_nullify_v :
       exact ih s' hs' r hr j'' hj''
     · exact hinner j' hs'
 
-/-- 全正直者が lead(v) のブロックに投票する。 -/
-theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s₀ instrs r) :
-    Sends instrs r (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) := by
-  obtain ⟨T, hT⟩ := progression hn hinit hh hb (hs.mono R.hδ) hr ⟨v.val + 1⟩
-  obtain ⟨s, _, hs1, hs2⟩ := exists_leave_slot hinit R.hv (Nat.lt_of_succ_le hT)
+/-- 正直者 r が view v を通過するスロット s では、そのとき lead(v) のブロックに投票するか、
+    既に投票している。 -/
+theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
+    (hs1 : (viewAt s₀ instrs r s).val ≤ v.val) (hs2 : v.val < (viewAt s₀ instrs r (s + 1)).val) :
+    ∃ s' ≤ s, ∃ j, Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
+      ∈ (instrs s').actions r := by
   rw [viewAt_succ_eq hh hr s] at hs2
   obtain ⟨q, hLq, hqv, _, hcert, hnew, hqS, hqsend⟩ :=
     Algo.climb_pass (localInv_run hinit hh hr s) hs1 hs2
@@ -968,16 +969,143 @@ theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s�
       have hbv := (Algo.mem_mNotarisedAt hb'').1
       rw [hqv] at hbv
       have := vote_unique_leaderBlock hinit hh hb hs R s r hr b'' hbv r hsend'
-      rw [← this]; exact ⟨s, r, hsend'⟩
+      refine ⟨s, le_refl _, r, ?_⟩
+      rw [← this]; exact hsend'
     · have hmem := hLq.null_mem hnl
       rw [hqv] at hmem
       obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc hmem) rfl
       exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
   · have hcv := (hLq.notar_view c hnot).trans hqv
-    have hsends := sends_of_mem_S hinit (hqsucc (hLq.notar_mem c hnot)) rfl
-    obtain ⟨s', j, hj⟩ := hsends
+    obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc (hLq.notar_mem c hnot)) rfl
     have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
-    rw [← this]; exact ⟨s', j, hj⟩
+    refine ⟨s', Nat.lt_succ_iff.mp hs', j, ?_⟩
+    rw [← this]; exact hj
+
+/-- t + 2δ 以降に登りを view v で終える正直者は、そのスロットで 9〜11 行により投票するか、
+    既に投票している。 -/
+theorem vote_line11 {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 * δ ≤ s)
+    (hst1v : (Algo.st1 f r ((State.run s₀ instrs s).procs r)).view = v) :
+    ∃ s' ≤ s, ∃ j, Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
+      ∈ (instrs s').actions r := by
+  have hvalid := leader_valid_at hinit hh hb hs R hr (T := s) hT
+  have hbLv := leaderBlockAt_view hinit hh hb hs R
+  have hst1S : ((State.run s₀ instrs s).procs r).S
+      ⊆ (Algo.st1 f r ((State.run s₀ instrs s).procs r)).S := Algo.S_subset_st1 f r _
+  have hst2S : (Algo.st1 f r ((State.run s₀ instrs s).procs r)).S
+      ⊆ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S := Algo.S_subset_propose f lead r _
+  have hst2v : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view = v := by
+    rw [Algo.st2_view, hst1v]
+  have hL1 := Algo.localInv_st1 (localInv_run hinit hh hr s)
+  have hclimb_send : ∀ m j, Action.send m j
+      ∈ (Algo.climb f r (Algo.maxView ((State.run s₀ instrs s).procs r).S + 1)
+          ((State.run s₀ instrs s).procs r)).2 →
+      Action.send m j ∈ (instrs s).actions r := by
+    intro m j hm
+    rw [hh s r (hr s), Algo.step_eq_stepPair, Algo.stepPair_snd']
+    apply List.mem_append_left
+    simp only [Algo.innerActs, List.mem_append]
+    left; left; left; left
+    exact hm
+  have huniq : ∀ b', b'.view = (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view →
+      Msg.block (lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view) b'
+        ∈ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S →
+      b' = leaderBlockAt f lead s₀ instrs v e := by
+    intro b' hb'v hb'
+    rw [hst2v] at hb'v hb'
+    rcases Algo.mem_S_st2 hb' with hm2 | ⟨b'', hm2, hs2⟩
+    · rcases Algo.mem_S_st1 hm2 with hm1 | ⟨_, hm1, _⟩
+      · exact hvalid.unique b' hb'v hm1
+      · cases hm1
+    · injection hm2 with hr' _
+      obtain ⟨_, _, hp⟩ := Algo.send_propose_eq' hs2
+      subst hr'
+      have hP : Algo.PropInv (lead v) (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))) :=
+        (propInv_run hinit hh hr s).climb (f := f) _
+      have hmem : Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)
+          ∈ (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))).S :=
+        hst1S (leader_block_delivered hinit hh hb hs R hT)
+      have hflag := hP.prop_flag _ hmem (hbLv.trans hst1v.symm)
+      rw [hp] at hflag; cases hflag
+  have hvp2 : ValidProposal f lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S
+      (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view (leaderBlockAt f lead s₀ instrs v e) :=
+    ⟨by rw [hst2v]; exact hbLv, by rw [hst2v]; exact hst2S (hst1S hvalid.signed), huniq,
+      Algo.leaderBlock_ne_gen _ _, fun p₀ hp₀ => (hvalid.parent p₀ hp₀).mono (hst1S.trans hst2S),
+      fun p₀ hp₀ w h1 h2 =>
+        (hvalid.gaps p₀ hp₀ w h1 (by rw [hst2v] at h2; exact h2)).mono (hst1S.trans hst2S)⟩
+  have hprop : Algo.proposals lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S
+      (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view = [leaderBlockAt f lead s₀ instrs v e] :=
+    Algo.proposals_eq_singleton (by rw [hst2v]; exact hst2S (hst1S hvalid.signed))
+      (by rw [hst2v]; exact hbLv) huniq
+  have h3 := Algo.voteProposal_eq_of_singleton (f := f) (i := r) hprop
+  by_cases hcond : ValidProposal f lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S
+      (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view (leaderBlockAt f lead s₀ instrs v e)
+      ∧ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).notarised = none
+      ∧ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).nullified = false
+  · refine ⟨s, le_refl _, r, ?_⟩
+    rw [hh s r (hr s), Algo.step_eq_stepPair, Algo.stepPair_snd']
+    apply List.mem_append_left
+    simp only [Algo.innerActs, List.mem_append]
+    left; left; right
+    rw [h3, if_pos hcond]
+    exact Algo.mem_disseminate_snd.mpr ⟨r, rfl⟩
+  · have hnn : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).notarised ≠ none
+        ∨ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).nullified = true := by
+      by_cases h1 : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).notarised = none
+      · by_cases h2 : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).nullified = false
+        · exact absurd ⟨hvp2, h1, h2⟩ hcond
+        · right; simpa using h2
+      · exact Or.inl h1
+    have hn2 : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).notarised
+        = (Algo.st1 f r ((State.run s₀ instrs s).procs r)).notarised := Algo.propose_notarised f lead r _
+    have hl2 : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).nullified
+        = (Algo.st1 f r ((State.run s₀ instrs s).procs r)).nullified := Algo.propose_nullified f lead r _
+    rcases hnn with hnot | hnl
+    · rw [hn2] at hnot
+      obtain ⟨c, hc⟩ := Option.ne_none_iff_exists'.mp hnot
+      have hcv : c.view = v := (hL1.notar_view c hc).trans hst1v
+      rcases Algo.mem_S_st1 (hL1.notar_mem c hc) with hm1 | ⟨b', hb', _, j, hj⟩
+      · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+        have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
+        refine ⟨s', hs'.le, j, ?_⟩
+        rw [← this]; exact hj
+      · injection hb' with _ hbb
+        subst hbb
+        have hj' := hclimb_send _ _ hj
+        have := vote_unique_leaderBlock hinit hh hb hs R s r hr c hcv j hj'
+        refine ⟨s, le_refl _, j, ?_⟩
+        rw [← this]; exact hj'
+    · rw [hl2] at hnl
+      have hmem := hL1.null_mem hnl
+      rw [hst1v] at hmem
+      rcases Algo.mem_S_st1 hmem with hm1 | ⟨_, hb', _⟩
+      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+        exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
+      · cases hb'
+
+/-- t + 2δ 以降のスロット s の終わりに view v 以上にいる正直者は、s までに lead(v) の
+    ブロックに投票している。 -/
+theorem vote_by {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 * δ ≤ s)
+    (hle : v.val ≤ (viewAt s₀ instrs r (s + 1)).val) :
+    ∃ s' ≤ s, ∃ j, Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
+      ∈ (instrs s').actions r := by
+  rcases Nat.lt_or_ge v.val (viewAt s₀ instrs r (s + 1)).val with hlt | hge
+  · rcases Nat.lt_or_ge v.val (viewAt s₀ instrs r s).val with hlt' | hge'
+    · obtain ⟨s'', hs'', h1, h2⟩ := exists_leave_slot hinit R.hv hlt'
+      obtain ⟨s', hs', j, hj⟩ := vote_at_pass hinit hh hb hs R hr h1 h2
+      exact ⟨s', by omega, j, hj⟩
+    · exact vote_at_pass hinit hh hb hs R hr hge' hlt
+  · have heq : (viewAt s₀ instrs r (s + 1)).val = v.val := le_antisymm hge hle
+    have hst1v : (Algo.st1 f r ((State.run s₀ instrs s).procs r)).view = v := by
+      rw [← viewAt_succ_eq hh hr s]; exact View.val_injective heq
+    exact vote_line11 hinit hh hb hs R hr hT hst1v
+
+/-- 全正直者が lead(v) のブロックに投票する。 -/
+theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s₀ instrs r) :
+    Sends instrs r (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) := by
+  obtain ⟨T, hT⟩ := progression hn hinit hh hb (hs.mono R.hδ) hr ⟨v.val + 1⟩
+  obtain ⟨s, _, hs1, hs2⟩ := exists_leave_slot hinit R.hv (Nat.lt_of_succ_le hT)
+  obtain ⟨s', _, j, hj⟩ := vote_at_pass hinit hh hb hs R hr hs1 hs2
+  exact ⟨s', j, hj⟩
 
 end CorrectLeader
 

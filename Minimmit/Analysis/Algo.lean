@@ -1212,6 +1212,20 @@ theorem propose_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processo
   · exact disseminate_view i p _
   · rfl
 
+theorem propose_notarised (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (propose f lead i p).1.notarised = p.notarised := by
+  unfold propose; split_ifs
+  · rw [disseminate_fst]
+    exact PreInv.foldl_send_notarised_of_not_vote (fun _ h => by cases h) _ _
+  · rfl
+
+theorem propose_nullified (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (propose f lead i p).1.nullified = p.nullified := by
+  unfold propose; split_ifs
+  · rw [disseminate_fst]
+    exact PreInv.foldl_send_nullified_of_not_nullify (fun _ h => by cases h) _ _
+  · rfl
+
 theorem voteProposal_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (voteProposal f lead i p).1.view = p.view := by
   unfold voteProposal

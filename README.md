@@ -38,7 +38,10 @@ lake build
 - `State`: 大域状態。各プロセッサ `procs`、これまでに腐敗した `byz`、網に載った packet の全体 `pool`、現在のスロット `now`。
 - `Action`: プロセッサが自分から起こす動作。message を送るか、次の view へ進むか。
 - `Instr`: 1 スロット分の指示。各プロセッサの動作列・配送・取引投入・腐敗。敵対者は指示の列 `instrs : Nat → Instr` を選ぶ。
-- `State.run s₀ instrs t`: スロット t の冒頭の状態。
+- `State.run s₀ instrs t`: スロット t の冒頭の状態。スロット t の動作で起きた view の変化は、スロット t + 1 の冒頭の状態に現れる。
+- ブロックは親をハッシュではなくブロックそのもので持つ。論文は暗号を完全と仮定しているので、ハッシュと実体を同一視した。
+- 初期状態の S は空。Table 2 が初期の S に含める genesis の M/L-notarisation は、述語 `MNotarised`・`LNotarised` が genesis を無条件に認めることで表す。
+- 論文が「some b」や同点の選択を任意に残している箇所（19 行の投票先、SelectParent の同点）は、S の列挙順で選ぶ。
 - `Algo.step`: Algorithm 1。局所状態から 1 スロット分の動作列を返す関数。
 - 制約: `Init`（初期状態）、`Honest`（腐敗していないプロセッサの動作は `Algo.step` の出力）、`ByzBound`（腐敗は f 人以下）、`PartialSync`（GST と Δ、Δ ≥ 1）、`Fair`（どのプロセッサも無限回リーダーになる）。
 - 証明書は S 上の述語。`MNotarised`・`LNotarised`・`Nullified`・`ValidProposal`・`NoProgress`。
@@ -117,9 +120,11 @@ Minimmit
 
 ### ステートメント
 
+- Lemma 5.5 の「view v に入る」は「view v 以上に達する」として述べる。登り切りでは 1 スロットで v を通り過ぎることがあり、スロットの冒頭に v にいるとは限らない。
 - Lemma 5.6・5.8・5.9 は view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では誰も view 0 にいないので結論が成り立たない。
+- Lemma 5.4 の `consistency` は p_i・p_j の正直さを仮定しない。署名の遡りは腐敗したプロセッサの S でも成り立つ。
 - Lemma 5.8〜5.10 の O(·) は具体的な上界に置き換えた。5.8 は t + 3δ、5.9 は t + 2Δ + 3δ、5.10 は t + δ + (f_a + 1)(2Δ + 3δ) + 3δ。
-- Lemma 5.10 のリーダーの条件は「どの f_a + 1 個の連続する view にも正直なリーダーがいる」。論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす。
+- Lemma 5.10 のリーダーの条件は「どの f_a + 1 個の連続する view にも正直なリーダーがいる」。f_a はこの条件のパラメータで、f_a ≤ f は課さない。論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす。
 - Lemma 5.8〜5.10 の δ は `PartialSync δ` として与える。timeout の 2Δ は Honest の Δ のまま。
 
 ## 未証明

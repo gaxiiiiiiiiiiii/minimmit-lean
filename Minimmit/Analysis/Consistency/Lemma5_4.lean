@@ -178,13 +178,14 @@ theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
     rw [mem_voteSenders]
     exact sends_of_mem_S hinit hw rfl
 
-/-- Consistency（§2）をブロックの形で: 正直者が L-notarisation を持つ 2 つのブロックは、
-    一方が他方の祖先。log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が
+/-- Consistency（§2）をブロックの形で: 2 つのプロセッサが L-notarisation を持つ 2 つの
+    ブロックは、一方が他方の祖先。論文は正直者 p_i・p_j について述べるが、署名の遡り
+    （`sendsBefore_of_mem_S`）は腐敗したプロセッサの S でも成り立つので、i・j の正直さは
+    要らない。log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が
     L-notarisation を持つブロックの Tr* に当たる。 -/
 theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    {i j : Fin n} (_hi : Correct s₀ instrs i) (_hj : Correct s₀ instrs j)
-    {t t' : Nat} {b b' : Block Tx}
+    {i j : Fin n} {t t' : Nat} {b b' : Block Tx}
     (hbi : LNotarised f ((State.run s₀ instrs t).procs i).S b)
     (hbj : LNotarised f ((State.run s₀ instrs t').procs j).S b') :
     b.Ancestor b' ∨ b'.Ancestor b :=

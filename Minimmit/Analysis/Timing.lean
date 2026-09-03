@@ -233,17 +233,15 @@ theorem prevS_run_honest (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : C
 theorem prevS_zero (hinit : Init s₀) (i : Fin n) : ((State.run s₀ instrs 0).procs i).prevS = ∅ := by
   rw [State.run, hinit.procs i]; rfl
 
-/-- 正直者が nullification を持つなら、その動作を終えた時点の S で初めてそれが完成した
+/-- 正直者が動作を終えた時点の S に nullification を持つなら、それが初めて完成した
     スロット t' ≤ t に、その構成 nullify を全員へ送っている。 -/
-theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+theorem forward_nullification_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {v : View}
-    (h : Nullified f ((State.run s₀ instrs t).procs i).S v) :
+    (ht : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v) :
     ∃ t' ≤ t, Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v
       ∧ ∀ q ∈ nullifiers (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
         Action.send (Msg.nullify q v) j ∈ (instrs t').actions i := by
   classical
-  have ht : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v :=
-    h.mono (Algo.S_subset_st5 f Δ lead i _)
   have hex : ∃ t', Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
   rw [mem_nullifiers] at hq
@@ -259,17 +257,23 @@ theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
   exact Algo.send_mem_step_of_mem_forwardMsgs
     (Algo.mem_forwardMsgs_nullify (Nat.find_spec hex) hnew hq) j
 
-/-- 正直者が genesis でないブロックの M-notarisation を持つなら、その動作を終えた時点の S で
-    初めてそれが完成したスロットに、その構成の票を全員へ送っている。 -/
-theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+/-- 正直者が nullification を持つなら、その動作を終えた時点の S で初めてそれが完成した
+    スロット t' ≤ t に、その構成 nullify を全員へ送っている。 -/
+theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {v : View}
+    (h : Nullified f ((State.run s₀ instrs t).procs i).S v) :
+    ∃ t' ≤ t, Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v
+      ∧ ∀ q ∈ nullifiers (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
+        Action.send (Msg.nullify q v) j ∈ (instrs t').actions i :=
+  forward_nullification_end hinit hh hi (h.mono (Algo.S_subset_st5 f Δ lead i _))
+
+theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
-    (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
+    (ht : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
       ∧ ∀ q ∈ voters (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i := by
   classical
-  have ht : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b :=
-    h.mono (Algo.S_subset_st5 f Δ lead i _)
   have hex : ∃ t', MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
   rw [mem_voters] at hq
@@ -287,6 +291,16 @@ theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
   rw [hh (Nat.find hex) i (hi _)]
   exact Algo.send_mem_step_of_mem_forwardMsgs
     (Algo.mem_forwardMsgs_vote (Nat.find_spec hex) hnew hq) j
+
+/-- 正直者が genesis でないブロックの M-notarisation を持つなら、その動作を終えた時点の S で
+    初めてそれが完成したスロットに、その構成の票を全員へ送っている。 -/
+theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
+    (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
+    ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
+      ∧ ∀ q ∈ voters (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
+        Action.send (Msg.vote q b) j ∈ (instrs t').actions i :=
+  forward_mnotarisation_end hinit hh hi hg (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
 /-- 正直者 p_i がスロット t に nullification を持つなら、正直者 p_j は期限までにそれを持つ。 -/
 theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
@@ -313,6 +327,73 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') Δ).trans hT₂)
+
+/-- `nullified_all` の、動作を終えた時点の S についての版。 -/
+theorem nullified_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync Δ s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
+    (h : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v) {T : Nat}
+    (hT₁ : t + 1 ≤ T) (hT₂ : max hs.GST.val t + Δ ≤ T) :
+    Nullified f ((State.run s₀ instrs T).procs j).S v := by
+  obtain ⟨t', ht', hn', hsend⟩ := forward_nullification_end hinit hh hi h
+  refine hn'.trans (Finset.card_le_card fun q hq => ?_)
+  rw [mem_nullifiers]
+  exact delivered hinit hh hs hi (hsend q hq j) (by omega)
+    ((Nat.add_le_add_right (max_le_max (le_refl _) ht') Δ).trans hT₂)
+
+theorem mnotarised_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync Δ s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx}
+    (h : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b) {T : Nat}
+    (hT₁ : t + 1 ≤ T) (hT₂ : max hs.GST.val t + Δ ≤ T) :
+    MNotarised f ((State.run s₀ instrs T).procs j).S b := by
+  by_cases hg : b = .gen
+  · exact Or.inl hg
+  obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation_end hinit hh hi hg h
+  rcases hn' with h' | hn'
+  · exact Or.inl h'
+  right
+  refine hn'.trans (Finset.card_le_card fun q hq => ?_)
+  rw [mem_voters]
+  exact delivered hinit hh hs hi (hsend q hq j) (by omega)
+    ((Nat.add_le_add_right (max_le_max (le_refl _) ht') Δ).trans hT₂)
+
+/-! ### timer と view の滞在 -/
+
+theorem timerAt_le_slot (hinit : Init s₀) (i : Fin n) (t : Nat) : timerAt s₀ instrs i t ≤ t := by
+  induction t with
+  | zero =>
+    show ((State.run s₀ instrs 0).procs i).timer ≤ 0
+    rw [State.run, hinit.procs i]; exact le_refl _
+  | succ t ih =>
+    rcases timerAt_succ (s₀ := s₀) (instrs := instrs) i t with ⟨h1, _⟩ | ⟨h1, _⟩
+    · rw [h1]; omega
+    · rw [h1]; omega
+
+/-- timer が m より大きければ、m スロット前から同じ view にいる。 -/
+theorem viewAt_eq_of_lt_timer (hinit : Init s₀) (i : Fin n) (t : Nat) :
+    ∀ m, m < timerAt s₀ instrs i t →
+      ∀ m' ≤ m, viewAt s₀ instrs i (t - m') = viewAt s₀ instrs i t := by
+  intro m
+  induction m with
+  | zero => intro _ m' hm'; rw [Nat.le_zero.mp hm', Nat.sub_zero]
+  | succ m ih =>
+    intro hm m' hm'
+    rcases Nat.le_succ_iff.mp hm' with hle | rfl
+    · exact ih (Nat.lt_of_succ_lt hm) m' hle
+    · have hle := timerAt_le_slot (instrs := instrs) hinit i t
+      have hstay : ∀ k' ≤ m, viewAt s₀ instrs i (t - m + k') = viewAt s₀ instrs i (t - m) := by
+        intro k' hk'
+        have e1 := ih (Nat.lt_of_succ_lt hm) (m - k') (Nat.sub_le _ _)
+        have e2 := ih (Nat.lt_of_succ_lt hm) m (le_refl _)
+        rw [show t - m + k' = t - (m - k') by omega, e1, e2]
+      have htimer := timerAt_add (s₀ := s₀) (instrs := instrs) i (t - m) m hstay
+      rw [show t - m + m = t by omega] at htimer
+      rcases timerAt_succ (s₀ := s₀) (instrs := instrs) i (t - (m + 1)) with ⟨h1, _⟩ | ⟨_, h2⟩
+      · exfalso
+        rw [show t - (m + 1) + 1 = t - m by omega] at h1
+        omega
+      · rw [show t - (m + 1) + 1 = t - m by omega] at h2
+        rw [← h2]
+        exact ih (Nat.lt_of_succ_lt hm) m (le_refl _)
 
 /-! ### 正直者の反応 -/
 

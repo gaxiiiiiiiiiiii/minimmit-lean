@@ -144,6 +144,22 @@ theorem send_nullify_nullified (i : Fin n) (p : Processor n Tx) (v : View) (j : 
   simp only [send, true_and]
   split_ifs <;> rfl
 
+/-- 自分の現在の view のブロックでなければ proposed は変わらない。 -/
+theorem send_proposed_of_not_block (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
+    (h : ∀ b, m = .block i b → b.view ≠ p.view) : (p.send i m j).proposed = p.proposed := by
+  cases m with
+  | block q b =>
+    simp only [send]
+    have : ¬ (q = i ∧ b.view = p.view) := fun ⟨hq, hb⟩ => h b (by rw [hq]) hb
+    simp only [this, if_false]
+    split_ifs <;> rfl
+  | _ => simp only [send]; split_ifs <;> rfl
+
+theorem send_block_proposed (i : Fin n) (p : Processor n Tx) (b : Block Tx) (j : Fin n) :
+    (p.send i (.block i b) j).proposed = if b.view = p.view then true else p.proposed := by
+  simp only [send, true_and]
+  split_ifs <;> rfl
+
 /-- 署名者が k でない message が k の動作の後に S にあるなら、動作の前からあった。 -/
 theorem mem_S_executeAll_of_signer_ne (k : Fin n) (p : Processor n Tx) (acts : List (Action n Tx))
     {m : Msg n Tx} (hm : m ∈ (p.executeAll k acts).S) (hs : m.signer ≠ some k) : m ∈ p.S := by

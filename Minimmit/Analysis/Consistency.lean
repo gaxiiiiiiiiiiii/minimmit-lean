@@ -74,6 +74,78 @@ theorem localInv_run (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
   | t + 1 => localInv_step hinit hh hi t (localInv_run hinit hh hi t)
 
 omit [DecidableEq Tx] in
+theorem propInv_init (hinit : Init s₀) (i : Fin n) : Algo.PropInv i (s₀.procs i) := by
+  rw [hinit.procs i]
+  refine ⟨?_, ?_, ?_⟩ <;> simp [Processor.init]
+
+theorem propInv_step (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) (t : Nat) (h : Algo.PropInv i ((State.run s₀ instrs t).procs i)) :
+    Algo.PropInv i ((State.run s₀ instrs (t + 1)).procs i) := by
+  have hact := hh t i (hi t)
+  have hloc : Algo.PropInv i ((((State.run s₀ instrs t).procs i).executeAll i
+      ((instrs t).actions i)).tick) := by
+    rw [hact, Algo.executeAll_step]
+    exact (h.stepPair (f := f) Δ lead).tick
+  refine hloc.of_sgrows (State.step_procs _ _ i) fun b hb => ?_
+  rw [Processor.tick_S, ← State.act_procs]; exact own_mem_act_of_mem_succ hinit hh hi rfl hb
+
+/-- 正直者 p_i の提案の不変量は全スロットで成り立つ。 -/
+theorem propInv_run (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) (t : Nat) : Algo.PropInv i ((State.run s₀ instrs t).procs i) := by
+  induction t with
+  | zero => exact propInv_init hinit i
+  | succ t ih => exact propInv_step hinit hh hi t ih
+
+/-- 正直者がスロット t に送るブロックは、登りの後の状態の `leaderBlock`。 -/
+theorem send_block_eq (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} {j : Fin n}
+    (h : Action.send (Msg.block i b) j ∈ (instrs t).actions i) :
+    b = Algo.leaderBlock f (Algo.st1 f i ((State.run s₀ instrs t).procs i))
+      ∧ lead (Algo.st1 f i ((State.run s₀ instrs t).procs i)).view = i
+      ∧ (Algo.st1 f i ((State.run s₀ instrs t).procs i)).proposed = false := by
+  rw [hh t i (hi t), Algo.step_eq_stepPair, Algo.stepPair_snd] at h
+  simp only [List.mem_append] at h
+  rcases h with (((((h | h) | h) | h) | h) | h)
+  · obtain ⟨_, _, hm, _⟩ := Algo.send_climb (localInv_run hinit hh hi t) h
+    cases hm
+  · obtain ⟨hm, hl, hp⟩ := Algo.send_propose_eq' h
+    injection hm with _ hbb
+    exact ⟨hbb, hl, hp⟩
+  · obtain ⟨_, hm, _⟩ := Algo.send_voteProposal_eq h; cases hm
+  · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq h; cases hm
+  · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq h; cases hm
+  · rw [Algo.forwardNew_eq] at h
+    obtain ⟨m', hm', _, hmm⟩ := Algo.mem_disseminateAll_snd.mp h
+    cases hmm
+    exact absurd hm' Algo.not_block_mem_forwardMsgs
+
+/-- 正直者が同じ view のブロックを 2 つ送ることはない。 -/
+theorem leader_block_unique (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t₁ t₂ : Nat} {b₁ b₂ : Block Tx} {j₁ j₂ : Fin n}
+    (h₁ : Action.send (Msg.block i b₁) j₁ ∈ (instrs t₁).actions i)
+    (h₂ : Action.send (Msg.block i b₂) j₂ ∈ (instrs t₂).actions i) (hv : b₁.view = b₂.view) :
+    b₁ = b₂ := by
+  -- 同じスロットなら同じブロック。違うスロットなら、先のブロックが S にあって proposed が立つ
+  wlog hle : t₁ ≤ t₂ generalizing t₁ t₂ b₁ b₂ j₁ j₂
+  · exact (this h₂ h₁ hv.symm (Nat.le_of_not_le hle)).symm
+  obtain ⟨hb₁, _, _⟩ := send_block_eq hinit hh hi h₁
+  obtain ⟨hb₂, _, hp₂⟩ := send_block_eq hinit hh hi h₂
+  rcases Nat.eq_or_lt_of_le hle with rfl | hlt
+  · rw [hb₁, hb₂]
+  · exfalso
+    have hmem : Msg.block i b₁ ∈ ((State.run s₀ instrs t₂).procs i).S :=
+      S_subset_run s₀ instrs i hlt (mem_S_succ_of_send hh hi h₁)
+    have hP := (propInv_run hinit hh hi t₂).climb (f := f)
+      (Algo.maxView ((State.run s₀ instrs t₂).procs i).S + 1)
+    have hmem1 : Msg.block i b₁ ∈ (Algo.st1 f i ((State.run s₀ instrs t₂).procs i)).S :=
+      Algo.S_subset_st1 f i _ hmem
+    have hv1 : b₁.view = (Algo.st1 f i ((State.run s₀ instrs t₂).procs i)).view := by
+      rw [hv, hb₂]; rfl
+    have := hP.prop_flag b₁ hmem1 hv1
+    have h' : (Algo.st1 f i ((State.run s₀ instrs t₂).procs i)).proposed = true := this
+    rw [hp₂] at h'; cases h'
+
+omit [DecidableEq Tx] in
 theorem mem_voteSenders {q : Fin n} {b : Block Tx} :
     q ∈ voteSenders instrs b ↔ Sends instrs q (Msg.vote q b) := by
   simp [voteSenders]

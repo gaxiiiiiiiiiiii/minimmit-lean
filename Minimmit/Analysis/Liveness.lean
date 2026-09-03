@@ -60,6 +60,59 @@ theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (h
 theorem viewAt_zero (hinit : Init s₀) (j : Fin n) : (viewAt s₀ instrs j 0).val = 1 := by
   unfold viewAt; rw [State.run, hinit.procs j]; rfl
 
+/-- 正直者 j の view が v を越えるなら、v から越えるスロットがある。 -/
+theorem exists_leave_slot (hinit : Init s₀) {j : Fin n} {v : View} {t₁ : Nat} (hv : 1 ≤ v.val)
+    (h : v.val < (viewAt s₀ instrs j t₁).val) :
+    ∃ s < t₁, (viewAt s₀ instrs j s).val ≤ v.val ∧ v.val < (viewAt s₀ instrs j (s + 1)).val := by
+  classical
+  obtain ⟨t', rfl⟩ : ∃ t', t₁ = t' + 1 := by
+    rcases t₁ with _ | t'
+    · rw [viewAt_zero hinit] at h; omega
+    · exact ⟨t', rfl⟩
+  have hex : ∃ s, v.val < (viewAt s₀ instrs j (s + 1)).val := ⟨t', h⟩
+  refine ⟨Nat.find hex, Nat.lt_succ_of_le (Nat.find_min' hex h), ?_, Nat.find_spec hex⟩
+  rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
+  · rw [h0, viewAt_zero hinit]; exact hv
+  · obtain ⟨s', hs'⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
+    rw [hs']
+    exact not_lt.mp (Nat.find_min hex (by rw [hs']; exact Nat.lt_succ_self s'))
+
+/-- 正直者がスロット s に view w の証明書を持てば、正直者は全員、期限までにそれを持つ。 -/
+theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
+    {j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {w : View} (hw : 1 ≤ w.val)
+    (h : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w) {q : Fin n} (hq : Correct s₀ instrs q)
+    {T : Nat} (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + Δ ≤ T) :
+    Algo.HasCert f ((State.run s₀ instrs T).procs q).S w := by
+  rcases h with h | h
+  · exact Or.inl (nullified_all hinit hh hs hj hq h hT₁ hT₂)
+  · obtain ⟨b, hb⟩ := List.exists_mem_of_ne_nil _ h
+    obtain ⟨hbv, hM⟩ := Algo.mem_mNotarisedAt hb
+    have hg : b ≠ .gen := by
+      intro hg
+      subst hg
+      have : w.val = 0 := by rw [← hbv]; rfl
+      omega
+    have := mnotarised_all hinit hh hs hj hq hM hT₁ hT₂
+    rw [← hbv]
+    exact Algo.hasCert_of_mnotarised hg this
+
+/-- Lemma 5.6 の第 1 段: 最初の正直者が t ≥ GST に view v に入れば、正直者は全員 t + Δ までに
+    view v に入る。 -/
+theorem enter_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
+    {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) {q : Fin n}
+    (hq : Correct s₀ instrs q) : v.val ≤ (viewAt s₀ instrs q (t + Δ + 1)).val := by
+  obtain ⟨j, hj, hjv⟩ := hfirst.entered
+  have hΔ := hs.one_le
+  rw [viewAt_succ_eq hh hq (t + Δ)]
+  apply Algo.st1_reaches q
+  intro w h1 h2
+  have hw1 : 1 ≤ w.val := le_trans (viewAt_pos hinit hh hq (t + Δ)) h1
+  obtain ⟨s, hs_lt, hs1, hs2⟩ := exists_leave_slot hinit hw1 (lt_of_lt_of_le h2 hjv)
+  have hcert : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w := by
+    rw [viewAt_succ_eq hh hj s] at hs2
+    exact Algo.st1_certs hs1 hs2
+  exact hasCert_all hinit hh hs hj hw1 hcert hq (by omega) (by omega)
+
 /-- 正直者 p_i が view k で止まり続けるなら、他の正直者も view k を越えない。越えたなら
     その証明書が p_i に届いて p_i も進むから。 -/
 theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
@@ -271,15 +324,652 @@ theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     ∃ t, v.val ≤ (viewAt s₀ instrs i t).val :=
   progression_aux hn hinit hh hb hs v.val i hi
 
+/-! ### 5.6 の補題 -/
+
+/-- 正直者 r が view v 以上に達するなら、初めて達するスロット e がある。 -/
+theorem entry_slot (hinit : Init s₀) {r : Fin n} {v : View} (hv : 1 ≤ v.val)
+    (hreach : ∃ s, v.val ≤ (viewAt s₀ instrs r (s + 1)).val) :
+    ∃ e, v.val ≤ (viewAt s₀ instrs r (e + 1)).val
+      ∧ (∀ s' < e, (viewAt s₀ instrs r (s' + 1)).val < v.val)
+      ∧ ((viewAt s₀ instrs r e).val < v.val ∨ (e = 0 ∧ v.val = 1)) := by
+  classical
+  refine ⟨Nat.find hreach, Nat.find_spec hreach,
+    fun s' hs' => not_le.mp (Nat.find_min hreach hs'), ?_⟩
+  rcases Nat.eq_zero_or_pos (Nat.find hreach) with h0 | hpos
+  · rw [h0, viewAt_zero hinit]
+    rcases Nat.lt_or_ge 1 v.val with h | h
+    · exact Or.inl h
+    · exact Or.inr ⟨rfl, le_antisymm h hv⟩
+  · obtain ⟨s', hs'⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
+    left; rw [hs']
+    exact not_le.mp (Nat.find_min hreach (by rw [hs']; exact Nat.lt_succ_self s'))
+
+/-- lead(v) が view v に入るスロット e より前に、正直者は view v のブロックに投票しない。
+    e より前に投票するには lead(v) の署名付きの view v のブロックか、それへの正直者の票が
+    要るから。 -/
+theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+    {v : View} (hv : 1 ≤ v.val) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
+    (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val) :
+    ∀ s, ∀ r : Fin n, Correct s₀ instrs r → ∀ b : Block Tx, b.view = v → ∀ j,
+      Action.send (Msg.vote r b) j ∈ (instrs s).actions r → e ≤ s := by
+  intro s
+  induction s using Nat.strong_induction_on with
+  | _ s ih =>
+  intro r hr b hbv j hj
+  rcases Nat.lt_or_ge s e with hlt | hge
+  swap
+  · exact hge
+  exfalso
+  have hg : b ≠ .gen := by
+    intro hg; subst hg
+    have : v.val = 0 := by rw [← hbv]; rfl
+    omega
+  have hact := hh s r (hr s)
+  rw [hact] at hj
+  obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.vote r b) j'
+      ∈ Algo.innerActs f Δ lead r ((State.run s₀ instrs s).procs r) := by
+    rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+    rcases List.mem_append.mp hj with hj | hj
+    · exact ⟨j, hj⟩
+    · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj) with hm | ⟨_, j', hs'⟩
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+        exact absurd (ih s' hs' r hr b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
+      · exact ⟨j', hs'⟩
+  simp only [Algo.innerActs, List.mem_append] at hj'
+  rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
+  · -- 登り: 中間状態 q の S に b の M-notarisation。正直な投票者がそれより前に投票している
+    obtain ⟨b', q, hm, _, hqv, hM, _, _, _, _, hnew, _⟩ :=
+      Algo.send_climb (localInv_run hinit hh hr s) hj'
+    injection hm with _ hbb
+    subst hbb
+    rcases hM with hg' | hM
+    · exact hg hg'
+    obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM)
+    rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt'⟩
+    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl
+      exact absurd (ih s' hs' w hwc b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
+    · injection hb'' with _ hbb
+      subst hbb
+      rw [hqv] at hlt'
+      exact absurd hlt' (lt_irrefl _)
+  · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj'; cases hm
+  · -- 9〜11 行: valid proposal の署名ブロックは lead(v) が送ったもの
+    obtain ⟨b', hm, hbv', _, _, hvp, _⟩ := Algo.send_voteProposal_eq hj'
+    injection hm with _ hbb
+    subst hbb
+    have hsigned := hvp.signed
+    have hlv : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view = v := by
+      rw [← hbv, hbv']
+    rw [hlv] at hsigned
+    rcases Algo.mem_S_st2 hsigned with hm2 | ⟨b'', hm2, hs2⟩
+    · rcases Algo.mem_S_st1 hm2 with hm1 | ⟨_, hm1, _⟩
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+        obtain ⟨hbb, _, _⟩ := send_block_eq hinit hh hlc hj''
+        have h1 := hemin s' (lt_trans hs' hlt)
+        rw [viewAt_succ_eq hh hlc s'] at h1
+        have h2 : b.view = (Algo.st1 f (lead v) ((State.run s₀ instrs s').procs (lead v))).view := by
+          rw [hbb]; rfl
+        rw [← h2, hbv] at h1
+        exact lt_irrefl _ h1
+      · cases hm1
+    · injection hm2 with hr' hbb
+      subst hbb
+      obtain ⟨hm3, _, _⟩ := Algo.send_propose_eq' hs2
+      injection hm3 with _ hbb'
+      subst hr'
+      have h1 := hemin s hlt
+      rw [viewAt_succ_eq hh hlc s] at h1
+      have h2 : b.view = (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))).view := by
+        rw [hbb']; rfl
+      rw [← h2, hbv] at h1
+      exact lt_irrefl _ h1
+  · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq hj'; cases hm
+  · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq hj'; cases hm
+
+/-- lead(v) が view v に入るスロット e より前に、正直者は nullify(v) を送らない。 -/
+theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hb : ByzBound f s₀ instrs) (hs : PartialSync Δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
+    (he : e ≤ t + Δ) (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val) :
+    ∀ s, ∀ r : Fin n, Correct s₀ instrs r → ∀ j,
+      Action.send (Msg.nullify r v) j ∈ (instrs s).actions r → e ≤ s := by
+  intro s
+  induction s using Nat.strong_induction_on with
+  | _ s ih =>
+  intro r hr j hj
+  rcases Nat.lt_or_ge s e with hlt | hge
+  swap
+  · exact hge
+  exfalso
+  have hΔ := hs.one_le
+  have hact := hh s r (hr s)
+  rw [hact] at hj
+  obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.nullify r v) j'
+      ∈ Algo.innerActs f Δ lead r ((State.run s₀ instrs s).procs r) := by
+    rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+    rcases List.mem_append.mp hj with hj | hj
+    · exact ⟨j, hj⟩
+    · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj) with hm | ⟨_, j', hs'⟩
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+        exact absurd (ih s' hs' r hr j'' hj'') (not_le.mpr (lt_trans hs' hlt))
+      · exact ⟨j', hs'⟩
+  simp only [Algo.innerActs, List.mem_append] at hj'
+  rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
+  · obtain ⟨_, _, hm, _⟩ := Algo.send_climb (localInv_run hinit hh hr s) hj'; cases hm
+  · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj'; cases hm
+  · obtain ⟨_, hm, _⟩ := Algo.send_voteProposal_eq hj'; cases hm
+  · -- 13〜14 行: r は 2Δ スロット前から view v にいるので、t ≤ s − 2Δ
+    obtain ⟨hm, _, _, _, ht3⟩ := Algo.send_nullifyTimeout_eq hj'
+    injection hm with _ hv3
+    rw [Algo.st3_timer] at ht3
+    have hst1 : Algo.st1 f r ((State.run s₀ instrs s).procs r) = (State.run s₀ instrs s).procs r := by
+      rcases Algo.st1_eq_or f r ((State.run s₀ instrs s).procs r) with h | ⟨h, _⟩
+      · exact h
+      · rw [h] at ht3; omega
+    have htimer : timerAt s₀ instrs r s = 2 * Δ := by
+      show ((State.run s₀ instrs s).procs r).timer = 2 * Δ
+      rw [← hst1]; exact ht3
+    have hview : viewAt s₀ instrs r s = v := by
+      show ((State.run s₀ instrs s).procs r).view = v
+      rw [hv3, Algo.st3_view, hst1]
+    have hle := timerAt_le_slot (instrs := instrs) hinit r s
+    rw [htimer] at hle
+    have hstay := viewAt_eq_of_lt_timer hinit r s (2 * Δ - 1) (by rw [htimer]; omega) (2 * Δ - 1)
+      (le_refl _)
+    rw [show s - (2 * Δ - 1) = (s - 2 * Δ) + 1 by omega, hview] at hstay
+    have := hfirst.first r (s - 2 * Δ) hr (by rw [hstay])
+    omega
+  · -- 24〜28 行: r は view v のブロック c₀ に投票済みで、その票は e 以降
+    obtain ⟨hm, _, c₀, hc₀, _⟩ := Algo.send_nullifyNoProgress_eq hj'
+    injection hm with _ hv4
+    have hL4 := Algo.localInv_st4 (Δ := Δ) (lead := lead) (localInv_run hinit hh hr s)
+    have hvote := hL4.notar_mem c₀ hc₀
+    have hcv : c₀.view = v := (hL4.notar_view c₀ hc₀).trans hv4.symm
+    rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hvote)
+      with hm' | ⟨_, j'', hs''⟩
+    · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+      exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' r hr c₀ hcv j₃ hj₃)
+        (not_le.mpr (lt_trans hs' hlt))
+    · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
+        rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+        exact List.mem_append_left _ hs''
+      exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s r hr c₀ hcv j'' hsend) (not_le.mpr hlt)
+
+/-- lead(v) が view v に入るスロット e の冒頭の S に、view v の証明書はない。 -/
+theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hb : ByzBound f s₀ instrs) (hs : PartialSync Δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
+    (he : e ≤ t + Δ) (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val) :
+    ¬ Algo.HasCert f ((State.run s₀ instrs e).procs (lead v)).S v := by
+  intro hc
+  rcases hc with hN | hM
+  · have hcard := card_le_of_byz hb (nullifiers ((State.run s₀ instrs e).procs (lead v)).S v)
+      fun q hq => exists_byz_of_not_correct fun hqc => ?_
+    · unfold Nullified at hN; omega
+    · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_nullifiers.mp hq) rfl
+      exact absurd (nullify_slot_ge hinit hh hb hs hv hfirst hlc he hemin s' q hqc j hj)
+        (not_le.mpr hs')
+  · obtain ⟨b', hb'⟩ := List.exists_mem_of_ne_nil _ hM
+    obtain ⟨hbv, hM'⟩ := Algo.mem_mNotarisedAt hb'
+    rcases hM' with hg | hM'
+    · subst hg
+      have : v.val = 0 := by rw [← hbv]; rfl
+      omega
+    · have hcard := card_le_of_byz hb (voters ((State.run s₀ instrs e).procs (lead v)).S b')
+        fun q hq => exists_byz_of_not_correct fun hqc => ?_
+      · omega
+      · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_voters.mp hq) rfl
+        exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' q hqc b' hbv j hj) (not_le.mpr hs')
+
+/-- lead(v) は view v に入るスロット e に、登りを view v で終え、まだ提案していない。 -/
+theorem leader_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hb : ByzBound f s₀ instrs) (hs : PartialSync Δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
+    (he : e ≤ t + Δ) (hev : v.val ≤ (viewAt s₀ instrs (lead v) (e + 1)).val)
+    (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val)
+    (hstart : (viewAt s₀ instrs (lead v) e).val < v.val ∨ (e = 0 ∧ v.val = 1)) :
+    (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).view = v
+      ∧ (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).proposed = false := by
+  have hnc := no_cert_at_entry hinit hh hb hs hv hfirst hlc he hemin
+  rw [viewAt_succ_eq hh hlc e] at hev
+  have hle : (viewAt s₀ instrs (lead v) e).val ≤ v.val := by
+    rcases hstart with h | ⟨rfl, h⟩
+    · exact h.le
+    · rw [viewAt_zero hinit]; omega
+  have hview : (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).view = v := by
+    apply View.val_injective
+    rcases Nat.lt_or_ge v.val (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).view.val
+      with hlt | hge
+    · exact absurd (Algo.st1_certs hle hlt) hnc
+    · exact le_antisymm hge hev
+  refine ⟨hview, ?_⟩
+  rcases Algo.st1_eq_or f (lead v) ((State.run s₀ instrs e).procs (lead v)) with h | ⟨_, h⟩
+  · rw [h]
+    rcases hstart with hlt | ⟨rfl, _⟩
+    · exfalso
+      rw [h] at hview
+      have : (viewAt s₀ instrs (lead v) e).val = v.val := congrArg View.val hview
+      omega
+    · show ((State.run s₀ instrs 0).procs (lead v)).proposed = false
+      rw [State.run, hinit.procs]; rfl
+  · exact h
+
+/-- Lemma 5.6 の設定: view v ≥ 1 の lead(v) は正直で、最初の正直者が t ≥ GST に view v に入り、
+    lead(v) 自身は t ≤ e ≤ t + Δ のスロット e に初めて view v 以上になる。 -/
+structure LeaderRound (f Δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
+    (instrs : Nat → Instr n Tx) (hs : PartialSync Δ s₀ instrs) (v : View) (t e : Nat) : Prop where
+  hv : 1 ≤ v.val
+  hfirst : FirstEntry s₀ instrs v t
+  hgst : hs.GST.val ≤ t
+  hlc : Correct s₀ instrs (lead v)
+  he : e ≤ t + Δ
+  hev : v.val ≤ (viewAt s₀ instrs (lead v) (e + 1)).val
+  hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val
+  hstart : (viewAt s₀ instrs (lead v) e).val < v.val ∨ (e = 0 ∧ v.val = 1)
+
+/-- lead(v) がスロット e に提案するブロック。 -/
+noncomputable def leaderBlockAt (f : Nat) (lead : View → Fin n) (s₀ : State n Tx)
+    (instrs : Nat → Instr n Tx) (v : View) (e : Nat) : Block Tx :=
+  Algo.leaderBlock f (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v)))
+
+/-- その親。 -/
+noncomputable def leaderParentAt (f : Nat) (lead : View → Fin n) (s₀ : State n Tx)
+    (instrs : Nat → Instr n Tx) (v : View) (e : Nat) : Block Tx :=
+  Algo.selectParent f (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).S
+    (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).view
+
+theorem leaderBlockAt_parent (f : Nat) (lead : View → Fin n) (s₀ : State n Tx)
+    (instrs : Nat → Instr n Tx) (v : View) (e : Nat) :
+    (leaderBlockAt f lead s₀ instrs v e).parent = some (leaderParentAt f lead s₀ instrs v e) := rfl
+
+section CorrectLeader
+
+variable (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+  (hs : PartialSync Δ s₀ instrs) {v : View} {t e : Nat} (R : LeaderRound f Δ lead s₀ instrs hs v t e)
+
+include hinit hh hb hs R
+
+theorem leaderBlockAt_view : (leaderBlockAt f lead s₀ instrs v e).view = v :=
+  (leader_at_entry hinit hh hb hs R.hv R.hfirst R.hlc R.he R.hev R.hemin R.hstart).1
+
+theorem leaderParentAt_view_lt : (leaderParentAt f lead s₀ instrs v e).view.val < v.val := by
+  have hview := (leader_at_entry hinit hh hb hs R.hv R.hfirst R.hlc R.he R.hev R.hemin R.hstart).1
+  unfold leaderParentAt
+  rw [hview]
+  exact Algo.selectParent_view_lt f _ R.hv
+
+/-- lead(v) はスロット e にブロックを全員へ送る。 -/
+theorem leader_proposes (j : Fin n) :
+    Action.send (Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)) j
+      ∈ (instrs e).actions (lead v) := by
+  obtain ⟨hview, hprop⟩ :=
+    leader_at_entry hinit hh hb hs R.hv R.hfirst R.hlc R.he R.hev R.hemin R.hstart
+  rw [hh e (lead v) (R.hlc e), Algo.step_eq_stepPair, Algo.stepPair_snd']
+  apply List.mem_append_left
+  simp only [Algo.innerActs, List.mem_append]
+  left; left; left; right
+  exact Algo.propose_fires (by rw [hview]) hprop j
+
+theorem t_le_e : t ≤ e := R.hfirst.first (lead v) e R.hlc R.hev
+
+/-- ブロックは t + 2Δ までに全正直者に届く。 -/
+theorem leader_block_delivered {r : Fin n} {T : Nat} (hT : t + 2 * Δ ≤ T) :
+    Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e) ∈ ((State.run s₀ instrs T).procs r).S := by
+  have hΔ := hs.one_le
+  have he := R.he
+  have hgst := R.hgst
+  exact delivered hinit hh hs R.hlc (leader_proposes hinit hh hb hs R r) (by omega) (by omega)
+
+/-- 親の M-notarisation は t + 2Δ までに全正直者に届く。 -/
+theorem leader_parent_mnotarised_all {r : Fin n} {T : Nat} (hT : t + 2 * Δ ≤ T) :
+    MNotarised f ((State.run s₀ instrs T).procs r).S (leaderParentAt f lead s₀ instrs v e) := by
+  have hΔ := hs.one_le
+  have he := R.he
+  have hgst := R.hgst
+  have h1 : MNotarised f (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).S
+      (leaderParentAt f lead s₀ instrs v e) := Algo.selectParent_mnotarised f _ _
+  have h5 := h1.mono (Algo.S_st1_subset_st5 f Δ lead (lead v) _)
+  exact mnotarised_all_end hinit hh hs R.hlc h5 (by omega) (by omega)
+
+/-- 親の view と v の間の view の nullification は t + 2Δ までに全正直者に届く。 -/
+theorem leader_gaps_nullified_all {r : Fin n} (hr : Correct s₀ instrs r) {T : Nat}
+    (hT : t + 2 * Δ ≤ T) {w : View}
+    (h1 : (leaderParentAt f lead s₀ instrs v e).view.val < w.val) (h2 : w.val < v.val) :
+    Nullified f ((State.run s₀ instrs T).procs r).S w := by
+  have hΔ := hs.one_le
+  have he := R.he
+  have hgst := R.hgst
+  have hview := (leader_at_entry hinit hh hb hs R.hv R.hfirst R.hlc R.he R.hev R.hemin R.hstart).1
+  have hw1 : 1 ≤ w.val := by omega
+  obtain ⟨s', hs'_lt, hs1, hs2⟩ := exists_leave_slot hinit hw1 (lt_of_lt_of_le h2 R.hev)
+  have hcert : Algo.HasCert f ((State.run s₀ instrs s').procs (lead v)).S w := by
+    rw [viewAt_succ_eq hh R.hlc s'] at hs2
+    exact Algo.st1_certs hs1 hs2
+  rcases hcert with hN | hM
+  · exact nullified_all hinit hh hs R.hlc hr hN (by omega) (by omega)
+  · exfalso
+    obtain ⟨b'', hb''⟩ := List.exists_mem_of_ne_nil _ hM
+    obtain ⟨hbv, hM''⟩ := Algo.mem_mNotarisedAt hb''
+    have hsub : ((State.run s₀ instrs s').procs (lead v)).S
+        ⊆ (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).S :=
+      (S_subset_run s₀ instrs (lead v) (Nat.lt_succ_iff.mp hs'_lt)).trans
+        (Algo.S_subset_st1 f (lead v) _)
+    obtain ⟨q, hq⟩ := Algo.exists_vote_of_mem_votedBlocks (Algo.mem_votedBlocks_of_mem_mNotarisedAt hb'')
+    have hmax := Algo.selectParent_max f
+      (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).S
+      (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).view
+      (Algo.mem_votedBlocks (hsub hq)) (by rw [hbv, hview]; exact h2) (hM''.mono hsub)
+    rw [hbv] at hmax
+    exact absurd h1 (not_lt.mpr hmax)
+
+/-- t + 2Δ 以降、全正直者の S でブロックは valid proposal。 -/
+theorem leader_valid_at {r : Fin n} (hr : Correct s₀ instrs r) {T : Nat} (hT : t + 2 * Δ ≤ T) :
+    ValidProposal f lead ((State.run s₀ instrs T).procs r).S v (leaderBlockAt f lead s₀ instrs v e) := by
+  refine ⟨leaderBlockAt_view hinit hh hb hs R, leader_block_delivered hinit hh hb hs R hT, ?_,
+    Algo.leaderBlock_ne_gen _ _, ?_, ?_⟩
+  · intro b' hb'v hb'
+    obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hb' rfl
+    exact leader_block_unique hinit hh R.hlc hj (leader_proposes hinit hh hb hs R r)
+      (by rw [hb'v, leaderBlockAt_view hinit hh hb hs R])
+  · intro p₀ hp₀
+    rw [leaderBlockAt_parent] at hp₀
+    obtain rfl := Option.some.inj (Option.mem_def.mp hp₀).symm
+    exact leader_parent_mnotarised_all hinit hh hb hs R hT
+  · intro p₀ hp₀ w h1 h2
+    rw [leaderBlockAt_parent] at hp₀
+    obtain rfl := Option.some.inj (Option.mem_def.mp hp₀).symm
+    exact leader_gaps_nullified_all hinit hh hb hs R hr hT h1 h2
+
+/-- 正直者の view v のブロックへの票は、すべて lead(v) のブロックへの票。 -/
+theorem vote_unique_leaderBlock :
+    ∀ s, ∀ r : Fin n, Correct s₀ instrs r → ∀ b : Block Tx, b.view = v → ∀ j,
+      Action.send (Msg.vote r b) j ∈ (instrs s).actions r →
+      b = leaderBlockAt f lead s₀ instrs v e := by
+  intro s
+  induction s using Nat.strong_induction_on with
+  | _ s ih =>
+  intro r hr b hbv j hj
+  have hv := R.hv
+  have hg : b ≠ .gen := by
+    intro hg; subst hg
+    have : v.val = 0 := by rw [← hbv]; rfl
+    omega
+  have hact := hh s r (hr s)
+  have hinner : ∀ j', Action.send (Msg.vote r b) j'
+      ∈ Algo.innerActs f Δ lead r ((State.run s₀ instrs s).procs r) →
+      b = leaderBlockAt f lead s₀ instrs v e := by
+    intro j' hj'
+    simp only [Algo.innerActs, List.mem_append] at hj'
+    rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
+    · obtain ⟨b', q, hm, _, hqv, hM, _, _, _, _, hnew, _⟩ :=
+        Algo.send_climb (localInv_run hinit hh hr s) hj'
+      injection hm with _ hbb
+      subst hbb
+      rcases hM with hg' | hM
+      · exact absurd hg' hg
+      obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM)
+      rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt'⟩
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl
+        exact ih s' hs' w hwc b hbv j'' hj''
+      · injection hb'' with _ hbb
+        subst hbb
+        rw [hqv] at hlt'
+        exact absurd hlt' (lt_irrefl _)
+    · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj'; cases hm
+    · obtain ⟨b', hm, hbv', _, _, hvp, _⟩ := Algo.send_voteProposal_eq hj'
+      injection hm with _ hbb
+      subst hbb
+      have hsigned := hvp.signed
+      have hlv : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view = v := by
+        rw [← hbv, hbv']
+      rw [hlv] at hsigned
+      rcases Algo.mem_S_st2 hsigned with hm2 | ⟨b'', hm2, hs2⟩
+      · rcases Algo.mem_S_st1 hm2 with hm1 | ⟨_, hm1, _⟩
+        · obtain ⟨s', _, j'', hj''⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+          exact leader_block_unique hinit hh R.hlc hj'' (leader_proposes hinit hh hb hs R r)
+            (by rw [hbv, leaderBlockAt_view hinit hh hb hs R])
+        · cases hm1
+      · injection hm2 with hr' hbb
+        subst hbb
+        subst hr'
+        have hsend : Action.send (Msg.block (lead v) b) (lead v) ∈ (instrs s).actions (lead v) := by
+          rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+          apply List.mem_append_left
+          simp only [Algo.innerActs, List.mem_append]
+          left; left; left; right
+          exact hs2
+        exact leader_block_unique hinit hh R.hlc hsend (leader_proposes hinit hh hb hs R (lead v))
+          (by rw [hbv, leaderBlockAt_view hinit hh hb hs R])
+    · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq hj'; cases hm
+    · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq hj'; cases hm
+  rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+  rcases List.mem_append.mp hj with hj | hj
+  · exact hinner j hj
+  · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj) with hm | ⟨_, j', hs'⟩
+    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+      exact ih s' hs' r hr b hbv j'' hj''
+    · exact hinner j' hs'
+
+/-- 正直者は timeout で nullify(v) を送らない: timeout の時点で lead(v) のブロックは valid
+    proposal として届いていて、9〜11 行が先に投票するから。 -/
+theorem no_timeout_nullify :
+    ∀ s, ∀ r : Fin n, Correct s₀ instrs r → ∀ j,
+      Action.send (Msg.nullify r v) j
+        ∈ (Algo.nullifyTimeout Δ r (Algo.st3 f lead r ((State.run s₀ instrs s).procs r))).2 →
+      False := by
+  intro s r hr j hj
+  have hΔ := hs.one_le
+  have hv := R.hv
+  obtain ⟨hm, hnl3, hnot3, _, ht3⟩ := Algo.send_nullifyTimeout_eq hj
+  injection hm with _ hv3
+  rw [Algo.st3_timer] at ht3
+  have hst1 : Algo.st1 f r ((State.run s₀ instrs s).procs r) = (State.run s₀ instrs s).procs r := by
+    rcases Algo.st1_eq_or f r ((State.run s₀ instrs s).procs r) with h | ⟨h, _⟩
+    · exact h
+    · rw [h] at ht3; omega
+  have htimer : timerAt s₀ instrs r s = 2 * Δ := by
+    show ((State.run s₀ instrs s).procs r).timer = 2 * Δ
+    rw [← hst1]; exact ht3
+  have hview : viewAt s₀ instrs r s = v := by
+    show ((State.run s₀ instrs s).procs r).view = v
+    rw [hv3, Algo.st3_view, hst1]
+  -- t + 2Δ ≤ s
+  have hle := timerAt_le_slot (instrs := instrs) hinit r s
+  rw [htimer] at hle
+  have hstay := viewAt_eq_of_lt_timer hinit r s (2 * Δ - 1) (by rw [htimer]; omega) (2 * Δ - 1)
+    (le_refl _)
+  rw [show s - (2 * Δ - 1) = (s - 2 * Δ) + 1 by omega, hview] at hstay
+  have hT : t + 2 * Δ ≤ s := by
+    have := R.hfirst.first r (s - 2 * Δ) hr (by rw [hstay])
+    omega
+  -- lead(v) のブロックは S にあり valid
+  have hvalid := leader_valid_at hinit hh hb hs R hr hT
+  have hst2S : ((State.run s₀ instrs s).procs r).S
+      ⊆ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S :=
+    Algo.S_subset_st2 f lead r _
+  have hst2v : (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view = v := by
+    rw [Algo.st2_view, hst1]; exact hview
+  have hbLv := leaderBlockAt_view hinit hh hb hs R
+  have huniq : ∀ b', b'.view = (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view →
+      Msg.block (lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view) b'
+        ∈ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S →
+      b' = leaderBlockAt f lead s₀ instrs v e := by
+    intro b' hb'v hb'
+    rw [hst2v] at hb'v hb'
+    rcases Algo.mem_S_st2 hb' with hm2 | ⟨b'', hm2, hs2⟩
+    · rw [hst1] at hm2
+      exact hvalid.unique b' hb'v hm2
+    · injection hm2 with hr' _
+      obtain ⟨_, _, hp⟩ := Algo.send_propose_eq' hs2
+      subst hr'
+      have hP : Algo.PropInv (lead v) (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))) :=
+        (propInv_run hinit hh hr s).climb (f := f) _
+      have hmem : Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)
+          ∈ (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))).S :=
+        Algo.S_subset_st1 f (lead v) _ (leader_block_delivered hinit hh hb hs R hT)
+      have hflag := hP.prop_flag _ hmem (by rw [hst1]; exact hbLv.trans hview.symm)
+      rw [hp] at hflag; cases hflag
+  have hvp2 : ValidProposal f lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S
+      (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view (leaderBlockAt f lead s₀ instrs v e) :=
+    ⟨by rw [hst2v]; exact hbLv, by rw [hst2v]; exact hst2S hvalid.signed, huniq,
+      Algo.leaderBlock_ne_gen _ _, fun p₀ hp₀ => (hvalid.parent p₀ hp₀).mono hst2S,
+      fun p₀ hp₀ w h1 h2 => (hvalid.gaps p₀ hp₀ w h1 (by rw [hst2v] at h2; exact h2)).mono hst2S⟩
+  have hprop : Algo.proposals lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S
+      (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view = [leaderBlockAt f lead s₀ instrs v e] :=
+    Algo.proposals_eq_singleton (by rw [hst2v]; exact hst2S hvalid.signed) (by rw [hst2v]; exact hbLv)
+      huniq
+  have h3 := Algo.voteProposal_eq_of_singleton (f := f) (i := r) hprop
+  have hnot3' : (Algo.voteProposal f lead r (Algo.st2 f lead r ((State.run s₀ instrs s).procs r))).1.notarised
+      = none := hnot3
+  have hnl3' : (Algo.voteProposal f lead r (Algo.st2 f lead r ((State.run s₀ instrs s).procs r))).1.nullified
+      = false := hnl3
+  rw [h3] at hnot3' hnl3'
+  split_ifs at hnot3' hnl3' with hcond
+  · rw [Algo.disseminate_vote_notarised (by rw [hst2v]; exact hbLv)] at hnot3'
+    cases hnot3'
+  · exact hcond ⟨hvp2, hnot3', hnl3'⟩
+
+/-- 正直者は nullify(v) を送らない。 -/
+theorem no_nullify_v :
+    ∀ s, ∀ r : Fin n, Correct s₀ instrs r → ∀ j,
+      Action.send (Msg.nullify r v) j ∈ (instrs s).actions r → False := by
+  intro s
+  induction s using Nat.strong_induction_on with
+  | _ s ih =>
+  intro r hr j hj
+  have hact := hh s r (hr s)
+  have hinner : ∀ j', Action.send (Msg.nullify r v) j'
+      ∈ Algo.innerActs f Δ lead r ((State.run s₀ instrs s).procs r) → False := by
+    intro j' hj'
+    simp only [Algo.innerActs, List.mem_append] at hj'
+    rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
+    · obtain ⟨_, _, hm, _⟩ := Algo.send_climb (localInv_run hinit hh hr s) hj'; cases hm
+    · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj'; cases hm
+    · obtain ⟨_, hm, _⟩ := Algo.send_voteProposal_eq hj'; cases hm
+    · exact no_timeout_nullify hinit hh hb hs R s r hr j' hj'
+    · -- 24〜28 行: 証拠の署名者に正直者はいない
+      obtain ⟨hm, _, c₀, hc₀, hnp⟩ := Algo.send_nullifyNoProgress_eq hj'
+      injection hm with _ hv4
+      have hL4 := Algo.localInv_st4 (Δ := Δ) (lead := lead) (localInv_run hinit hh hr s)
+      have hvote := hL4.notar_mem c₀ hc₀
+      have hcv : c₀.view = v := (hL4.notar_view c₀ hc₀).trans hv4.symm
+      -- c₀ は lead(v) のブロック
+      have hc₀eq : c₀ = leaderBlockAt f lead s₀ instrs v e := by
+        rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hvote)
+          with hm' | ⟨_, j'', hs''⟩
+        · obtain ⟨s', _, j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+          exact vote_unique_leaderBlock hinit hh hb hs R s' r hr c₀ hcv j₃ hj₃
+        · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
+            rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+            exact List.mem_append_left _ hs''
+          exact vote_unique_leaderBlock hinit hh hb hs R s r hr c₀ hcv j'' hsend
+      rw [← hv4] at hnp
+      obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hnp)
+      rcases mem_noProgressWitnesses.mp hw with hwn | ⟨b'', hb''v, hne, hwv⟩
+      · -- 正直者 w の nullify(v)
+        by_cases hwr : w = r
+        · subst hwr
+          rcases Algo.mem_S_st4_nullify hwn with hm' | hs''
+          · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+            exact ih s' hs' w hwc j₃ hj₃
+          · exact no_timeout_nullify hinit hh hb hs R s w hwc w hs''
+        · have hm' : Msg.nullify w v ∈ ((State.run s₀ instrs s).procs r).S := by
+            rcases Algo.mem_S_stage_or f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hwn)
+              with hm' | hsig
+            · exact hm'
+            · simp only [Msg.signer, Option.some.injEq] at hsig
+              exact absurd hsig hwr
+          obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+          exact ih s' hs' w hwc j₃ hj₃
+      · -- 正直者 w の、lead(v) のブロック以外への票はない
+        have hb''eq : b'' = leaderBlockAt f lead s₀ instrs v e := by
+          rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hwv)
+            with hm' | ⟨hsig, j'', hs''⟩
+          · obtain ⟨s', _, j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+            exact vote_unique_leaderBlock hinit hh hb hs R s' w hwc b'' hb''v j₃ hj₃
+          · simp only [Msg.signer, Option.some.injEq] at hsig
+            subst hsig
+            have hsend : Action.send (Msg.vote w b'') j'' ∈ (instrs s).actions w := by
+              rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+              exact List.mem_append_left _ hs''
+            exact vote_unique_leaderBlock hinit hh hb hs R s w hwc b'' hb''v j'' hsend
+        exact hne (by rw [hb''eq, hc₀eq])
+  rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+  rcases List.mem_append.mp hj with hj | hj
+  · exact hinner j hj
+  · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj) with hm | ⟨_, j', hs'⟩
+    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+      exact ih s' hs' r hr j'' hj''
+    · exact hinner j' hs'
+
+/-- 全正直者が lead(v) のブロックに投票する。 -/
+theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s₀ instrs r) :
+    Sends instrs r (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) := by
+  obtain ⟨T, hT⟩ := progression hn hinit hh hb hs hr ⟨v.val + 1⟩
+  obtain ⟨s, _, hs1, hs2⟩ := exists_leave_slot hinit R.hv (Nat.lt_of_succ_le hT)
+  rw [viewAt_succ_eq hh hr s] at hs2
+  obtain ⟨q, hLq, hqv, _, hcert, hnew, hqS, hqsend⟩ :=
+    Algo.climb_pass (localInv_run hinit hh hr s) hs1 hs2
+  have hqsucc : q.S ⊆ ((State.run s₀ instrs (s + 1)).procs r).S :=
+    (Algo.S_subset_advanceOnce f r q).trans
+      (hqS.trans ((Algo.S_st1_subset_st5 f Δ lead r _).trans (S_st5_subset_succ hh hr s)))
+  have hN : ¬ Nullified f q.S v := by
+    intro hN
+    have hcard := card_le_of_byz hb (nullifiers q.S v)
+      fun w hw => exists_byz_of_not_correct fun hwc => ?_
+    · unfold Nullified at hN; omega
+    · rcases hnew _ (mem_nullifiers.mp hw) with hm | ⟨_, hm, _⟩
+      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm rfl
+        exact no_nullify_v hinit hh hb hs R s' w hwc j hj
+      · cases hm
+  have hM : Algo.mNotarisedAt f q.S q.view ≠ [] := by
+    rw [hqv]; exact hcert.resolve_left hN
+  rcases hnot : q.notarised with _ | c
+  · rcases hnl : q.nullified with _ | _
+    · obtain ⟨b'', hb'', hsend⟩ := Algo.advanceOnce_vote_of r (by rw [hqv]; exact hN) hM hnot hnl
+      have hsend' : Action.send (Msg.vote r b'') r ∈ (instrs s).actions r := by
+        rw [hh s r (hr s), Algo.step_eq_stepPair, Algo.stepPair_snd']
+        apply List.mem_append_left
+        simp only [Algo.innerActs, List.mem_append]
+        left; left; left; left
+        exact hqsend _ _ hsend
+      have hbv := (Algo.mem_mNotarisedAt hb'').1
+      rw [hqv] at hbv
+      have := vote_unique_leaderBlock hinit hh hb hs R s r hr b'' hbv r hsend'
+      rw [← this]; exact ⟨s, r, hsend'⟩
+    · have hmem := hLq.null_mem hnl
+      rw [hqv] at hmem
+      obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc hmem) rfl
+      exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
+  · have hcv := (hLq.notar_view c hnot).trans hqv
+    have hsends := sends_of_mem_S hinit (hqsucc (hLq.notar_mem c hnot)) rfl
+    obtain ⟨s', j, hj⟩ := hsends
+    have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
+    rw [← this]; exact ⟨s', j, hj⟩
+
+end CorrectLeader
+
 /-- Lemma 5.6（Correct leaders finalise blocks）: lead(v) が正直で、最初の正直者が GST 以降に
     view v に入るなら、lead(v) はブロックを送り、それは L-notarisation を受ける。 -/
 theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ s₀ instrs) {v : View} (hi : Correct s₀ instrs (lead v))
+    (hs : PartialSync Δ s₀ instrs) {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
     ∃ b : Block Tx, b.view = v ∧ Sends instrs (lead v) (.block (lead v) b)
       ∧ ReceivesL f instrs b := by
-  sorry
+  have hreach : ∃ s, v.val ≤ (viewAt s₀ instrs (lead v) (s + 1)).val :=
+    ⟨t + Δ, enter_all hinit hh hs hfirst hgst hi⟩
+  obtain ⟨e, hev, hemin, hstart⟩ := entry_slot hinit hv hreach
+  have he : e ≤ t + Δ := by
+    rcases Nat.lt_or_ge (t + Δ) e with h | h
+    · exact absurd (enter_all hinit hh hs hfirst hgst hi) (not_le.mpr (hemin (t + Δ) h))
+    · exact h
+  have R : LeaderRound f Δ lead s₀ instrs hs v t e := ⟨hv, hfirst, hgst, hi, he, hev, hemin, hstart⟩
+  refine ⟨leaderBlockAt f lead s₀ instrs v e, leaderBlockAt_view hinit hh hb hs R,
+    ⟨e, lead v, leader_proposes hinit hh hb hs R (lead v)⟩, ?_⟩
+  right
+  refine (card_correctSet hb).trans (Finset.card_le_card fun r hr => ?_)
+  exact mem_voteSenders.mpr (all_vote_leaderBlock hinit hh hb hs R hn (mem_correctSet.mp hr))
 
 /-- Lemma 5.7（Liveness）: 正直者 p_i が受け取った取引は、正直者 p_j が L-notarisation を
     持つブロックの Tr* にいつか入る。 -/

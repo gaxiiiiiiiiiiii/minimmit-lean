@@ -69,7 +69,8 @@ theorem Processor.executeAll_timer (i : Fin n) (p : Processor n Tx) (acts : List
       | send m j =>
         simp only [Processor.execute] at h1 h2 ⊢
         split_ifs at h1 h2 ⊢
-        · exact Or.inr ⟨h1.trans (Processor.send_timer i p m j), h2.trans (Processor.send_view i p m j)⟩
+        · exact Or.inr
+            ⟨h1.trans (Processor.send_timer i p m j), h2.trans (Processor.send_view i p m j)⟩
         · exact Or.inr ⟨h1, h2⟩
       | progress =>
         left
@@ -78,7 +79,8 @@ theorem Processor.executeAll_timer (i : Fin n) (p : Processor n Tx) (acts : List
         simp [Processor.execute, Processor.progress]
 
 theorem timerAt_succ (i : Fin n) (t : Nat) :
-    (timerAt s₀ instrs i (t + 1) = 1 ∧ (viewAt s₀ instrs i t).val < (viewAt s₀ instrs i (t + 1)).val)
+    (timerAt s₀ instrs i (t + 1) = 1 ∧ (viewAt s₀ instrs i t).val
+    < (viewAt s₀ instrs i (t + 1)).val)
       ∨ (timerAt s₀ instrs i (t + 1) = timerAt s₀ instrs i t + 1
           ∧ viewAt s₀ instrs i (t + 1) = viewAt s₀ instrs i t) := by
   unfold timerAt viewAt
@@ -119,12 +121,14 @@ theorem State.pool_subset_foldl_execute (s : State n Tx) (i : Fin n) (acts : Lis
   | cons a acts ih => exact (State.execute_pool_subset s i a).trans (ih _)
 
 theorem State.pool_subset_foldl_act (s : State n Tx) (instr : Instr n Tx) (l : List (Fin n)) :
-    s.pool ⊆ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
+    s.pool ⊆
+      (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
   induction l generalizing s with
   | nil => exact Finset.Subset.refl _
   | cons k l ih => exact (State.pool_subset_foldl_execute s k _).trans (ih _)
 
-theorem State.pool_subset_step (s : State n Tx) (instr : Instr n Tx) : s.pool ⊆ (s.step instr).pool := by
+theorem State.pool_subset_step (s : State n Tx) (instr : Instr n Tx) :
+    s.pool ⊆ (s.step instr).pool := by
   rw [State.step_pool]; exact State.pool_subset_foldl_act s instr _
 
 theorem pool_subset_run {t t' : Nat} (h : t ≤ t') :
@@ -161,7 +165,8 @@ theorem Algo.send_guard {p : Processor n Tx} {i : Fin n} {m : Msg n Tx} {j : Fin
     · obtain ⟨rfl, _⟩ := Algo.send_nullifyNoProgress_eq h; exact Or.inl rfl
   · exact (Algo.mem_S_stage_or f Δ lead i p (Algo.send_forwardNew_mem h)).symm
 
-theorem State.mem_pool_foldl_execute_of_send (s : State n Tx) (i : Fin n) {acts : List (Action n Tx)}
+theorem State.mem_pool_foldl_execute_of_send (s : State n Tx) (i : Fin n)
+    {acts : List (Action n Tx)}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ acts)
     (hg : m.signer = some i ∨ m ∈ (s.procs i).S) :
     (⟨m, j, s.now⟩ : Packet n Tx) ∈ (acts.foldl (fun s a => s.execute i a) s).pool := by
@@ -197,7 +202,8 @@ theorem State.mem_pool_foldl_act_of_send (s : State n Tx) (instr : Instr n Tx) {
       rwa [State.foldl_execute_now] at this
 
 theorem State.mem_pool_step_of_send (s : State n Tx) (instr : Instr n Tx) {i : Fin n} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ instr.actions i) (hg : m.signer = some i ∨ m ∈ (s.procs i).S) :
+    {j : Fin n} (h : Action.send m j ∈ instr.actions i)
+    (hg : m.signer = some i ∨ m ∈ (s.procs i).S) :
     (⟨m, j, s.now⟩ : Packet n Tx) ∈ (s.step instr).pool := by
   rw [State.step_pool]
   exact State.mem_pool_foldl_act_of_send s instr (List.nodup_finRange n) (List.mem_finRange i) h hg
@@ -252,10 +258,12 @@ theorem forward_nullification_end (hinit : Init s₀) (hh : Honest f Δ lead s�
       ∧ ∀ q ∈ nullifiers (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
         Action.send (Msg.nullify q v) j ∈ (instrs t').actions i := by
   classical
-  have hex : ∃ t', Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v := ⟨t, ht⟩
+  have hex :
+      ∃ t', Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
   rw [mem_nullifiers] at hq
-  have hnew : ¬ Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS v := by
+  have hnew : ¬ Nullified f (Algo.st5 f Δ lead i
+      ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS v := by
     rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
@@ -284,10 +292,12 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
       ∧ ∀ q ∈ voters (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i := by
   classical
-  have hex : ∃ t', MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b := ⟨t, ht⟩
+  have hex :
+      ∃ t', MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
   rw [mem_voters] at hq
-  have hnew : ¬ MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS b := by
+  have hnew : ¬ MNotarised f (Algo.st5 f Δ lead i
+      ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS b := by
     rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
@@ -313,7 +323,8 @@ theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
   forward_mnotarisation_end hinit hh hi hg (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
 /-- 正直者 p_i がスロット t に nullification を持つなら、p_j は期限までにそれを持つ。 -/
-theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
+theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync δ s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f ((State.run s₀ instrs t).procs i).S v) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max hs.GST.val t + δ ≤ T) : Nullified f ((State.run s₀ instrs T).procs j).S v := by
@@ -323,7 +334,8 @@ theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (h
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
 
-theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
+theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync δ s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx}
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max hs.GST.val t + δ ≤ T) : MNotarised f ((State.run s₀ instrs T).procs j).S b := by

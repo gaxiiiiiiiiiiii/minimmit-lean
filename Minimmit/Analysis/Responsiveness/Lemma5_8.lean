@@ -25,7 +25,8 @@ variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : N
 theorem leaderBlock_lnotarised_by (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ s₀ instrs)
     {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs hs v t e) {j : Fin n} :
-    LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S (leaderBlockAt f lead s₀ instrs v e) := by
+    LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
+    (leaderBlockAt f lead s₀ instrs v e) := by
   have hδ1 := hs.one_le
   have hgst := R.hgst
   right

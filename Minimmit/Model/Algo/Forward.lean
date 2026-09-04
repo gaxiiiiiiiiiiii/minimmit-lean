@@ -163,7 +163,8 @@ theorem stepPair_timer (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
 theorem selectParent_mnotarised (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
     MNotarised f S (selectParent f S v) := by
   unfold selectParent
-  generalize hl : ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
+  generalize hl :
+      ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     (fun b => b.view.val) = o
   cases o with
   | none => exact Or.inl rfl
@@ -175,7 +176,8 @@ theorem selectParent_mnotarised (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
 theorem selectParent_view_lt (f : Nat) (S : Finset (Msg n Tx)) {v : View} (hv : 1 ≤ v.val) :
     (selectParent f S v).view.val < v.val := by
   unfold selectParent
-  generalize hl : ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
+  generalize hl :
+      ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     (fun b => b.view.val) = o
   cases o with
   | none => exact hv
@@ -192,7 +194,8 @@ theorem selectParent_max (f : Nat) (S : Finset (Msg n Tx)) (v : View) {b : Block
   have hmem : b ∈ (votedBlocks S).filter
       (fun b => decide (b.view.val < v.val ∧ MNotarised f S b)) := by
     simp only [List.mem_filter, decide_eq_true_eq]; exact ⟨hb, hlt, hM⟩
-  generalize hl : ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
+  generalize hl :
+      ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     (fun b => b.view.val) = o at hmem
   cases o with
   | none =>

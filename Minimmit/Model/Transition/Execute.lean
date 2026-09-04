@@ -208,16 +208,20 @@ theorem mem_S_executeAll (k : Fin n) (p : Processor n Tx) (acts : List (Action n
 
 /-! ### receive は S 以外を変えない -/
 
-@[simp] theorem receive_view (p : Processor n Tx) (m : Msg n Tx) : (p.receive m).view = p.view := rfl
-@[simp] theorem receive_timer (p : Processor n Tx) (m : Msg n Tx) : (p.receive m).timer = p.timer := rfl
+@[simp] theorem receive_view (p : Processor n Tx) (m : Msg n Tx) :
+    (p.receive m).view = p.view := rfl
+@[simp] theorem receive_timer (p : Processor n Tx) (m : Msg n Tx) :
+    (p.receive m).timer = p.timer := rfl
 @[simp] theorem receive_nullified (p : Processor n Tx) (m : Msg n Tx) :
     (p.receive m).nullified = p.nullified := rfl
 @[simp] theorem receive_proposed (p : Processor n Tx) (m : Msg n Tx) :
     (p.receive m).proposed = p.proposed := rfl
 @[simp] theorem receive_notarised (p : Processor n Tx) (m : Msg n Tx) :
     (p.receive m).notarised = p.notarised := rfl
-@[simp] theorem receive_prevS (p : Processor n Tx) (m : Msg n Tx) : (p.receive m).prevS = p.prevS := rfl
-@[simp] theorem receive_S (p : Processor n Tx) (m : Msg n Tx) : (p.receive m).S = insert m p.S := rfl
+@[simp] theorem receive_prevS (p : Processor n Tx) (m : Msg n Tx) :
+    (p.receive m).prevS = p.prevS := rfl
+@[simp] theorem receive_S (p : Processor n Tx) (m : Msg n Tx) :
+    (p.receive m).S = insert m p.S := rfl
 
 theorem S_subset_receive (p : Processor n Tx) (m : Msg n Tx) : p.S ⊆ (p.receive m).S :=
   Finset.subset_insert _ _
@@ -230,7 +234,8 @@ namespace State
 
 theorem corrupt_procs (s : State n Tx) (k : Fin n) : (s.corrupt k).procs = s.procs := rfl
 
-@[simp] theorem update_procs_self (s : State n Tx) (i : Fin n) (f : Processor n Tx → Processor n Tx) :
+@[simp] theorem update_procs_self (s : State n Tx) (i : Fin n)
+    (f : Processor n Tx → Processor n Tx) :
     (s.update i f).procs i = f (s.procs i) := by
   simp [update]
 
@@ -247,7 +252,8 @@ theorem update_procs_ne (s : State n Tx) {i k : Fin n} (hk : k ≠ i)
 
 variable [DecidableEq Tx]
 
-@[simp] theorem transmit_procs (s : State n Tx) (x : Packet n Tx) : (s.transmit x).procs = s.procs := rfl
+@[simp] theorem transmit_procs (s : State n Tx) (x : Packet n Tx) :
+    (s.transmit x).procs = s.procs := rfl
 @[simp] theorem transmit_now (s : State n Tx) (x : Packet n Tx) : (s.transmit x).now = s.now := rfl
 
 /-! ### execute の射影 -/
@@ -268,7 +274,8 @@ theorem execute_procs_ne (s : State n Tx) {i k : Fin n} (hk : k ≠ i) (a : Acti
     split_ifs <;> simp [update_procs_ne _ hk]
   | progress => simp [execute, progress, update_procs_ne _ hk]
 
-theorem execute_now (s : State n Tx) (i : Fin n) (a : Action n Tx) : (s.execute i a).now = s.now := by
+theorem execute_now (s : State n Tx) (i : Fin n) (a : Action n Tx) :
+    (s.execute i a).now = s.now := by
   cases a with
   | send m j => simp only [execute, send]; split_ifs <;> simp
   | progress => rfl
@@ -440,7 +447,8 @@ theorem mem_pool_act {s : State n Tx} {instr : Instr n Tx} {x : Packet n Tx}
 @[simp] theorem deliver_pool (s : State n Tx) (x : Packet n Tx) : (s.deliver x).pool = s.pool := by
   simp only [deliver]; split_ifs <;> rfl
 
-@[simp] theorem submit_pool (s : State n Tx) (j : Fin n) (tr : Tx) : (s.submit j tr).pool = s.pool := rfl
+@[simp] theorem submit_pool (s : State n Tx) (j : Fin n) (tr : Tx) :
+    (s.submit j tr).pool = s.pool := rfl
 
 omit [DecidableEq Tx] in
 @[simp] theorem corrupt_pool (s : State n Tx) (k : Fin n) : (s.corrupt k).pool = s.pool := rfl
@@ -521,7 +529,8 @@ theorem mem_S_foldl_submit {s : State n Tx} {l : List (Fin n × Tx)} {k : Fin n}
 
 /-! ### byz は腐敗でしか変わらず、増えるだけ -/
 
-theorem execute_byz (s : State n Tx) (i : Fin n) (a : Action n Tx) : (s.execute i a).byz = s.byz := by
+theorem execute_byz (s : State n Tx) (i : Fin n) (a : Action n Tx) :
+    (s.execute i a).byz = s.byz := by
   cases a with
   | send m j => simp only [execute, send]; split_ifs <;> rfl
   | progress => rfl
@@ -541,7 +550,8 @@ theorem act_byz (s : State n Tx) (instr : Instr n Tx) : (s.act instr).byz = s.by
 @[simp] theorem deliver_byz (s : State n Tx) (x : Packet n Tx) : (s.deliver x).byz = s.byz := by
   simp only [deliver]; split_ifs <;> rfl
 
-@[simp] theorem submit_byz (s : State n Tx) (j : Fin n) (tr : Tx) : (s.submit j tr).byz = s.byz := rfl
+@[simp] theorem submit_byz (s : State n Tx) (j : Fin n) (tr : Tx) :
+    (s.submit j tr).byz = s.byz := rfl
 
 omit [DecidableEq Tx] in
 @[simp] theorem tick_byz (s : State n Tx) : s.tick.byz = s.byz := rfl
@@ -590,13 +600,15 @@ theorem step_procs (s : State n Tx) (instr : Instr n Tx) (i : Fin n) :
   rw [tick_procs, act_procs] at h₁
   exact h₁.trans h₂
 
-theorem step_pool (s : State n Tx) (instr : Instr n Tx) : (s.step instr).pool = (s.act instr).pool := by
+theorem step_pool (s : State n Tx) (instr : Instr n Tx) :
+    (s.step instr).pool = (s.act instr).pool := by
   rw [step_eq, foldl_corrupt_pool, foldl_submit_pool, foldl_deliver_pool, tick_pool]
 
 @[simp] theorem deliver_now (s : State n Tx) (x : Packet n Tx) : (s.deliver x).now = s.now := by
   simp only [deliver]; split_ifs <;> rfl
 
-@[simp] theorem submit_now (s : State n Tx) (j : Fin n) (tr : Tx) : (s.submit j tr).now = s.now := rfl
+@[simp] theorem submit_now (s : State n Tx) (j : Fin n) (tr : Tx) :
+    (s.submit j tr).now = s.now := rfl
 
 omit [DecidableEq Tx] in
 @[simp] theorem corrupt_now (s : State n Tx) (k : Fin n) : (s.corrupt k).now = s.now := rfl

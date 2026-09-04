@@ -82,7 +82,8 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       · exact h
     have hte : t ≤ e := hfirst.first r e hr hev
     have hview' : ∀ s, e + 1 ≤ s → s ≤ T₀ + 2 * Δ + 2 * δ + 1 → viewAt s₀ instrs r s = v :=
-      fun s h1 h2 => View.val_injective (le_antisymm (hstay r hr s h2) (hev.trans (viewAt_mono r h1)))
+      fun s h1 h2 => View.val_injective
+      (le_antisymm (hstay r hr s h2) (hev.trans (viewAt_mono r h1)))
     have htimer : timerAt s₀ instrs r (e + 2 * Δ) = 2 * Δ := by
       rcases hstart with hlt | ⟨rfl, hv1⟩
       · have h1 : timerAt s₀ instrs r (e + 1) = 1 := by
@@ -149,10 +150,12 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         apply hnc r hr (T₀ + 2 * Δ + 2 * δ) (le_refl _)
         rw [← hbv]
         exact Algo.hasCert_of_mnotarised hg hM
-      have hvoters : (voters ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S b).card ≤ 2 * f := by
+      have hvoters :
+          (voters ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S b).card ≤ 2 * f := by
         by_contra h
         exact hnoM (Or.inr (not_le.mp h))
-      have hnp : NoProgress f ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S v (some b) := by
+      have hnp :
+          NoProgress f ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S v (some b) := by
         have hCsub : correctSet s₀ instrs ⊆
             (correctSet s₀ instrs).filter
               (fun c => NoProgressWitness ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S
@@ -174,7 +177,8 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         have hW : (correctSet s₀ instrs).filter
             (fun c => NoProgressWitness ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S
               v (some b) c)
-            ⊆ noProgressWitnesses ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S v (some b) :=
+            ⊆ noProgressWitnesses ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S v
+            (some b) :=
           fun c hc => mem_noProgressWitnesses.mpr (Finset.mem_filter.mp hc).2
         have h1 := Finset.card_le_card hCsub
         have h2 := Finset.card_union_le ((correctSet s₀ instrs).filter

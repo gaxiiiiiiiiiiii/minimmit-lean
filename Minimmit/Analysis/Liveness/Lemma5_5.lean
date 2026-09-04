@@ -53,10 +53,12 @@ theorem card_correctSet (hb : ByzBound f s₀ instrs) : n - f ≤ (correctSet s�
   omega
 
 /-- 正直者 p_j が t + 1 の S に持つ自分の署名付き message は、p_i に期限までに届く。 -/
-theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
+theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync δ s₀ instrs)
     {i j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}
     (hm : m ∈ ((State.run s₀ instrs (s + 1)).procs j).S) (hsig : m.signer = some j) {T : Nat}
-    (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T) : m ∈ ((State.run s₀ instrs T).procs i).S := by
+    (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T) :
+    m ∈ ((State.run s₀ instrs T).procs i).S := by
   obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm hsig
   have hact := hh t' j (hj t')
   have hsend : Action.send m i ∈ (instrs t').actions j := by
@@ -107,7 +109,8 @@ theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : 
 
 /-- view k に止まる正直者は、timer が 2Δ に達したスロット s で、view k のブロックに投票済みか
     nullify(k) を送っている。 -/
-theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
+theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync Δ s₀ instrs)
     {j : Fin n} (hj : Correct s₀ instrs j) {k : Nat} (hreach : ∃ t, k ≤ (viewAt s₀ instrs j t).val)
     (hstuck : ∀ t, (viewAt s₀ instrs j t).val ≤ k) :
     ∃ s, k ≤ (viewAt s₀ instrs j s).val
@@ -136,7 +139,9 @@ theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (h
         rw [he] at this
         omega
   have h2Δ := hs.one_le
-  have h2 : timerAt s₀ instrs j (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex))) = 2 * Δ := by
+  have h2 :
+      timerAt s₀ instrs j (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)))
+      = 2 * Δ := by
     rw [timerAt_add j _ _ (fun k' _ => hstay k')]
     omega
   refine ⟨Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)), ?_, ?_⟩
@@ -145,7 +150,8 @@ theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (h
     · exact Or.inl h
     · exact Or.inr h
     · exfalso
-      have h' : k < (viewAt s₀ instrs j (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)) + 1)).val := h
+      have h' : k < (viewAt s₀ instrs j
+          (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)) + 1)).val := h
       have := hstuck (Nat.find hex + (2 * Δ - timerAt s₀ instrs j (Nat.find hex)) + 1)
       omega
 
@@ -242,7 +248,8 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
             · exact Finset.mem_union_left _ (Finset.mem_filter.mpr ⟨hc, .nullify hm'⟩)
           have hV : ((correctSet s₀ instrs).filter
               (fun c => Msg.vote c b ∈ ((State.run s₀ instrs T₂).procs j).S)).card ≤ 2 * f :=
-            (Finset.card_le_card fun c hc => mem_voters.mpr (Finset.mem_filter.mp hc).2).trans hvoters
+            (Finset.card_le_card fun c hc => mem_voters.mpr (Finset.mem_filter.mp hc).2).trans
+            hvoters
           have hW : (correctSet s₀ instrs).filter
               (fun c => NoProgressWitness ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c)
               ⊆ noProgressWitnesses ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) :=
@@ -260,7 +267,8 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         · exact absurd (hall j hjc (T₂ + 1)) (not_le.mpr h)
       · exact S_subset_run s₀ instrs j (by have := (hT₂ j hj).1; omega) hm
     -- nullification が i に届き、i が進む
-    have hN : Nullified f ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
+    have hN :
+        Nullified f ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
       have hsub : correctSet s₀ instrs
           ⊆ nullifiers ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ :=
         fun j hj => mem_nullifiers.mpr (own_delivered hinit hh hs (mem_correctSet.mp hj)

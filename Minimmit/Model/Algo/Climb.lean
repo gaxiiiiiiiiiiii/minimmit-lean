@@ -41,7 +41,8 @@ theorem mem_votedBlocks_of_mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v
   simp only [mNotarisedAt, List.mem_filter] at h
   exact h.1
 
-theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx} (hb : b ∈ votedBlocks S)
+theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx}
+    (hb : b ∈ votedBlocks S)
     (hM : MNotarised f S b) : b ∈ mNotarisedAt f S b.view := by
   simp only [mNotarisedAt, List.mem_filter, decide_eq_true_eq]
   exact ⟨hb, trivial, hM⟩
@@ -323,7 +324,8 @@ theorem climb_pass {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} (hL :
     ∃ q, LocalInv f i q ∧ q.view = w ∧ p.S ⊆ q.S ∧ HasCert f q.S w
       ∧ (∀ m ∈ q.S, m ∈ p.S ∨ ∃ b', m = Msg.vote i b' ∧ b'.view.val < w.val)
       ∧ (advanceOnce f i q).1.S ⊆ (climb f i fuel p).1.S
-      ∧ (∀ m j, Action.send m j ∈ (advanceOnce f i q).2 → Action.send m j ∈ (climb f i fuel p).2) := by
+      ∧ (∀ m j, Action.send m j ∈ (advanceOnce f i q).2
+        → Action.send m j ∈ (climb f i fuel p).2) := by
   induction fuel generalizing p with
   | zero => exact absurd (lt_of_le_of_lt h1 h2) (lt_irrefl _)
   | succ fuel ih =>

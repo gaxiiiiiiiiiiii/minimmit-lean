@@ -36,7 +36,8 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       ∧ Correct s₀ instrs (lead v'))
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {tr : Tx}
     (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
-    (hfirst : ∀ j t', Correct s₀ instrs j → t' < t → Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S)
+    (hfirst : ∀ j t', Correct s₀ instrs j → t' < t →
+      Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S)
     (hgst : hs.GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j → ∃ b : Block Tx,
       LNotarised f ((State.run s₀ instrs (t + δ + (fa + 1) * (2 * Δ + 3 * δ) + 3 * δ)).procs j).S b
@@ -54,9 +55,11 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   obtain ⟨r₀, hr₀, hv₀⟩ := Finset.exists_mem_eq_sup (correctSet s₀ instrs) hne
     (fun r => (viewAt s₀ instrs r (t + δ)).val)
   have hr₀c := mem_correctSet.mp hr₀
-  set v₀ : View := ⟨(correctSet s₀ instrs).sup fun r => (viewAt s₀ instrs r (t + δ)).val⟩ with hv₀def
+  set v₀ : View := ⟨(correctSet s₀ instrs).sup fun r => (viewAt s₀ instrs r (t + δ)).val⟩
+    with hv₀def
   have hbound : ∀ r, Correct s₀ instrs r → (viewAt s₀ instrs r (t + δ)).val ≤ v₀.val :=
-    fun r hr => Finset.le_sup (f := fun r => (viewAt s₀ instrs r (t + δ)).val) (mem_correctSet.mpr hr)
+    fun r hr => Finset.le_sup (f := fun r => (viewAt s₀ instrs r (t + δ)).val)
+    (mem_correctSet.mpr hr)
   have hv₀1 : 1 ≤ v₀.val := le_trans (viewAt_pos hinit hh hi (t + δ)) (hbound i hi)
   have hv₀r : v₀.val = (viewAt s₀ instrs r₀ (t + δ)).val := hv₀
   have hreach₀ : ∃ s, ∃ r, Correct s₀ instrs r ∧ v₀.val ≤ (viewAt s₀ instrs r (s + 1)).val :=
@@ -85,7 +88,8 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
             (t + δ + k * (2 * Δ + 3 * δ) + 2 * Δ + 3 * δ + 1)).val := hleave i hi
         show v₀.val + (k + 1) ≤ _
         omega
-      refine ⟨Nat.find hreach, ⟨Nat.find_spec hreach, fun r t' hr h => Nat.find_min' hreach ⟨r, hr, h⟩⟩, ?_⟩
+      refine ⟨Nat.find hreach,
+        ⟨Nat.find_spec hreach, fun r t' hr h => Nat.find_min' hreach ⟨r, hr, h⟩⟩, ?_⟩
       have h1 := Nat.find_min' hreach (m := t + δ + k * (2 * Δ + 3 * δ) + 2 * Δ + 3 * δ) ⟨i, hi, by
         have h1 : v₀.val + k < (viewAt s₀ instrs i
             (t + δ + k * (2 * Δ + 3 * δ) + 2 * Δ + 3 * δ + 1)).val := hleave i hi

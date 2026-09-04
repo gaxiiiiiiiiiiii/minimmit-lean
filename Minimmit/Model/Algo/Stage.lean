@@ -346,7 +346,8 @@ theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
       (S_subset_voteProposal _ _ _ _ (mem_S_of_send_propose h))))
   · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (S_subset_nullifyTimeout _ _ _
       (mem_S_of_send_voteProposal h)))
-  · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (mem_S_of_send_nullifyTimeout h))
+  · exact S_subset_forwardNew _ _ _
+      (S_subset_nullifyNoProgress _ _ _ (mem_S_of_send_nullifyTimeout h))
   · exact S_subset_forwardNew _ _ _ (mem_S_of_send_nullifyNoProgress h)
   · exact mem_S_of_send_forwardNew h
 
@@ -368,7 +369,8 @@ noncomputable def st5 : Processor n Tx := (nullifyNoProgress f i (st4 f Δ lead 
 theorem stepPair_snd : (stepPair f Δ lead i p).2 =
     (climb f i (maxView p.S + 1) p).2 ++ (propose f lead i (st1 f i p)).2
       ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
-      ++ (nullifyNoProgress f i (st4 f Δ lead i p)).2 ++ (forwardNew f i (st5 f Δ lead i p)).2 := rfl
+      ++ (nullifyNoProgress f i (st4 f Δ lead i p)).2
+      ++ (forwardNew f i (st5 f Δ lead i p)).2 := rfl
 
 theorem stepPair_fst : (stepPair f Δ lead i p).1 = (forwardNew f i (st5 f Δ lead i p)).1 := rfl
 

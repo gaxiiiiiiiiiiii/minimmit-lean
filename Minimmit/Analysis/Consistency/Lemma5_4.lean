@@ -56,7 +56,9 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
       ∧ ValidProposal f lead (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S
           (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view b₂ := by
   classical
-  have hex : ∃ t, ∃ q, Correct s₀ instrs q ∧ ∃ j, Action.send (Msg.vote q b₂) j ∈ (instrs t).actions q := by
+  have hex :
+      ∃ t, ∃ q, Correct s₀ instrs q ∧ ∃ j, Action.send (Msg.vote q b₂) j
+      ∈ (instrs t).actions q := by
     rcases hM with rfl | hM
     · exact absurd rfl hg
     · obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM)
@@ -80,7 +82,8 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
     rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
     rcases List.mem_append.mp hj with hj | hj
     · exact ⟨j, hj⟩
-    · rcases Algo.mem_S_stage_or_sent f Δ lead q _ (Algo.send_forwardNew_mem hj) with hm | ⟨_, j', hs⟩
+    · rcases Algo.mem_S_stage_or_sent f Δ lead q _ (Algo.send_forwardNew_mem hj)
+        with hm | ⟨_, j', hs⟩
       · exact absurd hm (hnoS q hqc)
       · exact ⟨j', hs⟩
   simp only [Algo.innerActs, List.mem_append] at hj'

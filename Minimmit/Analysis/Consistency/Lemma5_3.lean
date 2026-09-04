@@ -71,7 +71,8 @@ theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hmem rfl
     exact absurd (Nat.find_min' hexv ⟨j', hj'⟩) (not_le.mpr ht')
   have hbvote : Msg.vote q₀ b ∈ ((State.run s₀ instrs (T q₀)).procs q₀).S
-      ∨ Action.send (Msg.vote q₀ b) j₁ ∈ Algo.step f Δ lead q₀ ((State.run s₀ instrs (T q₀)).procs q₀) := by
+      ∨ Action.send (Msg.vote q₀ b) j₁
+      ∈ Algo.step f Δ lead q₀ ((State.run s₀ instrs (T q₀)).procs q₀) := by
     rcases lt_trichotomy (Nat.find hexv) (T q₀) with hlt | heq | hgt
     · left
       exact S_subset_run s₀ instrs q₀ (Nat.succ_le_of_lt hlt) (mem_S_succ_of_send hh hq₀c hj₁)
@@ -86,7 +87,8 @@ theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         S_subset_run s₀ instrs q₀ (Nat.succ_le_of_lt hgt) (mem_S_succ_of_send hh hq₀c hj₀')
       have hact₁ := hh (Nat.find hexv) q₀ (hq₀c _)
       rw [hact₁] at hj₁
-      rcases Algo.vote_emission (localInv_run hinit hh hq₀c _) hj₁ with hmem | ⟨q, hq, hqv, _, hqnl, hqS, _, _⟩
+      rcases Algo.vote_emission (localInv_run hinit hh hq₀c _) hj₁
+          with hmem | ⟨q, hq, hqv, _, hqnl, hqS, _, _⟩
       · exact hvote_no hmem
       · have := hq.null_flag (by rw [hqv]; exact hqS hnull_mem)
         rw [hqnl] at this

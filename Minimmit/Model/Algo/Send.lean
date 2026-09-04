@@ -39,36 +39,43 @@ theorem mem_S_propose {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Process
     m ∈ q.S ∨ ∃ b, m = Msg.block i b ∧ Action.send (Msg.block i b) i ∈ (propose f lead i q).2 := by
   unfold propose at hm ⊢
   split_ifs at hm ⊢
-  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+  · exact (mem_S_disseminate_or i q _ hm).imp_right
+      fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
   · exact Or.inl hm
 
 theorem mem_S_voteProposal {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
     {m : Msg n Tx} (hm : m ∈ (voteProposal f lead i q).1.S) :
-    m ∈ q.S ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (voteProposal f lead i q).2 := by
+    m ∈ q.S ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i
+    ∈ (voteProposal f lead i q).2 := by
   unfold voteProposal at hm ⊢
   generalize proposals lead q.S q.view = l at hm ⊢
   rcases l with _ | ⟨b, _ | ⟨b', l⟩⟩
   · exact Or.inl hm
   · simp only at hm ⊢
     split_ifs at hm ⊢
-    · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨b, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+    · exact (mem_S_disseminate_or i q _ hm).imp_right
+        fun h => ⟨b, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
     · exact Or.inl hm
   · exact Or.inl hm
 
 theorem mem_S_nullifyTimeout {Δ : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (nullifyTimeout Δ i q).1.S) :
-    m ∈ q.S ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyTimeout Δ i q).2 := by
+    m ∈ q.S ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i
+    ∈ (nullifyTimeout Δ i q).2 := by
   unfold nullifyTimeout at hm ⊢
   split_ifs at hm ⊢
-  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+  · exact (mem_S_disseminate_or i q _ hm).imp_right
+      fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
   · exact Or.inl hm
 
 theorem mem_S_nullifyNoProgress {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (nullifyNoProgress f i q).1.S) :
-    m ∈ q.S ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyNoProgress f i q).2 := by
+    m ∈ q.S ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i
+    ∈ (nullifyNoProgress f i q).2 := by
   unfold nullifyNoProgress at hm ⊢
   split_ifs at hm ⊢
-  · exact (mem_S_disseminate_or i q _ hm).imp_right fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+  · exact (mem_S_disseminate_or i q _ hm).imp_right
+      fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
   · exact Or.inl hm
 
 theorem mem_S_st1 {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
@@ -86,19 +93,22 @@ theorem mem_S_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n
 theorem mem_S_st3 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st3 f lead i p).S) :
     m ∈ (st2 f lead i p).S
-      ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i ∈ (voteProposal f lead i (st2 f lead i p)).2 :=
+      ∨ ∃ b, m = Msg.vote i b ∧ Action.send (Msg.vote i b) i
+      ∈ (voteProposal f lead i (st2 f lead i p)).2 :=
   mem_S_voteProposal hm
 
 theorem mem_S_st4 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st4 f Δ lead i p).S) :
     m ∈ (st3 f lead i p).S
-      ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyTimeout Δ i (st3 f lead i p)).2 :=
+      ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i
+      ∈ (nullifyTimeout Δ i (st3 f lead i p)).2 :=
   mem_S_nullifyTimeout hm
 
 theorem mem_S_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st5 f Δ lead i p).S) :
     m ∈ (st4 f Δ lead i p).S
-      ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i ∈ (nullifyNoProgress f i (st4 f Δ lead i p)).2 :=
+      ∨ ∃ v, m = Msg.nullify i v ∧ Action.send (Msg.nullify i v) i
+      ∈ (nullifyNoProgress f i (st4 f Δ lead i p)).2 :=
   mem_S_nullifyNoProgress hm
 
 /-- 13〜14 行の後の S にある自分の nullify は、前からあったか 13〜14 行で送った。 -/

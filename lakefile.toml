@@ -4,6 +4,8 @@ defaultTargets = ["Minimmit"]
 [leanOptions]
 # 宣言していない識別子を暗黙の変数として補わない。定理文の打ち間違いをエラーにする
 autoImplicit = false
+# 100 字を超える行を警告する（Mathlib の style linter）
+weak.linter.style.longLine = true
 
 [[require]]
 name = "mathlib"

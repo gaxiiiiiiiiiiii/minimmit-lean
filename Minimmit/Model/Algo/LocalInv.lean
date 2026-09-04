@@ -320,7 +320,8 @@ theorem foldl_send_notarised_of_not_vote {m : Msg n Tx} (hv : ∀ b, m ≠ Msg.v
   induction l generalizing p with
   | nil => rfl
   | cons j l ih =>
-    rw [List.foldl_cons, ih, Processor.send_notarised_of_not_vote i p m j fun b hb => absurd hb (hv b)]
+    rw [List.foldl_cons, ih,
+      Processor.send_notarised_of_not_vote i p m j fun b hb => absurd hb (hv b)]
 
 end PreInv
 

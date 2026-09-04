@@ -6,7 +6,7 @@ BFT コンセンサスプロトコル Minimmit（Chou et al., [arXiv:2508.10862]
 
 ## 状態
 
-Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依存する公理は `propext`・`Classical.choice`・`Quot.sound` のみ。
+Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依存する公理は `propext`・`Classical.choice`・`Quot.sound` のみ。`Minimmit/Axioms.lean` が主定理ごとにこれを `#guard_msgs` で固定し、GitHub Actions の CI が push ごとにビルドと、ライブラリ全体の公理の監査を回す。
 
 | 論文 | 定理 | ファイル |
 |---|---|---|
@@ -60,6 +60,7 @@ printf 'import Minimmit\n#print axioms Minimmit.liveness\n' | lake env lean --st
 
 ```
 Minimmit
+├── Axioms.lean             主定理の一覧と、依存公理の固定
 ├── Model
 │   ├── Transition
 │   │   ├── Basic.lean          状態、message、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.run

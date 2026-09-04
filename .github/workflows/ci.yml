@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          use-mathlib-cache: "true"
+          # ライブラリの全宣言が propext・Classical.choice・Quot.sound 以外の公理に依存すると失敗する
+          axiom-audit: "true"

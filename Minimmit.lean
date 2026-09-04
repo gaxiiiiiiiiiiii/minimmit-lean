@@ -24,6 +24,7 @@ import Minimmit.Analysis.Liveness.Lemma5_7
 import Minimmit.Analysis.Responsiveness.Lemma5_8
 import Minimmit.Analysis.Responsiveness.Lemma5_9
 import Minimmit.Analysis.Responsiveness.Lemma5_10
+import Minimmit.Axioms
 
 /-!
 # Minimmit の形式化

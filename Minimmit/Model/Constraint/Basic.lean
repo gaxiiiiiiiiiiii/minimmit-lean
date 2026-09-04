@@ -5,6 +5,16 @@ import Minimmit.Model.Algo.Basic
 
 遷移系が課さない規則。定理の仮定になる。初期状態、部分同期、腐敗、リーダー、
 プロトコルに従うこと、の順。
+
+## 論文からの差異
+
+- `PartialSync` は Δ ≥ 1 を明示する。論文の「t に送った message は t′ > t に届く」から
+  従う条件で、`Timely` がスロット境界でしか判定しないため書き下す。Δ = 0 では timer = 2Δ
+  が二度と成り立たず、Lemma 5.5 が偽になる。
+- 配送の期限はスロット境界で判定する。状態はスロットの冒頭にしかないので、論文の
+  「max(GST, t) + Δ までに届く」を、そのスロットの冒頭で宛先の S にあることとして述べる。
+- リーダー関数 lead は輪番に固定せず、任意の関数。Lemma 5.7 は `Fair` を仮定する。論文の
+  lead(v) = p_{(v mod n)+1} は `Fair` を満たすので、論文の設定を含む。
 -/
 
 namespace Minimmit
@@ -27,8 +37,7 @@ def State.Timely (Δ : Nat) (GST : Time) (s : State n Tx) : Prop :=
   ∀ x ∈ s.pool, max GST.val x.sentAt.val + Δ ≤ s.now.val → x.msg ∈ (s.procs x.dst).S
 
 /-- 部分同期（§2）: ある GST があって、t に送られた packet は max(GST, t) + Δ までに
-    宛先の S に入る。Δ は既知、GST は敵が選ぶ。Δ ≥ 1 は、論文の「t に送った message は
-    t′ > t に届く」から従う条件で、`Timely` がスロット境界でしか判定しないため明示する。 -/
+    宛先の S に入る。Δ は既知、GST は敵が選ぶ。 -/
 structure PartialSync [DecidableEq Tx] (Δ : Nat) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) where
   GST : Time

@@ -7,6 +7,12 @@ import Mathlib.Data.Fintype.Basic
 §4 の用語（M/L-notarisation・nullification・valid proposal・proof of no progress）を
 message の集合 S 上の述語として定義し、§5.1 の「b が M-notarisation を受ける」などを
 実行上の述語として定義する。
+
+## 論文からの差異
+
+- 初期状態の S は空で、Table 2 が初期の S に含める genesis の M/L-notarisation は、
+  `MNotarised`・`LNotarised` が genesis を無条件に認めることで表す。S 上の述語の値は、
+  初期 S に genesis の notarisation を含めた場合と同じ。
 -/
 
 namespace Minimmit

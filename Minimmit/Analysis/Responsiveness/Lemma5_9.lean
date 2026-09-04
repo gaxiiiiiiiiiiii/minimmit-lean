@@ -4,6 +4,11 @@ import Minimmit.Analysis.Liveness.LeaderRound
 # Lemma 5.9（All correct processors leave the view）
 
 lead(v) が正直かどうかによらず、正直者は全員 t + 2Δ + 3δ までに view v を離れる。
+
+## 論文からの差異
+
+- 論文の O(·) は具体的な上界 t + 2Δ + 3δ に置き換える。具体的な上界は O(·) の主張を含む。
+- view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では結論が成り立たない。
 -/
 
 namespace Minimmit

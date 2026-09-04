@@ -4,11 +4,14 @@ import Minimmit.Analysis.Liveness.LeaderRound
 # Lemma 5.8（Fast finalisation under a correct leader）
 
 δ ≤ Δ は GST 以後の実際の遅延の上界、f_a ≤ f は実際に腐敗する人数。
-論文の O(·) は、証明中の具体的な bound で置き換えている。
 
-δ の仮定は `PartialSync δ`、つまり GST 前に送った packet も GST + δ までに届く。5.8 の
-証明は、最初の正直者が証明書を転送した時刻が GST より前であっても、それが t + δ までに
-全員へ届くことを使うので、この読みが要る。
+## 論文からの差異
+
+- δ は `PartialSync δ` として与える。つまり GST 前に送った packet も GST + δ までに届く。
+  証明は、最初の正直者が証明書を転送した時刻が GST より前であっても、それが t + δ までに
+  全員へ届くことを使うので、この読みが要る。timeout の 2Δ は `Honest` の Δ のまま。
+- 論文の O(·) は具体的な上界 t + 3δ に置き換える。具体的な上界は O(·) の主張を含む。
+- view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では結論が成り立たない。
 -/
 
 namespace Minimmit

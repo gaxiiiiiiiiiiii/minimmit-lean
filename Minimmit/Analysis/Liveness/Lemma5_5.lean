@@ -6,6 +6,12 @@ import Minimmit.Analysis.Liveness.Timing
 正直者はすべての view に入る。view k で止まる正直者がいれば、他の正直者も止まり、
 全員が timeout で投票か nullify を出し、進捗のなさの証拠から全員が nullify を出して
 nullification ができ、止まれない。
+
+## 論文からの差異
+
+- 論文の「view v に入る」を「view v 以上に達する」として述べる。登り切りでは 1 スロットで
+  v を通り過ぎることがあり、スロットの冒頭に v にいるとは限らない。view は 1 ずつしか
+  進まないので、v 以上に達したプロセッサは v を通過している。
 -/
 
 namespace Minimmit

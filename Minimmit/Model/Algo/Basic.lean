@@ -6,6 +6,30 @@ import Mathlib.Data.Finset.Lattice.Fold
 # Algorithm 1
 
 局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。
+
+## 論文からの差異
+
+- 評価順。論文の Algorithm 1 は各スロットで 2〜32 行を上から 1 回評価する。`step` は
+  16〜21、5〜7、9〜11、13〜14、24〜28、2〜3 行の順に評価する。論文の Lemma 5.6 以降の
+  時間の議論は、view に入った時点で提案し、証明書が届いた時点で転送することを使う。
+  論文の行順では、view に入ったスロットで提案できず、そのスロットで完成した証明書を同じ
+  スロットで転送できないので、これが 1〜2 スロット遅れる。行順でも論文の O(·) の主張は
+  偽にならず、ずれは定数だが、証明の時間計算は書いてあるとおりには通らない。この評価順では
+  通る。
+- 登り切り。16〜21 行は `climb` で、現在の view の証明書がある限り繰り返す。論文の
+  Lemma 5.6 の証明と付録の Lemma E.6 は「最初の正直者が t に view v に入れば、全正直者は
+  t + Δ までに v に入る」と主張するが、1 回評価では 1 スロットに高々 2 view しか進めず、
+  GST 前に配送が遅れて証明書が一括で届く正直者について偽になる。繰り返す動作では
+  `enter_all` として成り立ち、論文の議論がそのまま通る。§6.1 の「view を飛ばす」最適化とは
+  別で、ここでは順に 1 view ずつ登る。
+- 転送。2〜3 行の転送 `forwardNew` は、新しい証明書を構成する message を S にある分すべて
+  送る。論文は辞書順最小の 2f + 1 個を 1 組選ぶ。§5 の証明が転送に使うのは「新しい証明書を
+  受け取った正直者は全員へ送る」ことだけで、すべて送っても各宛先が受け取る集合は論文の
+  上位集合になる。差が出るのは §6.4 の通信量の見積もりで、これは形式化していない。
+- 同点の選択。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、S を `Finset.toList` で
+  並べた順で先のものを取る。論文の証明は選択の仕方を使わないので、この選択はその一例。
+- finalise。31〜32 行の Finalise は動作を伴わないので `step` に無く、finalise したことは
+  S に L-notarisation があることで表す。これは 31 行の条件そのもの。
 -/
 
 namespace Minimmit
@@ -14,7 +38,9 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 
 namespace Algo
 
-/-! ### 送信の局所効果
+/-! ## 部品 -/
+
+/-! ### 送信
 動作の列を組み立てながら、`Processor.send` で局所状態にも同じ効果を与える。 -/
 
 /-- m を全員へ送る（disseminate）。自分宛も含み、`Processor.send` が即時受信にする。 -/
@@ -59,44 +85,8 @@ noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
     List (Block Tx) :=
   (votedBlocks S).filter fun b => decide (b.view = v ∧ MNotarised f S b)
 
-/-! ### 2〜3 行と §4 の取引転送 -/
-
-/-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
-    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。スロットの最後に評価するので、
-    このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
-
-    証明書は、それを構成する message を S にある分だけ全部送る。論文は「new」の第 2 条件で
-    辞書順最小の 2f + 1 個を 1 つ選んで送る（§4）。§5 の証明が転送に使うのは「新しい証明書を
-    受け取った正直者は全員へ送る」ことだけで、全部送っても各宛先が受け取る集合は論文の
-    上位集合になる。差が出るのは §6.4 の通信量の見積もりで、これは形式化していない。 -/
-noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  let nulls := (nullifyViews p.S).filter fun v =>
-    decide (Nullified f p.S v ∧ ¬ Nullified f p.prevS v)
-  let notas := (votedBlocks p.S).filter fun b =>
-    decide (MNotarised f p.S b ∧ ¬ MNotarised f p.prevS b)
-  let ms :=
-    (nulls.flatMap fun v => p.S.toList.filter fun m => decide (∃ q, m = Msg.nullify q v))
-    ++ (notas.flatMap fun b => p.S.toList.filter fun m => decide (∃ q, m = Msg.vote q b))
-    ++ (p.S.toList.filter fun m => match m with | .tx _ => decide (m ∉ p.prevS) | _ => false)
-  disseminateAll i p ms
-
-/-! ### 5〜7 行（SelectParent と ProposeChild） -/
-
-/-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
-    最大のもの。票のあるブロックに候補が無ければ genesis（view 0 で常に M-notarisation を
-    持つ）。論文の「辞書順最小」の代わりに、同じ view に複数あれば `votedBlocks` の順で
-    先のもの。 -/
-noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block Tx :=
-  (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
-    fun b => b.view.val).getD .gen
-
-/-- ProposeChild(b, v) の Tr（§4）: 受信済みで b の祖先に含まれない取引。 -/
-noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
-  (S.toList.filterMap fun m => match m with | .tx tr => some tr | _ => none).filter
-    fun tr => decide (tr ∉ b.trStar)
-
-/-! ### Algorithm 1 -/
+/-! ## 各段の部品
+`step` の評価順に並べる。13〜14 行と 24〜28 行は部品を持たず、`step` に直接書く。 -/
 
 /-! ### 16〜21 行 -/
 
@@ -137,21 +127,45 @@ noncomputable def climb (f : Nat) (i : Fin n) :
       (r'.1, r.2 ++ r'.2)
     else (p, [])
 
+/-! ### 5〜7 行（SelectParent と ProposeChild） -/
+
+/-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
+    最大のもの。票のあるブロックに候補が無ければ genesis（view 0 で常に M-notarisation を
+    持つ）。論文の「辞書順最小」の代わりに、同じ view に複数あれば `votedBlocks` の順で
+    先のもの。 -/
+noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block Tx :=
+  (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
+    fun b => b.view.val).getD .gen
+
+/-- ProposeChild(b, v) の Tr（§4）: 受信済みで b の祖先に含まれない取引。 -/
+noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
+  (S.toList.filterMap fun m => match m with | .tx tr => some tr | _ => none).filter
+    fun tr => decide (tr ∉ b.trStar)
+
+/-! ### 2〜3 行と §4 の取引転送 -/
+
+/-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
+    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。スロットの最後に評価するので、
+    このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
+    証明書は、それを構成する message を S にある分だけ全部送る。 -/
+noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    Processor n Tx × List (Action n Tx) :=
+  let nulls := (nullifyViews p.S).filter fun v =>
+    decide (Nullified f p.S v ∧ ¬ Nullified f p.prevS v)
+  let notas := (votedBlocks p.S).filter fun b =>
+    decide (MNotarised f p.S b ∧ ¬ MNotarised f p.prevS b)
+  let ms :=
+    (nulls.flatMap fun v => p.S.toList.filter fun m => decide (∃ q, m = Msg.nullify q v))
+    ++ (notas.flatMap fun b => p.S.toList.filter fun m => decide (∃ q, m = Msg.vote q b))
+    ++ (p.S.toList.filter fun m => match m with | .tx _ => decide (m ∉ p.prevS) | _ => false)
+  disseminateAll i p ms
+
+/-! ## Algorithm 1 -/
+
 open Classical in
-/-- Algorithm 1: p_i が 1 スロットで起こす動作の列。行の順に局所状態を更新しながら決める。
-    `ValidProposal` の判定に古典論理を使う。31〜32 行の Finalise は動作を伴わないので無く、
-    finalise したことは S に L-notarisation があることで表す。
-
-    論文の Algorithm 1 との違いは 2 つ。
-
-    1. 16〜21 行は、現在の view の証明書がある限り繰り返す（`climb`）。論文の擬似コードは
-       各行を 1 回評価するので 1 スロットに高々 2 view しか進めないが、論文の解析
-       （Lemma 5.6 と付録 E.6 の「最初の正直者が view v に入ってから Δ 以内に全正直者が
-       入る」）は、届いている証明書の分だけその場で登ることを前提にしている。GST 前に
-       配送が遅れて証明書が一括で届く正直者は、1 回評価では Δ 以内に追いつけない。
-    2. 16〜21 行を 5〜11 行より先に評価し、2〜3 行の転送をスロットの最後に置く。論文の
-       行順では、view に入ったスロットで提案できず、そのスロットで完成した証明書を同じ
-       スロットで転送できないので、Lemma 5.6 以降の時間の議論が 1〜2 スロットずれる。 -/
+/-- Algorithm 1: p_i が 1 スロットで起こす動作の列。16〜21、5〜7、9〜11、13〜14、24〜28、
+    2〜3 行の順に評価し、局所状態を更新しながら決める。`ValidProposal` の判定に古典論理を
+    使う。 -/
 noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     List (Action n Tx) :=
   -- 16〜21 行。証明書のある view は S にある message の view を超えないので、

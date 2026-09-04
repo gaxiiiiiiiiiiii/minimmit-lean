@@ -30,28 +30,80 @@ lake exe cache get
 lake build
 ```
 
-## モデルの読み方
+## モデル
 
-時間は離散のスロット。各スロットで、各プロセッサが動作の列を起こし、次に網から message が届き、取引が投入され、腐敗が起きる。
+定義は `Model/` の 4 つの `Basic.lean` にある。論文と突き合わせるには Transition、Certificate、Algo、Constraint の順に読む。以下は論文の概念と Lean の定義の対応。
 
-- `Processor`: p_i の局所状態。Table 2 の view・T（`timer`）・nullified・proposed・notarised・S に、前スロットの動作を終えた時点の S である `prevS` を加えたもの。
-- `State`: 大域状態。各プロセッサ `procs`、これまでに腐敗した `byz`、網に載った packet の全体 `pool`、現在のスロット `now`。
-- `Action`: プロセッサが自分から起こす動作。message を送るか、次の view へ進むか。
-- `Instr`: 1 スロット分の指示。各プロセッサの動作列・配送・取引投入・腐敗。敵対者は指示の列 `instrs : Nat → Instr` を選ぶ。
-- `State.run s₀ instrs t`: スロット t の冒頭の状態。スロット t の動作で起きた view の変化は、スロット t + 1 の冒頭の状態に現れる。
-- ブロックは親をハッシュではなくブロックそのもので持つ。論文は暗号を完全と仮定しているので、ハッシュと実体を同一視した。
-- 初期状態の S は空。Table 2 が初期の S に含める genesis の M/L-notarisation は、述語 `MNotarised`・`LNotarised` が genesis を無条件に認めることで表す。
-- 論文が「some b」や同点の選択を任意に残している箇所（19 行の投票先、SelectParent の同点）は、S の列挙順で選ぶ。
-- `Algo.step`: Algorithm 1。局所状態から 1 スロット分の動作列を返す関数。
-- 制約: `Init`（初期状態）、`Honest`（腐敗していないプロセッサの動作は `Algo.step` の出力）、`ByzBound`（腐敗は f 人以下）、`PartialSync`（GST と Δ、Δ ≥ 1）、`Fair`（どのプロセッサも無限回リーダーになる）。
-- 証明書は S 上の述語。`MNotarised`・`LNotarised`・`Nullified`・`ValidProposal`・`NoProgress`。
-- finalise は動作を伴わない。S に L-notarisation があることで表す。
+### 実行モデル（§2）
 
-定理は「`Init s₀`、`Honest`、`ByzBound f`、`PartialSync Δ` を満たす任意の `s₀` と `instrs` について」の形で述べる。
+時間は離散のスロット。各スロットで、各プロセッサが動作の列を起こし、次に網から message が届き、取引が投入され、腐敗が起きる。この 1 スロット分を `Instr` が指定し、`State.step` が状態に適用する。
+
+| 論文 | Lean | 備考 |
+|---|---|---|
+| スロット t の状態 | `State.run s₀ instrs t` | スロット t の冒頭の状態。t の動作で起きた view の変化は t + 1 の冒頭に現れる |
+| 実行 | `instrs : Nat → Instr` | 各スロットの動作列 `actions`・配送 `deliveries`・取引投入 `submits`・腐敗 `corrupts`。定理はこの列を任意に取るので、敵対者の選択はすべてここに入る |
+| プロセッサの動作 | `Action` | message を誰かへ送る `send`、次の view へ進む `progress` |
+| 網 | `State.pool`、`Packet` | packet は message・宛先・送信スロットの組。送った packet は `pool` に載り、`pool` にあるものだけが届く |
+| 署名の偽造不能 | `State.send` のガード | 自分の署名付きか受信済みの message だけ送れる |
+| 腐敗 | `State.byz` | 腐敗したプロセッサの集合。増えるだけで減らない |
+
+### プロセッサと message（§4）
+
+| 論文 | Lean | 備考 |
+|---|---|---|
+| Table 2 の view、T、nullified、proposed、notarised、S | `Processor` の `view`、`timer`、`nullified`、`proposed`、`notarised`、`S` | notarised の ⊥ は `none` |
+| なし | `Processor.prevS` | 前スロットの動作を終えた時点の S。2〜3 行の「new」の判定に使う |
+| ブロック | `Block` | genesis `gen` か、view・取引列・親の組 `node` |
+| Tr* | `Block.trStar` | b とその祖先の取引列を古い順に連結したもの |
+| 提案・票・nullify・取引 | `Msg` の `block`・`vote`・`nullify`・`tx` | 前の 3 つは署名者 `q` を持つ。取引は署名を持たない |
+
+### 証明書（§4、§5.1）
+
+§4 の証明書は message の集合 S 上の述語。§5.1 の「b が M-notarisation を受ける」は、誰かの S でなく実行の中で誰が何を送ったかで言う述語。
+
+| 論文 | Lean | 備考 |
+|---|---|---|
+| S にある b の M-notarisation | `MNotarised f S b` | 相異なる 2f + 1 人の票。genesis は無条件に認める |
+| S にある b の L-notarisation | `LNotarised f S b` | 相異なる n − f 人の票。genesis は無条件に認める |
+| S にある view v の nullification | `Nullified f S v` | 相異なる 2f + 1 人の nullify(v) |
+| valid proposal | `ValidProposal f lead S v b` | 条件 (i)〜(iii) をフィールドに持つ構造体 |
+| proof of no progress | `NoProgress f S v notarised` | 24〜27 行の条件。2f + 1 人のそれぞれが、nullify(v) を送ったか、notarised 以外の view v のブロックに投票した |
+| p_i が m を送る | `Sends instrs i m` | 指示の列のどこかに m を送る動作がある |
+| b が M-notarisation を受ける | `ReceivesM f instrs b` | 2f + 1 人が b に票を送った。L-notarisation は `ReceivesL`、nullification は `ReceivesNullification` |
+
+### Algorithm 1（§4）
+
+`Algo.step f Δ lead i p` が、p_i の局所状態 p から 1 スロット分の動作列を返す。行の対応は次のとおり。評価順は論文と異なり、[論文からの差異](#論文からの差異) に書く。
+
+| Algorithm 1 | Lean |
+|---|---|
+| 2〜3 行 新しい証明書の転送 | `forwardNew` |
+| 5〜7 行 SelectParent、ProposeChild | `selectParent`、`payload` |
+| 9〜11 行 投票 | `step` の中。提案の列挙は `proposals`、条件は `ValidProposal` |
+| 13〜14 行 timeout の nullify | `step` の中 |
+| 16〜21 行 view の前進 | `advanceOnce`、`climb` |
+| 24〜28 行 進捗のなさの nullify | `step` の中。条件は `NoProgress` |
+| 31〜32 行 Finalise | 動作なし。finalise したことは S に L-notarisation があることで表す |
+
+### 仮定と定理（§2、§5）
+
+論文の仮定は、遷移系が課さない制約として定義し、定理の仮定に置く。
+
+| 論文 | Lean | 備考 |
+|---|---|---|
+| n ≥ 5f + 1 | `5 * f + 1 ≤ n` | 定理の仮定 |
+| Table 2 の初期値 | `Init s₀` | 全プロセッサが `Processor.init`、byz と pool は空、now は 0 |
+| 正直者は Algorithm 1 に従う | `Honest f Δ lead s₀ instrs` | 各スロットで byz にないプロセッサの動作列は `Algo.step` の出力 |
+| 腐敗は高々 f 人 | `ByzBound f s₀ instrs` | 全スロットで byz の要素数が f 以下 |
+| 部分同期 | `PartialSync Δ s₀ instrs` | GST は構造体のフィールド。t に送った packet は max(GST, t) + Δ までに届く。Δ ≥ 1 |
+| lead の輪番 | `Fair lead` | どのプロセッサも、どの view 以降にも自分がリーダーになる view を持つ |
+| correct processor | `Correct s₀ instrs i` | 全スロットで byz にない |
+
+定理は「`Init s₀`、`Honest`、`ByzBound f` を満たす任意の `s₀` と `instrs` について」の形で述べる。Lemma 5.5 以降はさらに `PartialSync Δ` を、Lemma 5.7 は `Fair lead` を仮定する。たとえば `consistency` は、任意のプロセッサ i, j と任意のスロット t, t′ について、i の S に b の L-notarisation があり j の S に b′ の L-notarisation があれば、b と b′ の一方が他方の祖先であると述べる。
 
 ## ファイル構成
 
-`Model/` が §4、`Analysis/` が §5。`Model/` の各ディレクトリでは `Basic.lean` が定義で、他のファイルは補題。定義を確かめるには 4 つの `Basic.lean` を読めばよい。
+`Model/` が §4、`Analysis/` が §5。`Model/` の各ディレクトリでは `Basic.lean` が定義で、他のファイルは補題。
 
 ```
 Minimmit
@@ -93,39 +145,41 @@ Minimmit
 
 ## 論文からの差異
 
-### Algorithm 1 の評価順と繰り返し
+形式化は論文と次の点で異なる。定理は、これらの差異を含んだプロトコルについて成り立つ。各差異の理由と、論文との関係を示す定理は、所在ファイルの冒頭の doc に「論文からの差異」として書いてある。
 
-論文の Algorithm 1 は各スロットで 2〜32 行を上から 1 回評価する。ここでは次の順で評価する。
+### 擬似コードの修正
 
-1. 16〜21 行（view の前進）。現在の view の証明書がある限り繰り返す。
-2. 5〜7 行（提案）
-3. 9〜11 行（投票）
-4. 13〜14 行（timeout の nullify）
-5. 24〜28 行（進捗のなさの nullify）
-6. 2〜3 行（新しい証明書の転送）
+論文の擬似コードは、論文の証明が使う動作をしていない。登り切りがないと Lemma E.6 が偽になり、行順のままだと証明の時間計算が 1〜2 スロットずれる。
 
-順序を変えた理由は、論文の行順では view に入ったスロットで提案できず、そのスロットで完成した証明書を同じスロットで転送できないため。Lemma 5.6 以降の時間の議論は、入った時点で提案し届いた時点で転送することを前提にしており、行順のままでは 1〜2 スロットずれる。
+| 差異 | 論文との関係 | 所在 |
+|---|---|---|
+| Algorithm 1 を 16〜21、5〜7、9〜11、13〜14、24〜28、2〜3 行の順に評価する | 証明の時間計算どおりになる。行順でも O(·) の主張は偽にならず、ずれは定数 | Model/Algo/Basic |
+| 16〜21 行を、現在の view の証明書がある限り繰り返す | 1 回評価では Lemma E.6 が偽になる実行がある | Model/Algo/Basic |
 
-繰り返しにした理由は、Lemma 5.6 の証明と付録の Lemma E.6 が「最初の正直者が t に view v に入れば、全正直者は t + Δ までに v に入る」と主張していて、これが 1 回評価では成り立たないため。1 回評価では 1 スロットに高々 2 view しか進めない。GST 前に配送が遅れていた正直者は、GST + Δ に複数の view の証明書を一括で受け取っても 1 スロットに 1〜2 view ずつしか登れず、リーダーがその状態にあると 5.6〜5.10 の結論が偽になる実行がある。証明書がある限り登り切る動作なら、t + Δ までに全員が v に入り、論文の議論がそのまま通る。§6.1 の「view を飛ばす」最適化とは別で、ここでは順に 1 view ずつ登る。
+### 具体化と同値な符号化
 
-### 転送
+| 差異 | 論文との関係 | 所在 |
+|---|---|---|
+| ブロックは親をハッシュでなくブロックそのもので持つ | 暗号を完全と仮定する論文では区別できない | Model/Transition/Basic |
+| Tr* の重複を除去しない | Lemma 5.7 の結論は重複に依らない | Model/Transition/Basic |
+| 初期状態の S は空。genesis の M/L-notarisation は述語が無条件に認める | 述語の値が同じ | Model/Certificate/Basic |
+| 2〜3 行の転送で、証明書を構成する message を S にある分すべて送る | 各宛先が受け取る集合が論文の上位集合 | Model/Algo/Basic |
+| 「some b」や同点の選択は S の列挙順 | 論文が任意に残した選択の一例 | Model/Algo/Basic |
+| finalise は動作を伴わない。S に L-notarisation があることで表す | 31 行の条件そのもの | Model/Algo/Basic |
+| 配送の期限はスロット境界で判定する | 同じ期限をスロット冒頭で述べたもの | Model/Constraint/Basic |
+| Δ ≥ 1 を `PartialSync` に明示する | 論文の仮定から従う | Model/Constraint/Basic |
+| lead は輪番に固定せず任意の関数。Lemma 5.7 は `Fair` を仮定する | 論文の輪番は `Fair` を満たす | Model/Constraint/Basic |
+| Lemma 5.8〜5.10 の δ は `PartialSync δ` として与える | GST 後の実際の遅延を Δ の代わりに置いたもの | Analysis/Responsiveness/Lemma5_8 |
 
-2〜3 行の転送は、新しい証明書を構成する message を S にある分すべて送る。論文は辞書順で最小の 2f + 1 個を 1 組選ぶ。L-notarisation は論文の脚注 12 のとおり転送しない。「新しい」は、動作を終えた時点の S にあって前スロットの動作を終えた時点の S になかったこと。
+### ステートメントの精密化
 
-### モデル
-
-- Δ ≥ 1 を `PartialSync` に明示する。論文の「t に送った message は t′ > t に届く」から従う条件で、Δ = 0 では timer = 2Δ が二度と成り立たず Lemma 5.5 が偽になる。
-- 配送の期限はスロット境界で判定する。
-- Tr* は祖先の payload を連結するだけで、重複を除去しない。
-
-### ステートメント
-
-- Lemma 5.5 の「view v に入る」は「view v 以上に達する」として述べる。登り切りでは 1 スロットで v を通り過ぎることがあり、スロットの冒頭に v にいるとは限らない。
-- Lemma 5.6・5.8・5.9 は view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では誰も view 0 にいないので結論が成り立たない。
-- Lemma 5.4 の `consistency` は p_i・p_j の正直さを仮定しない。署名の遡りは腐敗したプロセッサの S でも成り立つ。
-- Lemma 5.8〜5.10 の O(·) は具体的な上界に置き換えた。5.8 は t + 3δ、5.9 は t + 2Δ + 3δ、5.10 は t + δ + (f_a + 1)(2Δ + 3δ) + 3δ。
-- Lemma 5.10 のリーダーの条件は「どの f_a + 1 個の連続する view にも正直なリーダーがいる」。f_a はこの条件のパラメータで、f_a ≤ f は課さない。論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす。
-- Lemma 5.8〜5.10 の δ は `PartialSync δ` として与える。timeout の 2Δ は Honest の Δ のまま。
+| 差異 | 論文との関係 | 所在 |
+|---|---|---|
+| Lemma 5.5 の「view v に入る」を「view v 以上に達する」と述べる | view は 1 ずつ進むので同値 | Analysis/Liveness/Lemma5_5 |
+| Lemma 5.6・5.8・5.9 は view v ≥ 1 を仮定に持つ | 論文の view の範囲 ℕ≥1 を明示したもの | 各 Lemma のファイル |
+| Lemma 5.4 の `consistency` は p_i・p_j の正直さを仮定しない | 論文の主張を含む | Analysis/Consistency/Lemma5_4 |
+| Lemma 5.8〜5.10 の O(·) を具体的な上界に置き換える | 具体的な上界は O(·) の主張を含む | Analysis/Responsiveness の各ファイル |
+| Lemma 5.10 のリーダー条件は「どの f_a + 1 個の連続する view にも正直なリーダーがいる」 | 論文の輪番はこれを満たすので、論文の設定を含む | Analysis/Responsiveness/Lemma5_10 |
 
 ## 未証明
 

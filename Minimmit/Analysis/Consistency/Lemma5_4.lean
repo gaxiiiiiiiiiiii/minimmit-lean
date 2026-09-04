@@ -5,6 +5,14 @@ import Minimmit.Analysis.Consistency.Lemma5_3
 
 M-notarisation を受けたブロックの親と祖先も M-notarisation を受けることから、
 L-notarisation を受けた 2 つのブロックは一方が他方の祖先。
+
+## 論文からの差異
+
+- `consistency` は p_i・p_j の正直さを仮定しない。論文は正直者 p_i・p_j について述べるが、
+  署名の遡り `sendsBefore_of_mem_S` は腐敗したプロセッサの S でも成り立つので要らない。
+  論文の主張を含む。
+- log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が L-notarisation を持つ
+  ブロックの Tr* に当たり、`consistency` はその 2 つのブロックについて述べる。
 -/
 
 namespace Minimmit
@@ -179,10 +187,7 @@ theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
     exact sends_of_mem_S hinit hw rfl
 
 /-- Consistency（§2）をブロックの形で: 2 つのプロセッサが L-notarisation を持つ 2 つの
-    ブロックは、一方が他方の祖先。論文は正直者 p_i・p_j について述べるが、署名の遡り
-    （`sendsBefore_of_mem_S`）は腐敗したプロセッサの S でも成り立つので、i・j の正直さは
-    要らない。log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が
-    L-notarisation を持つブロックの Tr* に当たる。 -/
+    ブロックは、一方が他方の祖先。 -/
 theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {i j : Fin n} {t t' : Nat} {b b' : Block Tx}

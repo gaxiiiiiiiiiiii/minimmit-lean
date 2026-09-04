@@ -52,7 +52,7 @@ printf 'import Minimmit\n#print axioms Minimmit.liveness\n' | lake env lean --st
 
 ### 仮定と定理
 
-論文の仮定は制約として定義し、定理の仮定に置く。`Init` は初期状態、`Honest` は正直者の動作列が `Algo.step` の出力であること、`ByzBound` は腐敗が f 人以下、`PartialSync` は部分同期、`Fair` はリーダー関数の公平性。`Correct i` は p_i が全スロットで腐敗集合にないことで、定理の中の「正直者 p_i」はこれで述べる。定理は「n ≥ 5f + 1 と `Init`・`Honest`・`ByzBound` を満たす任意の `s₀` と `instrs` について」の形で、Lemma 5.5〜5.7 は `PartialSync Δ` を、Lemma 5.7 は `Fair` も仮定する。Lemma 5.8〜5.10 は GST 後の実際の遅延 δ ≤ Δ をとって `PartialSync δ` を仮定し、Lemma 5.10 はさらに、どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する。
+論文の仮定は制約として定義し、定理の仮定に置く。`Init` は初期状態、`Honest` は正直者の動作列が `Algo.step` の出力であること、`ByzBound` は腐敗が f 人以下、`PartialSync` は部分同期、`Fair` はリーダー関数の公平性。`Correct i` は p_i が全スロットで腐敗集合にないことで、定理の中の「正直者 p_i」はこれで述べる。定理は「n ≥ 5f + 1 と `Init`・`Honest`・`ByzBound` を満たす任意の `s₀` と `instrs` について」の形で、Lemma 5.5〜5.7 は `PartialSync Δ` を、Lemma 5.7 は `Fair` も仮定する。Lemma 5.8〜5.10 は GST 後の実際の遅延 δ ≤ Δ をとって `PartialSync δ` を仮定し、Lemma 5.10 はさらに、どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する。4 つの制約が同時に満たせることは Constraint/Witness の `constraints_satisfiable` が示す。
 
 ## ファイル構成
 
@@ -77,7 +77,8 @@ Minimmit
 │   │   └── Forward.lean        転送と反応の補題、SelectParent と valid proposal
 │   └── Constraint
 │       ├── Basic.lean          Init、PartialSync、Correct、ByzBound、Fair、Honest
-│       └── Run.lean            署名の遡り（S にあれば署名者が前に送った）、腐敗の数え上げ、不変量の実行への持ち上げ
+│       ├── Run.lean            署名の遡り（S にあれば署名者が前に送った）、腐敗の数え上げ、不変量の実行への持ち上げ
+│       └── Witness.lean        Init・Honest・ByzBound・PartialSync を同時に満たす実行の例、輪番の lead が Fair を満たすこと
 └── Analysis
     ├── Consistency
     │   ├── Lemma5_1.lean

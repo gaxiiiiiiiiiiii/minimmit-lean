@@ -11,6 +11,7 @@ import Minimmit.Model.Algo.Send
 import Minimmit.Model.Algo.Forward
 import Minimmit.Model.Constraint.Basic
 import Minimmit.Model.Constraint.Run
+import Minimmit.Model.Constraint.Witness
 import Minimmit.Analysis.Consistency.Lemma5_1
 import Minimmit.Analysis.Consistency.Lemma5_2
 import Minimmit.Analysis.Consistency.Lemma5_3

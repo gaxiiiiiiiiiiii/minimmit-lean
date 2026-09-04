@@ -16,7 +16,7 @@ namespace Algo
 /-! ### 段ごとの分解
 `Algo.step` の各段を名前付きの関数にする。本体は `Algo.step` と同じ。 -/
 
-/-- 2〜3 行で送る message の列。 -/
+/-- 2〜3 行で送る message の列 -/
 noncomputable def forwardMsgs (f : Nat) (p : Processor n Tx) : List (Msg n Tx) :=
   let nulls := (nullifyViews p.S).filter fun v =>
     decide (Nullified f p.S v ∧ ¬ Nullified f p.prevS v)
@@ -35,7 +35,7 @@ theorem mem_S_of_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {m : Msg n Tx}
     Finset.mem_toList] at h
   rcases h with (⟨_, _, hm, _⟩ | ⟨_, _, hm, _⟩) | ⟨hm, _⟩ <;> exact hm
 
-/-- 5〜7 行。 -/
+/-- 5〜7 行 -/
 noncomputable def propose (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   if lead p.view = i ∧ p.proposed = false then
@@ -44,7 +44,7 @@ noncomputable def propose (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
   else (p, [])
 
 open Classical in
-/-- 9〜11 行。 -/
+/-- 9〜11 行 -/
 noncomputable def voteProposal (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   match proposals lead p.S p.view with
@@ -54,14 +54,14 @@ noncomputable def voteProposal (f : Nat) (lead : View → Fin n) (i : Fin n) (p 
     else (p, [])
   | _ => (p, [])
 
-/-- 13〜14 行。 -/
+/-- 13〜14 行 -/
 def nullifyTimeout (Δ : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   if p.timer = 2 * Δ ∧ p.nullified = false ∧ p.notarised = none then
     disseminate i p (.nullify i p.view)
   else (p, [])
 
-/-- 19〜21 行。`advanceOnce` の、現在の view の nullification がない側。 -/
+/-- 19〜21 行、`advanceOnce` の現在の view の nullification がない側 -/
 noncomputable def advanceM (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   match mNotarisedAt f p.S p.view with
@@ -77,7 +77,7 @@ theorem advanceOnce_eq (f : Nat) (i : Fin n) (p : Processor n Tx) :
       = if Nullified f p.S p.view then (p.progress, [Action.progress]) else advanceM f i p := rfl
 
 open Classical in
-/-- 24〜28 行。 -/
+/-- 24〜28 行 -/
 noncomputable def nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   if p.nullified = false ∧ p.notarised ≠ none ∧ NoProgress f p.S p.view p.notarised then
@@ -357,8 +357,8 @@ section Stages
 
 variable (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
 
-/-- 各段の入力となる局所状態。st1 は 16〜21 行（登り）の後、st2 は 5〜7 行の後、st3 は
-    9〜11 行の後、st4 は 13〜14 行の後、st5 は 24〜28 行の後。最後に 2〜3 行。 -/
+/-- 各段の入力となる局所状態: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
+    st4 は 13〜14 行の後、st5 は 24〜28 行の後。最後に 2〜3 行が続く。 -/
 noncomputable def st1 : Processor n Tx := (climb f i (maxView p.S + 1) p).1
 noncomputable def st2 : Processor n Tx := (propose f lead i (st1 f i p)).1
 noncomputable def st3 : Processor n Tx := (voteProposal f lead i (st2 f lead i p)).1
@@ -372,7 +372,7 @@ theorem stepPair_snd : (stepPair f Δ lead i p).2 =
 
 theorem stepPair_fst : (stepPair f Δ lead i p).1 = (forwardNew f i (st5 f Δ lead i p)).1 := rfl
 
-/-- 2〜3 行の転送を除いた動作の列。 -/
+/-- 2〜3 行の転送を除いた動作の列 -/
 noncomputable def innerActs : List (Action n Tx) :=
   (climb f i (maxView p.S + 1) p).2 ++ (propose f lead i (st1 f i p)).2
     ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
@@ -467,7 +467,7 @@ theorem forwardNew_S (f : Nat) (i : Fin n) (p : Processor n Tx) : (forwardNew f 
       rw [ih _ (fun m' hm' => hS ▸ hq m' (List.mem_cons_of_mem _ hm')), hS]
   exact key _ p fun m hm => mem_S_of_mem_forwardMsgs hm
 
-/-- 各段の view。5〜7 行以降は view を変えない。 -/
+/-- 各段の view、5〜7 行以降は変わらない -/
 theorem st2_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (st2 f lead i p).view = (st1 f i p).view := propose_view f lead i _
 

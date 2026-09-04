@@ -24,24 +24,22 @@ variable [DecidableEq Tx]
 
 /-! ### notarisation と nullification -/
 
-/-- b への票を S に持つ署名者。 -/
+/-- b への票を S に持つ署名者 -/
 def voters (S : Finset (Msg n Tx)) (b : Block Tx) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.vote q b ∈ S
 
-/-- nullify(v) を S に持つ署名者。 -/
+/-- nullify(v) を S に持つ署名者 -/
 def nullifiers (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.nullify q v ∈ S
 
-/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む。
-    Table 2 の「S は初めから b_gen の M/L-notarisation を含む」に当たる。 -/
+/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む。 -/
 def MNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
   b = .gen ∨ 2 * f + 1 ≤ (voters S b).card
 
 instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Decidable (MNotarised f S b) :=
   inferInstanceAs (Decidable (_ ∨ _))
 
-/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む。
-    Table 2 の「S は初めから b_gen の M/L-notarisation を含む」に当たる。 -/
+/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む。 -/
 def LNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
   b = .gen ∨ n - f ≤ (voters S b).card
 
@@ -68,9 +66,9 @@ structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)
   unique : ∀ b', b'.view = v → Msg.block (lead v) b' ∈ S → b' = b
   /-- b は genesis でなく、親を持つ。 -/
   ne_gen : b ≠ .gen
-  /-- (ii) 親の M-notarisation。 -/
+  /-- (ii) 親の M-notarisation -/
   parent : ∀ p ∈ b.parent, MNotarised f S p
-  /-- (iii) 親の view と v の間の各 view の nullification。 -/
+  /-- (iii) 親の view と v の間の各 view の nullification -/
   gaps : ∀ p ∈ b.parent, ∀ w : View, p.view.val < w.val → w.val < v.val → Nullified f S w
 
 /-! ### proof of no progress -/
@@ -87,7 +85,7 @@ inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Opti
       (h : Msg.vote q b ∈ S) : NoProgressWitness S v notarised q
 
 open Classical in
-/-- view v の proof of no progress に寄与する署名者。 -/
+/-- view v の proof of no progress に寄与する署名者 -/
 noncomputable def noProgressWitnesses (S : Finset (Msg n Tx)) (v : View)
     (notarised : Option (Block Tx)) : Finset (Fin n) :=
   Finset.univ.filter (NoProgressWitness S v notarised)
@@ -104,12 +102,12 @@ end
 誰かの S でなく、実行の中で誰が何を送ったかで言う。 -/
 
 open Classical in
-/-- b への自分の票を送ったプロセッサ。 -/
+/-- b への自分の票を送ったプロセッサ -/
 noncomputable def voteSenders (instrs : Nat → Instr n Tx) (b : Block Tx) : Finset (Fin n) :=
   Finset.univ.filter fun q => Sends instrs q (.vote q b)
 
 open Classical in
-/-- nullify(v) を送ったプロセッサ。 -/
+/-- nullify(v) を送ったプロセッサ -/
 noncomputable def nullifySenders (instrs : Nat → Instr n Tx) (v : View) : Finset (Fin n) :=
   Finset.univ.filter fun q => Sends instrs q (.nullify q v)
 

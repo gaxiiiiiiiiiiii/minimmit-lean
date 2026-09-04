@@ -96,7 +96,7 @@ theorem tx_forwarded (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
   exact Algo.send_mem_step_of_mem_forwardMsgs (Algo.mem_forwardMsgs_tx hmem hnew) j
 
 
-/-- 有限個の存在は一様に押さえられる。 -/
+/-- 有限個の ∃ s は、共通の上界 T 以下の s で取れる。 -/
 theorem exists_bound {α : Type} {Q : Finset α} {P : α → Nat → Prop} (h : ∀ q ∈ Q, ∃ s, P q s) :
     ∃ T, ∀ q ∈ Q, ∃ s ≤ T, P q s := by
   classical
@@ -367,12 +367,12 @@ structure LeaderRound (f Δ δ : Nat) (lead : View → Fin n) (s₀ : State n Tx
   hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val
   hstart : (viewAt s₀ instrs (lead v) e).val < v.val ∨ (e = 0 ∧ v.val = 1)
 
-/-- lead(v) がスロット e に提案するブロック。 -/
+/-- lead(v) がスロット e に提案するブロック -/
 noncomputable def leaderBlockAt (f : Nat) (lead : View → Fin n) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) (v : View) (e : Nat) : Block Tx :=
   Algo.leaderBlock f (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v)))
 
-/-- その親。 -/
+/-- その親 -/
 noncomputable def leaderParentAt (f : Nat) (lead : View → Fin n) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) (v : View) (e : Nat) : Block Tx :=
   Algo.selectParent f (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).S

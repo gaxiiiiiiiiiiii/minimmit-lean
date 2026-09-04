@@ -13,11 +13,11 @@ namespace Minimmit
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
-/-- スロット t の冒頭の p_i の view。 -/
+/-- スロット t の冒頭の p_i の view -/
 def viewAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : View :=
   ((State.run s₀ instrs t).procs i).view
 
-/-- スロット t の冒頭の p_i の timer。 -/
+/-- スロット t の冒頭の p_i の timer -/
 def timerAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : Nat :=
   ((State.run s₀ instrs t).procs i).timer
 
@@ -133,7 +133,7 @@ theorem pool_subset_run {t t' : Nat} (h : t ≤ t') :
   | refl => exact Finset.Subset.refl _
   | step _ ih => exact ih.trans (State.pool_subset_step _ _)
 
-/-- 遅延の上界を緩めても部分同期。 -/
+/-- 遅延の上界を緩めても部分同期は成り立つ。 -/
 def PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ s₀ instrs) (hδ : δ ≤ Δ) :
     PartialSync Δ s₀ instrs where
   GST := hs.GST
@@ -338,7 +338,7 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
 
-/-- `nullified_all` の、動作を終えた時点の S についての版。 -/
+/-- `nullified_all` の、動作を終えた時点の S についての版 -/
 theorem nullified_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v) {T : Nat}

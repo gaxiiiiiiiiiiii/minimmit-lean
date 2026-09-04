@@ -32,74 +32,19 @@ lake build
 
 ## モデル
 
-定義は `Model/` の 4 つの `Basic.lean` にある。論文と突き合わせるには Transition、Certificate、Algo、Constraint の順に読む。以下は論文の概念と Lean の定義の対応。
+定義は `Model/` の 4 つの `Basic.lean` にある。Transition が遷移系、Certificate が証明書、Algo が Algorithm 1、Constraint が仮定。
 
-### 実行モデル（§2）
+### 遷移系
 
-時間は離散のスロット。各スロットで、各プロセッサが動作の列を起こし、次に網から message が届き、取引が投入され、腐敗が起きる。この 1 スロット分を `Instr` が指定し、`State.step` が状態に適用する。
+時間は離散のスロット。大域状態 `State` は、各プロセッサの局所状態 `Processor`、ネットワーク、腐敗集合からなる。1 スロットに起きること、つまり各プロセッサの動作列・配送・取引投入・腐敗を `Instr` が指定し、`State.step` が適用する。実行は初期状態 `s₀` と指示の列 `instrs` で決まり、`State.run s₀ instrs t` がスロット t の冒頭の状態。敵対者の選択はすべて `instrs` に入る。
 
-| 論文 | Lean | 備考 |
-|---|---|---|
-| スロット t の状態 | `State.run s₀ instrs t` | スロット t の冒頭の状態。t の動作で起きた view の変化は t + 1 の冒頭に現れる |
-| 実行 | `instrs : Nat → Instr` | 各スロットの動作列 `actions`・配送 `deliveries`・取引投入 `submits`・腐敗 `corrupts`。定理はこの列を任意に取るので、敵対者の選択はすべてここに入る |
-| プロセッサの動作 | `Action` | message を誰かへ送る `send`、次の view へ進む `progress` |
-| 網 | `State.pool`、`Packet` | packet は message・宛先・送信スロットの組。送った packet は `pool` に載り、`pool` にあるものだけが届く |
-| 署名の偽造不能 | `State.send` のガード | 自分の署名付きか受信済みの message だけ送れる |
-| 腐敗 | `State.byz` | 腐敗したプロセッサの集合。増えるだけで減らない |
+### アルゴリズムと証明書
 
-### プロセッサと message（§4）
+`Algo.step` が Algorithm 1 で、局所状態から 1 スロット分の動作列を返す。M/L-notarisation などの証明書は、message の集合 S 上の述語。
 
-| 論文 | Lean | 備考 |
-|---|---|---|
-| Table 2 の view、T、nullified、proposed、notarised、S | `Processor` の `view`、`timer`、`nullified`、`proposed`、`notarised`、`S` | notarised の ⊥ は `none` |
-| なし | `Processor.prevS` | 前スロットの動作を終えた時点の S。2〜3 行の「new」の判定に使う |
-| ブロック | `Block` | genesis `gen` か、view・取引列・親の組 `node` |
-| Tr* | `Block.trStar` | b とその祖先の取引列を古い順に連結したもの |
-| 提案・票・nullify・取引 | `Msg` の `block`・`vote`・`nullify`・`tx` | 前の 3 つは署名者 `q` を持つ。取引は署名を持たない |
+### 仮定と定理
 
-### 証明書（§4、§5.1）
-
-§4 の証明書は message の集合 S 上の述語。§5.1 の「b が M-notarisation を受ける」は、誰かの S でなく実行の中で誰が何を送ったかで言う述語。
-
-| 論文 | Lean | 備考 |
-|---|---|---|
-| S にある b の M-notarisation | `MNotarised f S b` | 相異なる 2f + 1 人の票。genesis は無条件に認める |
-| S にある b の L-notarisation | `LNotarised f S b` | 相異なる n − f 人の票。genesis は無条件に認める |
-| S にある view v の nullification | `Nullified f S v` | 相異なる 2f + 1 人の nullify(v) |
-| valid proposal | `ValidProposal f lead S v b` | 条件 (i)〜(iii) をフィールドに持つ構造体 |
-| proof of no progress | `NoProgress f S v notarised` | 24〜27 行の条件。2f + 1 人のそれぞれが、nullify(v) を送ったか、notarised 以外の view v のブロックに投票した |
-| p_i が m を送る | `Sends instrs i m` | 指示の列のどこかに m を送る動作がある |
-| b が M-notarisation を受ける | `ReceivesM f instrs b` | 2f + 1 人が b に票を送った。L-notarisation は `ReceivesL`、nullification は `ReceivesNullification` |
-
-### Algorithm 1（§4）
-
-`Algo.step f Δ lead i p` が、p_i の局所状態 p から 1 スロット分の動作列を返す。行の対応は次のとおり。評価順は論文と異なり、[論文からの差異](#論文からの差異) に書く。
-
-| Algorithm 1 | Lean |
-|---|---|
-| 2〜3 行 新しい証明書の転送 | `forwardNew` |
-| 5〜7 行 SelectParent、ProposeChild | `selectParent`、`payload` |
-| 9〜11 行 投票 | `step` の中。提案の列挙は `proposals`、条件は `ValidProposal` |
-| 13〜14 行 timeout の nullify | `step` の中 |
-| 16〜21 行 view の前進 | `advanceOnce`、`climb` |
-| 24〜28 行 進捗のなさの nullify | `step` の中。条件は `NoProgress` |
-| 31〜32 行 Finalise | 動作なし。finalise したことは S に L-notarisation があることで表す |
-
-### 仮定と定理（§2、§5）
-
-論文の仮定は、遷移系が課さない制約として定義し、定理の仮定に置く。
-
-| 論文 | Lean | 備考 |
-|---|---|---|
-| n ≥ 5f + 1 | `5 * f + 1 ≤ n` | 定理の仮定 |
-| Table 2 の初期値 | `Init s₀` | 全プロセッサが `Processor.init`、byz と pool は空、now は 0 |
-| 正直者は Algorithm 1 に従う | `Honest f Δ lead s₀ instrs` | 各スロットで byz にないプロセッサの動作列は `Algo.step` の出力 |
-| 腐敗は高々 f 人 | `ByzBound f s₀ instrs` | 全スロットで byz の要素数が f 以下 |
-| 部分同期 | `PartialSync Δ s₀ instrs` | GST は構造体のフィールド。t に送った packet は max(GST, t) + Δ までに届く。Δ ≥ 1 |
-| lead の輪番 | `Fair lead` | どのプロセッサも、どの view 以降にも自分がリーダーになる view を持つ |
-| correct processor | `Correct s₀ instrs i` | 全スロットで byz にない |
-
-定理は「`Init s₀`、`Honest`、`ByzBound f` を満たす任意の `s₀` と `instrs` について」の形で述べる。Lemma 5.5 以降はさらに `PartialSync Δ` を、Lemma 5.7 は `Fair lead` を仮定する。たとえば `consistency` は、任意のプロセッサ i, j と任意のスロット t, t′ について、i の S に b の L-notarisation があり j の S に b′ の L-notarisation があれば、b と b′ の一方が他方の祖先であると述べる。
+論文の仮定は制約として定義し、定理の仮定に置く。`Init` は初期状態、`Honest` は正直者の動作列が `Algo.step` の出力であること、`ByzBound` は腐敗が f 人以下、`PartialSync` は部分同期、`Fair` はリーダー関数の公平性。定理は「n ≥ 5f + 1 と `Init`・`Honest`・`ByzBound` を満たす任意の `s₀` と `instrs` について」の形で、Lemma 5.5 以降は `PartialSync` を、Lemma 5.7 は `Fair` を仮定する。
 
 ## ファイル構成
 

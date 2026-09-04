@@ -43,7 +43,7 @@ namespace Algo
 /-! ### 送信
 動作の列を組み立てながら、`Processor.send` で局所状態にも同じ効果を与える。 -/
 
-/-- m を全員へ送る（disseminate）。自分宛も含み、`Processor.send` が即時受信にする。 -/
+/-- m を全員へ送る。自分宛も含み、`Processor.send` が即時受信にする。 -/
 def disseminate (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
     Processor n Tx × List (Action n Tx) :=
   (List.finRange n).foldl
@@ -64,23 +64,23 @@ def disseminateAll (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
 `Finset.toList` の順に並べる。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、
 この順で先のものを取る。 -/
 
-/-- S にある nullify message の view（重複なし）。 -/
+/-- S にある nullify の view を重複なく列挙する。 -/
 noncomputable def nullifyViews (S : Finset (Msg n Tx)) : List View :=
   (S.toList.filterMap fun m => match m with | .nullify _ v => some v | _ => none).dedup
 
-/-- S にある票のブロック（重複なし）。 -/
+/-- S にある票のブロックを重複なく列挙する。 -/
 noncomputable def votedBlocks (S : Finset (Msg n Tx)) : List (Block Tx) :=
   (S.toList.filterMap fun m => match m with | .vote _ b => some b | _ => none).dedup
 
-/-- S にある、lead(v) の署名付きの view v のブロック（重複なし）。valid proposal の (i) は
-    これがちょうど 1 つであること。 -/
+/-- S にある、lead(v) の署名付きの view v のブロックを重複なく列挙する。valid proposal の
+    条件 (i) は、これがちょうど 1 つであること。 -/
 noncomputable def proposals (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View) :
     List (Block Tx) :=
   (S.toList.filterMap fun m => match m with
     | .block q b => if q = lead v ∧ b.view = v then some b else none
     | _ => none).dedup
 
-/-- S にある、M-notarisation を持つ view v のブロック（重複なし）。 -/
+/-- S にある、M-notarisation を持つ view v のブロックを重複なく列挙する。 -/
 noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
     List (Block Tx) :=
   (votedBlocks S).filter fun b => decide (b.view = v ∧ MNotarised f S b)
@@ -90,7 +90,7 @@ noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
 
 /-! ### 16〜21 行 -/
 
-/-- S にある message が言及する view の最大。 -/
+/-- S にある message が言及する view の最大 -/
 noncomputable def maxView (S : Finset (Msg n Tx)) : Nat := S.sup Msg.viewNum
 
 /-- S に view v の証明書がある: v の nullification か、view v のブロックの M-notarisation。
@@ -130,9 +130,8 @@ noncomputable def climb (f : Nat) (i : Fin n) :
 /-! ### 5〜7 行（SelectParent と ProposeChild） -/
 
 /-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
-    最大のもの。票のあるブロックに候補が無ければ genesis（view 0 で常に M-notarisation を
-    持つ）。論文の「辞書順最小」の代わりに、同じ view に複数あれば `votedBlocks` の順で
-    先のもの。 -/
+    最大のもの。票のあるブロックに候補が無ければ genesis。genesis は view 0 で常に
+    M-notarisation を持つ。同じ view に複数あれば `votedBlocks` の順で先のもの。 -/
 noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block Tx :=
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen
@@ -145,8 +144,8 @@ noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
 /-! ### 2〜3 行と §4 の取引転送 -/
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
-    取引（§4 本文）。新しい = S に含まれ prevS に含まれない。スロットの最後に評価するので、
-    このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
+    取引（§4 本文）。「新しい」とは、S にあって prevS にないこと。スロットの最後に評価する
+    ので、このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
     証明書は、それを構成する message を S にある分だけ全部送る。 -/
 noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=

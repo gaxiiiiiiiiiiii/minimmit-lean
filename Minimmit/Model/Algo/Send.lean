@@ -158,7 +158,7 @@ theorem send_propose_eq {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Proce
     cases hm; exact ⟨_, rfl⟩
   · simp at h
 
-/-- 5〜7 行が送るブロック。 -/
+/-- 5〜7 行が送るブロック -/
 noncomputable def leaderBlock (f : Nat) (p : Processor n Tx) : Block Tx :=
   .node p.view (payload p.S (selectParent f p.S p.view)) (selectParent f p.S p.view)
 
@@ -412,7 +412,7 @@ theorem localInv_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proce
     (h : LocalInv f i p) : LocalInv f i (st5 f Δ lead i p) :=
   (localInv_st4 (Δ := Δ) (lead := lead) h).nullifyNoProgress
 
-/-- 転送以外の段で自分の票を出す条件。 -/
+/-- 転送以外の段で自分の票を出す条件 -/
 theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) {b : Block Tx} {j : Fin n}
     (hv : Action.send (Msg.vote i b) j ∈ innerActs f Δ lead i p) :
@@ -444,7 +444,7 @@ theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · obtain ⟨hm, _⟩ := send_nullifyNoProgress_eq hv; cases hm
 
 /-- 自分の票の出所: S にあった（転送）か、19〜21 行か 9〜11 行で、その段の入力 q は現在の
-    view が b の view で、notarised = ⊥、nullified = false、S に M-notarisation か
+    view が b の view で、notarised = none、nullified = false、S に M-notarisation か
     valid proposal がある。 -/
 theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) {b : Block Tx} {j : Fin n}
@@ -515,7 +515,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · obtain ⟨_, _, hm, _⟩ := send_climb h hn; cases hm
   · obtain ⟨_, hm⟩ := send_propose_eq hn; cases hm
   · obtain ⟨_, hm, _⟩ := send_voteProposal_eq hn; cases hm
-  · -- 13〜14 行: st3 で notarised = ⊥
+  · -- 13〜14 行: st3 で notarised = none
     exfalso
     obtain ⟨hm, _, hnot3, _⟩ := send_nullifyTimeout_eq hn
     injection hm with _ hv3

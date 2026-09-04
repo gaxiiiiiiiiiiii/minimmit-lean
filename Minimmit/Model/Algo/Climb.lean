@@ -315,7 +315,7 @@ theorem climb_reaches (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) (v
       · omega
     · exact le_trans (not_lt.mp hlt) (view_le_climb f i (fuel + 1) p)
 
-/-- 登りで view w を通過する中間状態 q。q の S は登る前の S に、w 未満の view への自分の票を
+/-- 登りで view w を通過する中間状態 q: q の S は登る前の S に、w 未満の view への自分の票を
     足したもので、w の証明書を持つ。 -/
 theorem climb_pass {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} (hL : LocalInv f i p)
     {w : View} (h1 : p.view.val ≤ w.val) (h2 : w.val < (climb f i fuel p).1.view.val) :
@@ -363,7 +363,7 @@ theorem advanceOnce_vote_of {f : Nat} (i : Fin n) {q : Processor n Tx}
     rw [if_pos ⟨hn, hnl⟩]
     exact ⟨b, List.mem_cons_self .., List.mem_append_left _ (mem_disseminate_snd.mpr ⟨i, rfl⟩)⟩
 
-/-- 証明書があって進んだ後の timer・proposed・notarised・nullified。 -/
+/-- 証明書があって進んだ後の timer・proposed・notarised・nullified -/
 theorem advanceOnce_fields {f : Nat} (i : Fin n) {p : Processor n Tx} (hc : HasCert f p.S p.view) :
     (advanceOnce f i p).1.timer = 0 ∧ (advanceOnce f i p).1.proposed = false
       ∧ (advanceOnce f i p).1.notarised = none ∧ (advanceOnce f i p).1.nullified = false := by

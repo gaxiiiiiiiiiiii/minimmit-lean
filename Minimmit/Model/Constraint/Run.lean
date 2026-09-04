@@ -101,13 +101,13 @@ theorem byz_subset_run (s₀ : State n Tx) (instrs : Nat → Instr n Tx) {t t' :
   | refl => exact Finset.Subset.refl _
   | step _ ih => exact ih.trans (State.byz_subset_step _ _)
 
-/-- 正直者でなければ、いつか腐敗する。 -/
+/-- 正直者でなければ、どこかのスロットで腐敗している。 -/
 theorem exists_byz_of_not_correct {q : Fin n} (h : ¬ Correct s₀ instrs q) :
     ∃ t, q ∈ (State.run s₀ instrs t).byz := by
   by_contra hne
   exact h fun t ht => hne ⟨t, ht⟩
 
-/-- いつか腐敗するプロセッサの集合は f 人以下。 -/
+/-- どこかのスロットで腐敗しているプロセッサの集合は f 人以下。 -/
 theorem card_le_of_byz (hb : ByzBound f s₀ instrs) (Q : Finset (Fin n))
     (hQ : ∀ q ∈ Q, ∃ t, q ∈ (State.run s₀ instrs t).byz) : Q.card ≤ f := by
   suffices h : ∃ T, Q ⊆ (State.run s₀ instrs T).byz by

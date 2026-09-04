@@ -32,7 +32,7 @@ theorem viewAt_pos (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : 
     (hi : Correct s₀ instrs i) (t : Nat) : 1 ≤ (viewAt s₀ instrs i t).val :=
   (localInv_run hinit hh hi t).view_pos
 
-/-- 正直者の集合。 -/
+/-- 正直者の集合 -/
 noncomputable def correctSet (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Finset (Fin n) :=
   by classical exact Finset.univ.filter (Correct s₀ instrs)
 

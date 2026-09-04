@@ -16,7 +16,7 @@ namespace Algo
 /-! ### 正直者の局所状態の不変量
 Lemma 5.1・5.3 の核。S にある自分の票・nullify と、view・notarised・nullified の関係。 -/
 
-/-- 送信の途中（全員へ送る途中）でも保たれる部分。 -/
+/-- 全員へ送る途中でも保たれる部分 -/
 structure PreInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop where
   /-- view は 1 以上。 -/
   view_pos : 1 ≤ p.view.val
@@ -37,7 +37,7 @@ structure PreInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop where
   null_vote : ∀ w c, Msg.nullify i w ∈ p.S → Msg.vote i c ∈ p.S → c.view = w →
     NoProgress f p.S w (some c)
 
-/-- 正直者の局所状態の不変量。 -/
+/-- 正直者の局所状態の不変量 -/
 structure LocalInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop extends PreInv f i p where
   /-- notarised のブロックへの自分の票は S にある。 -/
   notar_mem : ∀ c, p.notarised = some c → Msg.vote i c ∈ p.S
@@ -49,7 +49,7 @@ namespace PreInv
 variable {f : Nat} {i : Fin n} {p : Processor n Tx}
 
 omit [DecidableEq Tx] in
-/-- 関係する欄が等しければ移る。 -/
+/-- view・notarised・nullified・S が等しい状態にも成り立つ。 -/
 theorem congr (h : PreInv f i p) {q : Processor n Tx} (hv : q.view = p.view)
     (hn : q.notarised = p.notarised) (hnl : q.nullified = p.nullified) (hS : q.S = p.S) :
     PreInv f i q := by
@@ -127,8 +127,8 @@ theorem send_of_mem (h : PreInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin 
   let ⟨hn, hnl, hS⟩ := h.send_of_mem_eq hm j
   h.congr (Processor.send_view i p m j) hn hnl hS
 
-/-- 現在の view のブロック b への自分の票。notarised が ⊥ か既に b で、現在の view の
-    nullify を送っていないとき。 -/
+/-- notarised が none か既に b で、現在の view の nullify を送っていなければ、現在の view の
+    ブロック b への自分の票を送っても保たれる。 -/
 theorem send_vote (h : PreInv f i p) {b : Block Tx} (hb : b.view = p.view)
     (hn : p.notarised = none ∨ p.notarised = some b) (hnn : Msg.nullify i p.view ∉ p.S)
     (j : Fin n) : PreInv f i (p.send i (Msg.vote i b) j) := by
@@ -180,8 +180,8 @@ theorem send_vote (h : PreInv f i p) {b : Block Tx} (hb : b.view = p.view)
       exact absurd hw' hnn
     · exact (h.null_vote w c hw' hc hcw).mono (Processor.S_subset_send i p _ j)
 
-/-- 現在の view の nullify。notarised が ⊥ か、notarised のブロック以外への進捗のなさの
-    証拠があるとき。 -/
+/-- notarised が none か、notarised のブロック以外への進捗のなさの証拠があれば、現在の
+    view の nullify を送っても保たれる。 -/
 theorem send_nullify (h : PreInv f i p)
     (hH : p.notarised = none ∨ ∃ c₀, p.notarised = some c₀ ∧ NoProgress f p.S p.view (some c₀))
     (j : Fin n) : PreInv f i (p.send i (Msg.nullify i p.view) j) := by
@@ -477,7 +477,7 @@ end LocalInv
 
 /-! ### 自分の提案についての不変量 -/
 
-/-- S にある自分の署名付きブロックと、view・proposed の関係。 -/
+/-- S にある自分の署名付きブロックと、view・proposed の関係 -/
 structure PropInv (i : Fin n) (p : Processor n Tx) : Prop where
   /-- 自分のブロックの view は現在の view 以下。 -/
   prop_view : ∀ b, Msg.block i b ∈ p.S → b.view.val ≤ p.view.val
@@ -544,7 +544,8 @@ theorem send_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n
       exact this
   · intro b b' hb hb'; rw [hS] at hb hb'; exact h.prop_unique b b' hb hb'
 
-/-- 現在の view のブロックの送信。同じ view の自分のブロックは S にそれしかない。 -/
+/-- 同じ view の自分のブロックが S にそれしかなければ、現在の view のブロックを送っても
+    保たれる。 -/
 theorem send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
     (huniq : ∀ b', Msg.block i b' ∈ p.S → b'.view = p.view → b' = b) (j : Fin n) :
     PropInv i (p.send i (Msg.block i b) j) := by
@@ -609,7 +610,7 @@ theorem disseminate_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) :
     PropInv i (disseminate i p m).1 := by
   rw [disseminate_fst]; exact h.foldl_send_of_mem hm _
 
-/-- まだ提案していないときの、現在の view のブロックの提案。 -/
+/-- まだ提案していなければ、現在の view のブロックを全員へ送っても保たれる。 -/
 theorem disseminate_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
     (hp : p.proposed = false) : PropInv i (disseminate i p (Msg.block i b)).1 := by
   rw [disseminate_fst]

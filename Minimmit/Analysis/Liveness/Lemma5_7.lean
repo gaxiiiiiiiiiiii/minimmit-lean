@@ -9,8 +9,8 @@ namespace Minimmit
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
-/-- Lemma 5.7（Liveness）: 正直者 p_i が受け取った取引は、正直者 p_j が L-notarisation を
-    持つブロックの Tr* にいつか入る。 -/
+/-- Lemma 5.7（Liveness）: 正直者 p_i が受け取った取引は、あるスロットで正直者 p_j が
+    L-notarisation を持つブロックの Tr* に入る。 -/
 theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hs : PartialSync Δ s₀ instrs) (hlead : Fair lead)

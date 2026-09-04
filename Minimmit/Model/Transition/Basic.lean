@@ -25,12 +25,12 @@ variable {n : Nat} {Tx : Type}
 
 /-! ## 基本の型 -/
 
-/-- view 番号。genesis のみ 0。 -/
+/-- view 番号、genesis のみ 0 -/
 structure View where
   val : Nat
 deriving DecidableEq
 
-/-- タイムスロット。 -/
+/-- タイムスロット -/
 structure Time where
   val : Nat
 deriving DecidableEq
@@ -42,22 +42,22 @@ inductive Block (Tx : Type) : Type where
   | node (v : View) (tr : List Tx) (parent : Block Tx) : Block Tx
 deriving DecidableEq
 
-/-- `b.view`。genesis は 0。 -/
+/-- b の view、genesis なら 0 -/
 def Block.view : Block Tx → View
   | .gen => ⟨0⟩
   | .node v _ _ => v
 
-/-- `b.Tr`。genesis は空。 -/
+/-- b の取引列 Tr、genesis なら空 -/
 def Block.tr : Block Tx → List Tx
   | .gen => []
   | .node _ tr _ => tr
 
-/-- `b.par`。genesis には無い。 -/
+/-- b の親、genesis には無い -/
 def Block.parent : Block Tx → Option (Block Tx)
   | .gen => none
   | .node _ _ parent => some parent
 
-/-- `b.Tr*`（§2）: b と全祖先の payload を古い順に連結した列。論文と違い重複を除去しない。 -/
+/-- b の Tr*（§2）: b と全祖先の取引列を古い順に連結した列。重複は除去しない。 -/
 def Block.trStar : Block Tx → List Tx
   | .gen => []
   | .node _ tr parent => parent.trStar ++ tr
@@ -68,8 +68,8 @@ inductive Block.Ancestor : Block Tx → Block Tx → Prop where
   | parent {a : Block Tx} (v : View) (tr : List Tx) (p : Block Tx) :
       Block.Ancestor a p → Block.Ancestor a (.node v tr p)
 
-/-- メッセージ（§4）: 提案・票・nullify は署名者 q を持つ。ブロックの署名はブロックで
-    なく message に付くので、票に埋め込まれた b は lead(v) の署名を運ばない。取引（§2）は
+/-- message（§4）: 提案・票・nullify は署名者 q を持つ。ブロックの署名はブロックでなく
+    message に付くので、票に埋め込まれた b は lead(v) の署名を運ばない。取引（§2）は
     環境の署名を持たず、Tx 型の値はすべて取引として扱う。 -/
 inductive Msg (n : Nat) (Tx : Type) : Type where
   | block (q : Fin n) (b : Block Tx) : Msg n Tx
@@ -78,21 +78,21 @@ inductive Msg (n : Nat) (Tx : Type) : Type where
   | tx (tr : Tx) : Msg n Tx
 deriving DecidableEq
 
-/-- 署名者。取引は環境の署名なので none。 -/
+/-- 署名者、プロセッサの署名を持たない取引では none -/
 def Msg.signer : Msg n Tx → Option (Fin n)
   | .block q _   => some q
   | .vote q _    => some q
   | .nullify q _ => some q
   | .tx _        => none
 
-/-- message が言及する view の番号。取引は 0。 -/
+/-- message が言及する view の番号、取引では 0 -/
 def Msg.viewNum : Msg n Tx → Nat
   | .block _ b   => b.view.val
   | .vote _ b    => b.view.val
   | .nullify _ v => v.val
   | .tx _        => 0
 
-/-- 網に載る単位: どのメッセージが、誰宛に、いつ送られたか。 -/
+/-- ネットワークに載る単位: message、宛先、送信したスロット。 -/
 structure Packet (n : Nat) (Tx : Type) where
   msg : Msg n Tx
   dst : Fin n
@@ -101,29 +101,30 @@ deriving DecidableEq
 
 /-! ## 局所状態
 プロセッサの局所状態と、初期値・受信・送信・view 前進・スロット境界がそれに与える効果。
+Table 2 の ⊥ は none で表す。
 送信と view 前進は `State` の原始関数から呼ばれるほか、`Algo.step` が動作の列を
 組み立てながら局所状態を追うのにも使う。 -/
 
-/-- プロセッサの局所状態（§4, Table 2）。 -/
+/-- プロセッサの局所状態（§4, Table 2） -/
 structure Processor (n : Nat) (Tx : Type) where
-  /-- 現在の view。初期値 1。 -/
+  /-- 現在の view、初期値 1 -/
   view : View
-  /-- タイマー T。view 入場で 0 にリセット、スロットごとに +1。 -/
+  /-- タイマー T、現在の view に入ってからのスロット数 -/
   timer : Nat
   /-- この view で nullify(v) を送ったか。 -/
   nullified : Bool
   /-- この view で提案したか。 -/
   proposed : Bool
-  /-- この view で投票したブロック。⊥ = `none`。 -/
+  /-- この view で投票したブロック、未投票なら none -/
   notarised : Option (Block Tx)
-  /-- 受信メッセージ全集合。 -/
+  /-- 受信した message の集合 -/
   S : Finset (Msg n Tx)
-  /-- 前スロットの動作を終えた時点の S。`tick` で退避する。 -/
+  /-- 前スロットの動作を終えた時点の S、`tick` で退避する -/
   prevS : Finset (Msg n Tx)
 
 namespace Processor
 
-/-- Table 2 の初期値: view 1、T = 0、フラグは false、notarised は ⊥、S は空。 -/
+/-- Table 2 の初期値: view 1、T = 0、フラグは false、notarised は none、S は空。 -/
 def init : Processor n Tx :=
   { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
     S := ∅, prevS := ∅ }
@@ -133,10 +134,10 @@ def init : Processor n Tx :=
 def receive [DecidableEq Tx] (p : Processor n Tx) (m : Msg n Tx) : Processor n Tx :=
   { p with S := insert m p.S }
 
-/-- m を j へ送った局所状態への効果。m が自分の署名付きで現在の view のものなら、
+/-- m を j へ送った局所状態への効果: m が自分の署名付きで現在の view のものなら、
     種類に応じてフラグを立てる。§4 の nullified・proposed・notarised は「現在の view で
     送ったか」の記録なので、他の view のもの、他人のもの、取引では何もしない。
-    j が自分なら即時受信。 -/
+    j が自分なら即時受信する。 -/
 def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
     Processor n Tx :=
   let p := match m with
@@ -147,7 +148,7 @@ def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : F
   if j = i then p.receive m else p
 
 /-- 次の view へ（Algorithm 1 の 17 行と 21 行）: v := v + 1、T := 0、
-    nullified・proposed := false、notarised := ⊥。S は触らない。 -/
+    nullified・proposed := false、notarised := none。S は変えない。 -/
 def progress (p : Processor n Tx) : Processor n Tx :=
   { p with view := ⟨p.view.val + 1⟩, timer := 0,
            nullified := false, proposed := false, notarised := none }
@@ -159,18 +160,18 @@ def tick (p : Processor n Tx) : Processor n Tx :=
 end Processor
 
 /-! ## 大域状態
-全プロセッサの局所状態と網を合わせた大域状態と、1 つの送信・view 前進・配送・取引・腐敗・
+全プロセッサの局所状態とネットワークを合わせた大域状態と、1 つの送信・view 前進・配送・取引・腐敗・
 スロット境界がそれに与える効果。 -/
 
-/-- 大域状態: 全プロセッサの局所状態、腐敗集合、網に載った packet、現在のタイムスロット。 -/
+/-- 大域状態: 全プロセッサの局所状態、腐敗集合、ネットワークに載った packet、現在のタイムスロット。 -/
 structure State (n : Nat) (Tx : Type) where
-  /-- 各プロセッサ。`procs i` が p_i。 -/
+  /-- 各プロセッサ、`procs i` が p_i -/
   procs : Fin n → Processor n Tx
-  /-- これまでに腐敗したプロセッサ。 -/
+  /-- これまでに腐敗したプロセッサ -/
   byz : Finset (Fin n)
-  /-- 網に載った packet の全体。 -/
+  /-- ネットワークに載った packet の全体 -/
   pool : Finset (Packet n Tx)
-  /-- 現在のタイムスロット。`State.tick` で進む。 -/
+  /-- 現在のタイムスロット、`State.tick` で進む -/
   now : Time
 
 namespace State
@@ -180,24 +181,24 @@ def update (s : State n Tx) (i : Fin n) (f : Processor n Tx → Processor n Tx) 
     State n Tx :=
   { s with procs := Function.update s.procs i (f (s.procs i)) }
 
-/-- packet x を網に載せる。`send` から呼ぶ。 -/
+/-- packet x をネットワークに載せる。`send` から呼ぶ。 -/
 def transmit [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   { s with pool := insert x s.pool }
 
 /-- p_i が m を j へ送る。m が自分の署名付きか受信済みのときだけ送り、そうでなければ
-    何もしない（§2 の、署名は偽造できないという仮定）。局所状態への効果は
-    `Processor.send`、網には now 付きの packet。 -/
+    何もしない。§2 の、署名は偽造できないという仮定に当たる。局所状態には
+    `Processor.send` の効果、ネットワークには now 付きの packet。 -/
 def send [DecidableEq Tx] (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n) :
     State n Tx :=
   if m.signer = some i ∨ m ∈ (s.procs i).S then
     (s.update i (·.send i m j)).transmit ⟨m, j, s.now⟩
   else s
 
-/-- p_i が次の view へ。 -/
+/-- p_i が次の view へ進む。 -/
 def progress (s : State n Tx) (i : Fin n) : State n Tx :=
   s.update i Processor.progress
 
-/-- packet x のメッセージが宛先に届く。x が pool にあるときだけ届き、そうでなければ
+/-- packet x の message が宛先に届く。x が pool にあるときだけ届き、そうでなければ
     何もしない。 -/
 def deliver [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   if x ∈ s.pool then s.update x.dst (·.receive x.msg) else s
@@ -218,16 +219,16 @@ end State
 
 /-! ## 指示
 1 スロット分にプロトコルの外から与えられるもの。`Instr` の成分は `State.step` の段階に
-対応する: actions の各動作が `execute`（send と progress）、deliveries が `deliver`、
-submits が `submit`、corrupts が `corrupt`。 -/
+対応する: actions の各動作が `execute`、deliveries が `deliver`、submits が `submit`、
+corrupts が `corrupt`。 -/
 
 /-- p_i が自分から起こす動作: m を j へ送る、または次の view へ進む。 -/
 inductive Action (n : Nat) (Tx : Type) : Type where
   | send (m : Msg n Tx) (j : Fin n) : Action n Tx
   | progress : Action n Tx
 
-/-- 1 スロット分の指示。プロトコルの外から与えられるもの: 各プロセッサの動作の列、
-    届く packet、環境が渡す取引、腐敗するプロセッサ。空のリストは「起きない」。 -/
+/-- プロトコルの外から与えられる 1 スロット分の指示: 各プロセッサの動作の列、届く packet、
+    環境が渡す取引、腐敗するプロセッサ。空のリストは、その種類のことが起きないことを表す。 -/
 structure Instr (n : Nat) (Tx : Type) where
   actions : Fin n → List (Action n Tx)
   deliveries : List (Packet n Tx)
@@ -247,7 +248,7 @@ def execute [DecidableEq Tx] (s : State n Tx) (i : Fin n) : Action n Tx → Stat
   | .send m j => s.send i m j
   | .progress => s.progress i
 
-/-- 1 スロット分の遷移。原始関数を 動作 → tick → deliver → submit → corrupt の順に
+/-- 1 スロット分の遷移: 原始関数を 動作 → tick → deliver → submit → corrupt の順に
     適用する。 -/
 def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   let s := (List.finRange n).foldl

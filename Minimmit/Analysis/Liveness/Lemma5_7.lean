@@ -2,6 +2,11 @@ import Minimmit.Analysis.Liveness.LeaderRound
 
 /-!
 # Lemma 5.7（Liveness）
+
+## 論文からの差異
+
+- `liveness` は p_j の正直さを仮定しない。論文は正直者 p_j について述べるが、`PartialSync` は
+  腐敗したプロセッサ宛の配送も保証するので要らない。論文の主張を含む。
 -/
 
 namespace Minimmit
@@ -9,12 +14,12 @@ namespace Minimmit
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
-/-- Lemma 5.7（Liveness）: 正直者 p_i が受け取った取引は、あるスロットで正直者 p_j が
+/-- Lemma 5.7（Liveness）: 正直者 p_i が受け取った取引は、あるスロットで任意の p_j が
     L-notarisation を持つブロックの Tr* に入る。 -/
 theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hs : PartialSync Δ s₀ instrs) (hlead : Fair lead)
-    {i j : Fin n} (hi : Correct s₀ instrs i) (hj : Correct s₀ instrs j)
+    {i j : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {tr : Tx} (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S) :
     ∃ t' b, LNotarised f ((State.run s₀ instrs t').procs j).S b ∧ tr ∈ b.trStar := by
   classical
@@ -40,7 +45,7 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     omega
   have hlc : Correct s₀ instrs (lead v') := hlv' ▸ hi
   obtain ⟨e, R⟩ := leader_round hinit hh hs (le_refl Δ) hv'1 hlc hfirst (by omega)
-  have hte := t_le_e hinit hh hb hs R
+  have hte := t_le_e hs R
   -- 取引はブロックの Tr* に入る
   have htr' : tr ∈ (leaderBlockAt f lead s₀ instrs v' e).trStar := by
     apply mem_trStar_leaderBlock

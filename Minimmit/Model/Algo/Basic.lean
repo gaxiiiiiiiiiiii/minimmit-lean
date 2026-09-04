@@ -5,7 +5,10 @@ import Mathlib.Data.Finset.Lattice.Fold
 /-!
 # Algorithm 1
 
-局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。
+局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。`step` の各段は
+Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`advanceM`・
+`nullifyNoProgress` として切り出してあり、`step` との一致は `step_eq_stepPair`。補題は段の
+名前で述べる。`step` が送る message が遷移系の送信ガードを通ることは Timing の `Algo.send_guard`。
 
 ## 論文からの差異
 
@@ -15,17 +18,24 @@ import Mathlib.Data.Finset.Lattice.Fold
   論文の行順では、view に入ったスロットで提案できず、そのスロットで完成した証明書を同じ
   スロットで転送できないので、これが 1〜2 スロット遅れる。行順でも論文の O(·) の主張は
   偽にならず、ずれは定数だが、証明の時間計算は書いてあるとおりには通らない。この評価順では
-  通る。
+  通る。行順は擬似コードにしかなく、§3 の地の文は「Upon entering view v, p_i finds the
+  greatest v′ < v …」「proceeds to view v + 1 immediately upon seeing an M-notarisation」と
+  事象駆動で、この評価順はその順に当たる。
 - 登り切り。16〜21 行は `climb` で、現在の view の証明書がある限り繰り返す。論文の
   Lemma 5.6 の証明と付録の Lemma E.6 は「最初の正直者が t に view v に入れば、全正直者は
   t + Δ までに v に入る」と主張するが、1 回評価では 1 スロットに高々 2 view しか進めず、
   GST 前に配送が遅れて証明書が一括で届く正直者について偽になる。繰り返す動作では
-  `enter_all` として成り立ち、論文の議論がそのまま通る。§6.1 の「view を飛ばす」最適化とは
-  別で、ここでは順に 1 view ずつ登る。
+  `enter_all` として成り立ち、論文の議論がそのまま通る。§6.1 の「view を飛ばす」最適化は
+  同じ穴を塞ぐもので、ここでは飛ばさず 1 view ずつ登る。§6.1 が追加する 2 つの規則は、順に
+  登れば別の規則なしに満たされる。通過した view の M-notarised ブロックへ投票する規則は、
+  `advanceOnce` が通過する各 view で 19〜20 行を評価することに当たる。リーダーが提案前に
+  親の M-notarisation と間の view の nullification を待つ規則は、順に登れば view v に入った
+  時点で揃っている（`leader_parent_mnotarised_all`・`leader_gaps_nullified_all`）。
 - 転送。2〜3 行の転送 `forwardNew` は、新しい証明書を構成する message を S にある分すべて
   送る。論文は辞書順最小の 2f + 1 個を 1 組選ぶ。§5 の証明が転送に使うのは「新しい証明書を
   受け取った正直者は全員へ送る」ことだけで、すべて送っても各宛先が受け取る集合は論文の
-  上位集合になる。差が出るのは §6.4 の通信量の見積もりで、これは形式化していない。
+  上位集合になる。差が出るのは通信量で、これは形式化していない。§6.4 が閾値署名で証明書を
+  1 つの署名にまとめると、どの票を送るかの差は消える。
 - 同点の選択。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、S を `Finset.toList` で
   並べた順で先のものを取る。論文の証明は選択の仕方を使わないので、この選択はその一例。
 - finalise。31〜32 行の Finalise は動作を伴わないので `step` に無く、finalise したことは
@@ -146,6 +156,7 @@ noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
     取引（§4 本文）。「新しい」とは、S にあって prevS にないこと。スロットの最後に評価する
     ので、このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
+    その証明書での view 前進は、16〜21 行をスロットの最初に評価するので次のスロット。
     証明書は、それを構成する message を S にある分だけ全部送る。 -/
 noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=

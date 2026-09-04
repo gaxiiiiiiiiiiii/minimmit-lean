@@ -52,9 +52,9 @@ theorem card_correctSet (hb : ByzBound f s₀ instrs) : n - f ≤ (correctSet s�
   rw [Finset.card_univ, Fintype.card_fin] at h1
   omega
 
-/-- 正直者 p_j が t + 1 の S に持つ自分の署名付き message は、正直者 p_i に期限までに届く。 -/
+/-- 正直者 p_j が t + 1 の S に持つ自分の署名付き message は、p_i に期限までに届く。 -/
 theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {i j : Fin n} (_hi : Correct s₀ instrs i) (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}
+    {i j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}
     (hm : m ∈ ((State.run s₀ instrs (s + 1)).procs j).S) (hsig : m.signer = some j) {T : Nat}
     (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T) : m ∈ ((State.run s₀ instrs T).procs i).S := by
   obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm hsig
@@ -93,13 +93,13 @@ theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : 
   have hvT : ∀ T, t₀ ≤ T → viewAt s₀ instrs i T = ⟨k⟩ := fun T hT =>
     View.val_injective (le_antisymm (hstuck T) (ht₀.trans (viewAt_mono i hT)))
   rcases leave_view_cert hh hj hle hlt with hN | ⟨b, hbv, hM⟩
-  · have hNi := nullified_all hinit hh hs hj hi hN
+  · have hNi := nullified_all (j := i) hinit hh hs hj hN
       (T := max (max hs.GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
     have := leave_of_nullified hh hi (hvT _ (by omega)) hNi
     exact absurd (hstuck _) (not_le.mpr this)
   · have hg : b ≠ .gen := by
       intro h; subst h; simp [Block.view] at hbv; omega
-    have hMi := mnotarised_all hinit hh hs hj hi hM
+    have hMi := mnotarised_all (j := i) hinit hh hs hj hM
       (T := max (max hs.GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
     have := leave_of_mnotarised hh hi ((hvT _ (by omega)).trans hbv.symm) hg hMi
     rw [hbv] at this
@@ -199,8 +199,8 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       have hjc := mem_correctSet.mp hj
       have hi'c := mem_correctSet.mp hi'
       rcases (hsf j hjc).2 with ⟨b, hbv, hm⟩ | hm
-      · exact Or.inl ⟨b, hbv, own_delivered hinit hh hs hi'c hjc hm rfl (hT₂ j hj).1 (hT₂ j hj).2⟩
-      · exact Or.inr (own_delivered hinit hh hs hi'c hjc hm rfl (hT₂ j hj).1 (hT₂ j hj).2)
+      · exact Or.inl ⟨b, hbv, own_delivered hinit hh hs hjc hm rfl (hT₂ j hj).1 (hT₂ j hj).2⟩
+      · exact Or.inr (own_delivered hinit hh hs hjc hm rfl (hT₂ j hj).1 (hT₂ j hj).2)
     -- 全正直者が T₂ + 1 までに nullify(k) を送る
     have hnull : ∀ j ∈ correctSet s₀ instrs,
         Msg.nullify j ⟨k⟩ ∈ ((State.run s₀ instrs (T₂ + 1)).procs j).S := by
@@ -263,7 +263,7 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have hN : Nullified f ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
       have hsub : correctSet s₀ instrs
           ⊆ nullifiers ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ :=
-        fun j hj => mem_nullifiers.mpr (own_delivered hinit hh hs hi (mem_correctSet.mp hj)
+        fun j hj => mem_nullifiers.mpr (own_delivered hinit hh hs (mem_correctSet.mp hj)
           (hnull j hj) rfl (by omega) (by omega))
       have := Finset.card_le_card hsub
       unfold Nullified

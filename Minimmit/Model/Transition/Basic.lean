@@ -9,8 +9,13 @@ import Mathlib.Data.Finset.Card
 
 ## 論文からの差異
 
-- ブロックは親をハッシュ値でなく親ブロックそのもので持つ。論文は暗号を完全と仮定していて
-  ハッシュは衝突しないので、ハッシュで参照することとブロックを直接持つことは区別できない。
+- ブロックは親をハッシュ値でなく親ブロックそのもので持つ。同一性については、論文は暗号を
+  完全と仮定していてハッシュは衝突しないので、ハッシュで参照することと直接持つことは
+  区別できない。データについては、ブロック b を含む message を受け取った時点で b の全祖先も
+  手元にあることになり、通信モデルが論文より強い。論文の票 (vote, b) は b の中身を運ぶが
+  親はハッシュ参照で、祖先が届くことは Lemma 5.7 と 5.10 の証明が「各祖先は M-notarisation
+  を受けるので f + 1 人の正直者が転送する」ことから別に導く。形式化ではこの議論が要らず、
+  `liveness`・`optimistic_responsiveness` の結論 tr ∈ b.trStar は b が S に入った時点で成り立つ。
 - `Block.trStar` は祖先の取引列を連結するだけで、論文の Tr* と違い重複を除去しない。
   Lemma 5.7 の結論 tr ∈ Tr* は重複の有無に依らない。
 - `State.step` は 1 スロットの中の原始関数を 動作 → tick → 配送 → 取引 → 腐敗 の順に
@@ -249,7 +254,8 @@ def execute [DecidableEq Tx] (s : State n Tx) (i : Fin n) : Action n Tx → Stat
   | .progress => s.progress i
 
 /-- 1 スロット分の遷移: 原始関数を 動作 → tick → deliver → submit → corrupt の順に
-    適用する。 -/
+    適用する。動作で送った packet の刻印 sentAt は tick 前の now なので、`instrs t` の動作で
+    送った packet は t を持つ。 -/
 def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   let s := (List.finRange n).foldl
     (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s

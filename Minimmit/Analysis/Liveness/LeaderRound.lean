@@ -34,11 +34,11 @@ theorem exists_leave_slot (hinit : Init s₀) {j : Fin n} {v : View} {t₁ : Nat
 /-- 正直者がスロット s に view w の証明書を持てば、正直者は全員、期限までにそれを持つ。 -/
 theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
     {j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {w : View} (hw : 1 ≤ w.val)
-    (h : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w) {q : Fin n} (hq : Correct s₀ instrs q)
+    (h : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w) {q : Fin n}
     {T : Nat} (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T) :
     Algo.HasCert f ((State.run s₀ instrs T).procs q).S w := by
   rcases h with h | h
-  · exact Or.inl (nullified_all hinit hh hs hj hq h hT₁ hT₂)
+  · exact Or.inl (nullified_all hinit hh hs hj h hT₁ hT₂)
   · obtain ⟨b, hb⟩ := List.exists_mem_of_ne_nil _ h
     obtain ⟨hbv, hM⟩ := Algo.mem_mNotarisedAt hb
     have hg : b ≠ .gen := by
@@ -46,7 +46,7 @@ theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs 
       subst hg
       have : w.val = 0 := by rw [← hbv]; rfl
       omega
-    have := mnotarised_all hinit hh hs hj hq hM hT₁ hT₂
+    have := mnotarised_all (j := q) hinit hh hs hj hM hT₁ hT₂
     rw [← hbv]
     exact Algo.hasCert_of_mnotarised hg this
 
@@ -66,7 +66,7 @@ theorem enter_all_anchor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   have hcert : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w := by
     rw [viewAt_succ_eq hh hj s] at hs2
     exact Algo.st1_certs hs1 hs2
-  exact hasCert_all hinit hh hs hj hw1 hcert hq (by omega) (by omega)
+  exact hasCert_all hinit hh hs hj hw1 hcert (by omega) (by omega)
 
 /-- 最初の正直者が t ≥ GST に view v に入れば、正直者は全員 t + δ までに view v に入る。 -/
 theorem enter_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
@@ -410,9 +410,10 @@ theorem leader_proposes (j : Fin n) :
   left; left; left; right
   exact Algo.propose_fires (by rw [hview]) hprop j
 
+omit hinit hh hb in
 theorem t_le_e : t ≤ e := R.hfirst.first (lead v) e R.hlc R.hev
 
-/-- ブロックは t + 2Δ までに全正直者に届く。 -/
+/-- ブロックは t + 2δ までに全正直者に届く。 -/
 theorem leader_block_delivered {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
     Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e) ∈ ((State.run s₀ instrs T).procs r).S := by
   have hδ1 := hs.one_le
@@ -421,7 +422,8 @@ theorem leader_block_delivered {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
   have hgst := R.hgst
   exact delivered hinit hh hs R.hlc (leader_proposes hinit hh hb hs R r) (by omega) (by omega)
 
-/-- 親の M-notarisation は t + 2Δ までに全正直者に届く。 -/
+omit hb in
+/-- 親の M-notarisation は t + 2δ までに全正直者に届く。 -/
 theorem leader_parent_mnotarised_all {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
     MNotarised f ((State.run s₀ instrs T).procs r).S (leaderParentAt f lead s₀ instrs v e) := by
   have hδ1 := hs.one_le
@@ -433,8 +435,8 @@ theorem leader_parent_mnotarised_all {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ 
   have h5 := h1.mono (Algo.S_st1_subset_st5 f Δ lead (lead v) _)
   exact mnotarised_all_end hinit hh hs R.hlc h5 (by omega) (by omega)
 
-/-- 親の view と v の間の view の nullification は t + 2Δ までに全正直者に届く。 -/
-theorem leader_gaps_nullified_all {r : Fin n} (hr : Correct s₀ instrs r) {T : Nat}
+/-- 親の view と v の間の view の nullification は t + 2δ までに全正直者に届く。 -/
+theorem leader_gaps_nullified_all {r : Fin n} {T : Nat}
     (hT : t + 2 * δ ≤ T) {w : View}
     (h1 : (leaderParentAt f lead s₀ instrs v e).view.val < w.val) (h2 : w.val < v.val) :
     Nullified f ((State.run s₀ instrs T).procs r).S w := by
@@ -449,7 +451,7 @@ theorem leader_gaps_nullified_all {r : Fin n} (hr : Correct s₀ instrs r) {T : 
     rw [viewAt_succ_eq hh R.hlc s'] at hs2
     exact Algo.st1_certs hs1 hs2
   rcases hcert with hN | hM
-  · exact nullified_all hinit hh hs R.hlc hr hN (by omega) (by omega)
+  · exact nullified_all hinit hh hs R.hlc hN (by omega) (by omega)
   · exfalso
     obtain ⟨b'', hb''⟩ := List.exists_mem_of_ne_nil _ hM
     obtain ⟨hbv, hM''⟩ := Algo.mem_mNotarisedAt hb''
@@ -465,8 +467,8 @@ theorem leader_gaps_nullified_all {r : Fin n} (hr : Correct s₀ instrs r) {T : 
     rw [hbv] at hmax
     exact absurd h1 (not_lt.mpr hmax)
 
-/-- t + 2Δ 以降、全正直者の S でブロックは valid proposal。 -/
-theorem leader_valid_at {r : Fin n} (hr : Correct s₀ instrs r) {T : Nat} (hT : t + 2 * δ ≤ T) :
+/-- t + 2δ 以降、全正直者の S でブロックは valid proposal。 -/
+theorem leader_valid_at {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
     ValidProposal f lead ((State.run s₀ instrs T).procs r).S v (leaderBlockAt f lead s₀ instrs v e) := by
   refine ⟨leaderBlockAt_view hinit hh hb hs R, leader_block_delivered hinit hh hb hs R hT, ?_,
     Algo.leaderBlock_ne_gen _ _, ?_, ?_⟩
@@ -477,11 +479,11 @@ theorem leader_valid_at {r : Fin n} (hr : Correct s₀ instrs r) {T : Nat} (hT :
   · intro p₀ hp₀
     rw [leaderBlockAt_parent] at hp₀
     obtain rfl := Option.some.inj (Option.mem_def.mp hp₀).symm
-    exact leader_parent_mnotarised_all hinit hh hb hs R hT
+    exact leader_parent_mnotarised_all hinit hh hs R hT
   · intro p₀ hp₀ w h1 h2
     rw [leaderBlockAt_parent] at hp₀
     obtain rfl := Option.some.inj (Option.mem_def.mp hp₀).symm
-    exact leader_gaps_nullified_all hinit hh hb hs R hr hT h1 h2
+    exact leader_gaps_nullified_all hinit hh hb hs R hT h1 h2
 
 /-- 正直者の view v のブロックへの票は、すべて lead(v) のブロックへの票。 -/
 theorem vote_unique_leaderBlock :
@@ -587,7 +589,7 @@ theorem no_timeout_nullify :
     have := R.hfirst.first r (s - 2 * Δ) hr (by rw [hstay])
     omega
   -- lead(v) のブロックは S にあり valid
-  have hvalid := leader_valid_at hinit hh hb hs R hr (T := s) (by omega)
+  have hvalid := leader_valid_at (r := r) hinit hh hb hs R (T := s) (by omega)
   have hst2S : ((State.run s₀ instrs s).procs r).S
       ⊆ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S :=
     Algo.S_subset_st2 f lead r _
@@ -759,7 +761,7 @@ theorem vote_line11 {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t +
     (hst1v : (Algo.st1 f r ((State.run s₀ instrs s).procs r)).view = v) :
     ∃ s' ≤ s, ∃ j, Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
       ∈ (instrs s').actions r := by
-  have hvalid := leader_valid_at hinit hh hb hs R hr (T := s) hT
+  have hvalid := leader_valid_at (r := r) hinit hh hb hs R (T := s) hT
   have hbLv := leaderBlockAt_view hinit hh hb hs R
   have hst1S : ((State.run s₀ instrs s).procs r).S
       ⊆ (Algo.st1 f r ((State.run s₀ instrs s).procs r)).S := Algo.S_subset_st1 f r _

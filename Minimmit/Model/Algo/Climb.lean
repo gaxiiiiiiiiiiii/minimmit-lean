@@ -46,6 +46,7 @@ theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx} (hb
   simp only [mNotarisedAt, List.mem_filter, decide_eq_true_eq]
   exact ⟨hb, trivial, hM⟩
 
+omit [DecidableEq Tx] in
 theorem viewNum_le_maxView {S : Finset (Msg n Tx)} {m : Msg n Tx} (h : m ∈ S) :
     m.viewNum ≤ maxView S :=
   Finset.le_sup h
@@ -76,7 +77,7 @@ theorem HasCert.mono {f : Nat} {S S' : Finset (Msg n Tx)} {v : View} (h : HasCer
 
 /-- S' が S に、view が w 未満のブロックへの票を足しただけなら、view w の証明書は S にもある。 -/
 theorem hasCert_of_votes_lt {f : Nat} {i : Fin n} {S S' : Finset (Msg n Tx)} {w : View}
-    (hS : S ⊆ S') (hnew : ∀ m ∈ S', m ∈ S ∨ ∃ b, m = Msg.vote i b ∧ b.view.val < w.val)
+    (hnew : ∀ m ∈ S', m ∈ S ∨ ∃ b, m = Msg.vote i b ∧ b.view.val < w.val)
     (h : HasCert f S' w) : HasCert f S w := by
   rcases h with h | h
   · left
@@ -288,7 +289,7 @@ theorem climb_certs (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
       · have h1' : (advanceOnce f i p).1.view.val ≤ w.val := by omega
         have h2' : w.val < (climb f i fuel (advanceOnce f i p).1).1.view.val := h2
         have hw' := ih (advanceOnce f i p).1 w h1' h2'
-        refine hasCert_of_votes_lt (i := i) (S_subset_advanceOnce f i p) ?_ hw'
+        refine hasCert_of_votes_lt (i := i) (S := p.S) ?_ hw'
         intro m hm
         rcases mem_S_advanceOnce hm with hm | ⟨b, rfl, hb, _⟩
         · exact Or.inl hm

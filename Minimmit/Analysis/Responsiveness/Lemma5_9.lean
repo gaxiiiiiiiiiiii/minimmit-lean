@@ -7,7 +7,9 @@ lead(v) が正直かどうかによらず、正直者は全員 t + 2Δ + 3δ ま
 
 ## 論文からの差異
 
-- 論文の O(·) は具体的な上界 t + 2Δ + 3δ に置き換える。具体的な上界は O(·) の主張を含む。
+- 論文の主張の O(·) は具体的な上界 t + 2Δ + 3δ に置き換える。t + 2Δ + 3δ は論文の証明本文が
+  背理法の仮定に置く数字で、「suppose some correct processor does not leave view v by
+  t + 2Δ + 3δ」。具体的な上界は O(·) の主張を含む。
 - view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では結論が成り立たない。
 -/
 
@@ -25,7 +27,7 @@ theorem leave_all_of_cert (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs
     (henter : ∀ j, Correct s₀ instrs j → v.val ≤ (viewAt s₀ instrs j T).val) :
     ∀ j, Correct s₀ instrs j → v.val < (viewAt s₀ instrs j (T + 1)).val := by
   intro j hj
-  have hcert := hasCert_all hinit hh hs hr hv hc hj hT₁ hT₂
+  have hcert := hasCert_all (q := j) hinit hh hs hr hv hc hT₁ hT₂
   rcases lt_or_eq_of_le (henter j hj) with hgt | heq
   · exact lt_of_lt_of_le hgt (viewAt_le_succ j T)
   · exact leave_of_hasCert hh hj (View.val_injective heq.symm) hcert
@@ -122,8 +124,8 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         ∨ Msg.nullify r v ∈ ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r').S := by
     intro r hr r' hr'
     rcases hto r hr with ⟨b, hbv, hm⟩ | hm
-    · exact Or.inl ⟨b, hbv, own_delivered hinit hh hs hr' hr hm rfl (by omega) (by omega)⟩
-    · exact Or.inr (own_delivered hinit hh hs hr' hr hm rfl (by omega) (by omega))
+    · exact Or.inl ⟨b, hbv, own_delivered hinit hh hs hr hm rfl (by omega) (by omega)⟩
+    · exact Or.inr (own_delivered hinit hh hs hr hm rfl (by omega) (by omega))
   -- 全正直者が t + 2Δ + 2δ + 1 までに nullify(v) を送る
   have hnull : ∀ r, Correct s₀ instrs r →
       Msg.nullify r v ∈ ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ + 1)).procs r).S := by
@@ -195,7 +197,7 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   have hN : Nullified f ((State.run s₀ instrs (T₀ + 2 * Δ + 3 * δ)).procs j).S v := by
     have hsub : correctSet s₀ instrs
         ⊆ nullifiers ((State.run s₀ instrs (T₀ + 2 * Δ + 3 * δ)).procs j).S v :=
-      fun r hr => mem_nullifiers.mpr (own_delivered hinit hh hs hj (mem_correctSet.mp hr)
+      fun r hr => mem_nullifiers.mpr (own_delivered hinit hh hs (mem_correctSet.mp hr)
         (hnull r (mem_correctSet.mp hr)) rfl (by omega) (by omega))
     have := Finset.card_le_card hsub
     have hC := card_correctSet (s₀ := s₀) (instrs := instrs) hb

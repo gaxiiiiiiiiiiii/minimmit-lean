@@ -21,6 +21,8 @@ Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依�
 | Lemma 5.9 | `leave_view` | Analysis/Responsiveness/Lemma5_9 |
 | Lemma 5.10 Optimistic responsiveness | `optimistic_responsiveness` | Analysis/Responsiveness/Lemma5_10 |
 
+Lemma 5.4 の `finalised_compatible` は、実行上で L-notarisation を受けた 2 つのブロックについて述べ、`consistency` はそれを 2 つのプロセッサの S にある L-notarisation の形で述べたもの。
+
 ## ビルド
 
 Lean `v4.29.1`、Mathlib `v4.29.1`。
@@ -28,6 +30,12 @@ Lean `v4.29.1`、Mathlib `v4.29.1`。
 ```
 lake exe cache get
 lake build
+```
+
+定理はすべて名前空間 `Minimmit` にある。依存公理は次で確認できる。
+
+```
+printf 'import Minimmit\n#print axioms Minimmit.liveness\n' | lake env lean --stdin
 ```
 
 ## モデル
@@ -44,7 +52,7 @@ lake build
 
 ### 仮定と定理
 
-論文の仮定は制約として定義し、定理の仮定に置く。`Init` は初期状態、`Honest` は正直者の動作列が `Algo.step` の出力であること、`ByzBound` は腐敗が f 人以下、`PartialSync` は部分同期、`Fair` はリーダー関数の公平性。定理は「n ≥ 5f + 1 と `Init`・`Honest`・`ByzBound` を満たす任意の `s₀` と `instrs` について」の形で、Lemma 5.5 以降は `PartialSync` を、Lemma 5.7 は `Fair` を仮定する。
+論文の仮定は制約として定義し、定理の仮定に置く。`Init` は初期状態、`Honest` は正直者の動作列が `Algo.step` の出力であること、`ByzBound` は腐敗が f 人以下、`PartialSync` は部分同期、`Fair` はリーダー関数の公平性。`Correct i` は p_i が全スロットで腐敗集合にないことで、定理の中の「正直者 p_i」はこれで述べる。定理は「n ≥ 5f + 1 と `Init`・`Honest`・`ByzBound` を満たす任意の `s₀` と `instrs` について」の形で、Lemma 5.5〜5.7 は `PartialSync Δ` を、Lemma 5.7 は `Fair` も仮定する。Lemma 5.8〜5.10 は GST 後の実際の遅延 δ ≤ Δ をとって `PartialSync δ` を仮定し、Lemma 5.10 はさらに、どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する。
 
 ## ファイル構成
 
@@ -90,9 +98,16 @@ Minimmit
 
 ## 論文からの差異
 
-Algorithm 1 は 2 点で論文の擬似コードと違う。証明書が届いている限り同じスロットで view を進め続けること、そして view を進めてから提案と投票をし、転送をスロットの最後に回すこと。論文の擬似コードは各行を上から 1 回ずつ評価するだけなので、1 スロットに 1〜2 view しか進めず、view に入ったスロットでは提案できない。論文の証明はどちらの動作も前提にしていて、擬似コードのままでは Lemma E.6 が成り立たない。
+Algorithm 1 は 2 点で論文の擬似コードと違う。証明書が届いている限り同じスロットで view を進め続けること、そして view を進めてから提案と投票をし、転送をスロットの最後に回すこと。論文の擬似コードは各行を上から 1 回ずつ評価するだけなので、1 スロットに進める view は 16〜17 行の nullification で 1 つと続く 19〜21 行の M-notarisation で 1 つの高々 2 つで、view に入ったスロットでは提案できない。論文の証明はどちらの動作も前提にしていて、擬似コードのままでは付録の Lemma E.6（Timely view entry: 正直者が t に view v に入れば、全正直者は max(t, GST) から有界の遅れで v に入る）が成り立たない。
 
-そのほかは、論文の記述を Lean に落とすための調整で、該当ファイルの冒頭の doc に「論文からの差異」として理由つきで書いてある。
+そのほかは、論文の記述を Lean に落とすための調整で、該当ファイルの冒頭の doc に「論文からの差異」として理由つきで書いてある。調整のうち、定理の読み方に関わるものは次の 4 つ。
+
+| 差異 | 論文との関係 | 所在 |
+|---|---|---|
+| message はブロックの祖先を丸ごと運ぶ | 論文は祖先が届くことを Lemma 5.7・5.10 の証明で導く。通信モデルが論文より強い | Model/Transition/Basic |
+| Lemma 5.8〜5.10 の δ は `PartialSync δ` として与える | GST 前に送った message にも GST + δ を課すので、論文の δ より強い仮定 | Analysis/Responsiveness/Lemma5_8 |
+| log と finalise を形式化していない | Consistency と Liveness はブロックについての言明で、論文の log についての言明への還元は非形式的 | Analysis/Consistency/Lemma5_4 |
+| `PartialSync` は Δ ≥ 1 を、Lemma 5.6・5.8・5.9 は v ≥ 1 を仮定に持つ | 論文の「t に送った message は t′ > t に届く」と、view の範囲 ℕ≥1 を明示したもの | Model/Constraint/Basic、各 Lemma |
 
 ## 未証明
 

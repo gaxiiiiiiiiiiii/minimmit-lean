@@ -312,9 +312,9 @@ theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i :=
   forward_mnotarisation_end hinit hh hi hg (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
-/-- 正直者 p_i がスロット t に nullification を持つなら、正直者 p_j は期限までにそれを持つ。 -/
+/-- 正直者 p_i がスロット t に nullification を持つなら、p_j は期限までにそれを持つ。 -/
 theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {i j : Fin n} (hi : Correct s₀ instrs i) (_hj : Correct s₀ instrs j) {t : Nat} {v : View}
+    {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f ((State.run s₀ instrs t).procs i).S v) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max hs.GST.val t + δ ≤ T) : Nullified f ((State.run s₀ instrs T).procs j).S v := by
   obtain ⟨t', ht', hn', hsend⟩ := forward_nullification hinit hh hi h
@@ -324,7 +324,7 @@ theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (h
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
 
 theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {i j : Fin n} (hi : Correct s₀ instrs i) (_hj : Correct s₀ instrs j) {t : Nat} {b : Block Tx}
+    {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx}
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max hs.GST.val t + δ ≤ T) : MNotarised f ((State.run s₀ instrs T).procs j).S b := by
   by_cases hg : b = .gen

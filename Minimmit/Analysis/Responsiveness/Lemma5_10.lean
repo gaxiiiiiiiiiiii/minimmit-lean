@@ -12,8 +12,12 @@ import Minimmit.Analysis.Responsiveness.Lemma5_9
   条件のパラメータで、定理は f_a ≤ f を課さない。論文の f_a は実際に腐敗する人数で f 以下、
   論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこの条件を満たすので、
   論文の設定はこの条件の一例。
-- 論文の O(·) は具体的な上界 t + δ + (f_a + 1)(2Δ + 3δ) + 3δ に置き換える。具体的な上界は
-  O(·) の主張を含む。
+- 論文の O(·) は具体的な上界 t + δ + (f_a + 1)(2Δ + 3δ) + 3δ に置き換える。論文の証明は
+  O(f_a Δ + δ) のままで数字を出さない。この上界は、取引が全正直者に届く t + δ に、Lemma 5.9
+  の上界を f_a + 1 view 分と Lemma 5.8 の上界を足したもの。具体的な上界は O(·) の主張を含む。
+- 上界に祖先が届くまでの時間は含まない。message がブロックの祖先を丸ごと運ぶので
+  （Transition/Basic の「論文からの差異」）、論文の証明が最後に見積もる「correct processors
+  receive all ancestors of b by t + O(f_a Δ + δ)」の分が要らない。
 -/
 
 namespace Minimmit
@@ -106,12 +110,12 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have h2 := hbound r hr
     omega
   obtain ⟨e, R⟩ := leader_round hinit hh hs hδ hv₁1 hlc hfm (by omega)
-  have hte := t_le_e hinit hh hb hs R
+  have hte := t_le_e hs R
   have hmul : (v₁.val - v₀.val) * (2 * Δ + 3 * δ) ≤ (fa + 1) * (2 * Δ + 3 * δ) :=
     Nat.mul_le_mul_right _ (by omega)
   intro j hj
   refine ⟨leaderBlockAt f lead s₀ instrs v₁ e, ?_, ?_⟩
-  · exact (leaderBlock_lnotarised_by hn hinit hh hb hs R hj).mono
+  · exact (leaderBlock_lnotarised_by (j := j) hinit hh hb hs R).mono
       (S_subset_run s₀ instrs j (by omega))
   · apply mem_trStar_leaderBlock
     apply Algo.S_subset_st1 f (lead v₁) _

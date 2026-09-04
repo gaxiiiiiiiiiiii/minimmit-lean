@@ -10,7 +10,9 @@ import Minimmit.Analysis.Liveness.LeaderRound
 - δ は `PartialSync δ` として与える。つまり GST 前に送った packet も GST + δ までに届く。
   証明は、最初の正直者が証明書を転送した時刻が GST より前であっても、それが t + δ までに
   全員へ届くことを使うので、この読みが要る。timeout の 2Δ は `Honest` の Δ のまま。
-- 論文の O(·) は具体的な上界 t + 3δ に置き換える。具体的な上界は O(·) の主張を含む。
+- 論文の主張の O(·) は具体的な上界 t + 3δ に置き換える。t + 3δ は論文の証明本文が出す数字で、
+  証明の末尾は「receive b together with an L-notarisation … by t + 3δ, and also leave view v
+  by this time」。具体的な上界は O(·) の主張を含む。
 - view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では結論が成り立たない。
 -/
 
@@ -20,10 +22,9 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.8 の核: 全正直者の票が t + 2δ までに出て t + 3δ までに届く。 -/
-theorem leaderBlock_lnotarised_by (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+theorem leaderBlock_lnotarised_by (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs hs v t e) {j : Fin n}
-    (hj : Correct s₀ instrs j) :
+    {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs hs v t e) {j : Fin n} :
     LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S (leaderBlockAt f lead s₀ instrs v e) := by
   have hδ1 := hs.one_le
   have hgst := R.hgst
@@ -54,7 +55,7 @@ theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   have hδ1 := hs.one_le
   obtain ⟨e, R⟩ := leader_round hinit hh hs hδ hv hi hfirst hgst
   have hbLv := leaderBlockAt_view hinit hh hb hs R
-  have hLN := leaderBlock_lnotarised_by hn hinit hh hb hs R hj
+  have hLN := leaderBlock_lnotarised_by (j := j) hinit hh hb hs R
   refine ⟨⟨leaderBlockAt f lead s₀ instrs v e, hbLv, hLN⟩, ?_⟩
   have hM : MNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
       (leaderBlockAt f lead s₀ instrs v e) := by

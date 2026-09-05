@@ -54,6 +54,51 @@ printf 'import Minimmit\n#print axioms Minimmit.liveness\n' | lake env lean --st
 
 論文の仮定は制約として定義し、定理の仮定に置く。`Init` は初期状態、`Honest` は正直者の動作列が `Algo.step` の出力であること、`ByzBound` は腐敗が f 人以下、`PartialSync` は部分同期、`Fair` はリーダー関数の公平性。`Correct i` は p_i が全スロットで腐敗集合にないことで、定理の中の「正直者 p_i」はこれで述べる。定理は「n ≥ 5f + 1 と `Init`・`Honest`・`ByzBound` を満たす任意の `s₀` と `instrs` について」の形で、Lemma 5.5〜5.7 は `PartialSync Δ` を、Lemma 5.7 は `Fair` も仮定する。Lemma 5.8〜5.10 は GST 後の実際の遅延 δ ≤ Δ をとって `PartialSync δ` を仮定し、Lemma 5.10 はさらに、どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する。4 つの制約が同時に満たせることは Constraint/Witness の `constraints_satisfiable` が示す。
 
+## 論文との対応
+
+論文の概念がどの定義に当たるか。定義の意味は各定義の docstring にある。
+
+### §2 のモデル
+
+| 論文 | Lean |
+|---|---|
+| タイムスロット、現在時刻 | `Time`、`State.now`、`State.run` |
+| プロセッサ、腐敗 | `Processor`、`State.byz`、`Instr.corrupts`、`Correct`、`ByzBound` |
+| 署名の偽造不能 | `Msg.signer` と `State.send` のガード |
+| 部分同期（GST、Δ） | `PartialSync`、`State.Timely` |
+| 取引 | `Msg.tx`、`Instr.submits` |
+| log、finalise | 形式化していない。S に `LNotarised` があることで表す |
+
+### §4 の用語
+
+| 論文 | Lean |
+|---|---|
+| block、genesis | `Block`（親は実体）、`Block.gen` |
+| vote、nullify(v) | `Msg.vote`、`Msg.nullify` |
+| M-notarisation、L-notarisation、nullification | `MNotarised`、`LNotarised`、`Nullified` |
+| S、v、T | `Processor.S`、`Processor.view`、`Processor.timer` |
+| nullified、proposed、notarised | `Processor` の同名フィールド |
+| lead | `lead` 引数、`Fair`、`roundRobin` |
+| SelectParent、ProposeChild | `selectParent`、`payload`・`propose` |
+| valid proposal、proof of no progress | `ValidProposal`、`NoProgress` |
+| new nullification / notarisation | `forwardNew`（S にあって prevS にないもの） |
+| Tr* | `Block.trStar` |
+| disseminate | `disseminate` |
+| §5.1 の receives、sends | `ReceivesM`・`ReceivesL`・`ReceivesNullification`、`Sends` |
+
+### Algorithm 1
+
+| 行 | Lean |
+|---|---|
+| 2〜3 | `forwardMsgs` |
+| 5〜7 | `propose` |
+| 9〜11 | `voteProposal` |
+| 13〜14 | `nullifyTimeout` |
+| 16〜21 | `advanceOnce`、`climb` |
+| 24〜28 | `nullifyNoProgress` |
+| 31〜32 | 動作なし。`LNotarised` が S にあること |
+| 全体と評価順 | `Algo.step`、順序は Algo/Basic の doc |
+
 ## ファイル構成
 
 `Model/` が §4、`Analysis/` が §5。`Model/` の各ディレクトリでは `Basic.lean` が定義で、他のファイルは補題。

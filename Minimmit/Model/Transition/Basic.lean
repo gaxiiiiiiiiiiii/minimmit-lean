@@ -240,7 +240,8 @@ structure Instr (n : Nat) (Tx : Type) where
   submits : List (Fin n × Tx)
   corrupts : List (Fin n)
 
-/-- p_i が m を送る（§5.1 の "sends"）: 指示の列のどこかに、誰か宛に m を送る動作がある。 -/
+/-- p_i が m を送る（§5.1 の "sends"）: 指示の列のどこかに、誰か宛に m を送る動作がある。
+    ガードを通らない動作も含み、ネットワークに載ったかどうかは `State.send` の効果で決まる。 -/
 def Sends (instrs : Nat → Instr n Tx) (i : Fin n) (m : Msg n Tx) : Prop :=
   ∃ t j, Action.send m j ∈ (instrs t).actions i
 

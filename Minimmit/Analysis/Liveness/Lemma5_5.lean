@@ -17,7 +17,8 @@ nullification ができ、止まれない。
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- 「最初の正直者が view v に入るのはスロット t」: スロット t を終えて view が v 以上に
     なった正直者がいて、それより前のスロットではいない。v = 1 なら t = 0。 -/
@@ -54,10 +55,10 @@ theorem card_correctSet (hb : ByzBound f s₀ instrs) : n - f ≤ (correctSet s�
 
 /-- 正直者 p_j が t + 1 の S に持つ自分の署名付き message は、p_i に期限までに届く。 -/
 theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
     {i j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}
     (hm : m ∈ ((State.run s₀ instrs (s + 1)).procs j).S) (hsig : m.signer = some j) {T : Nat}
-    (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T) :
+    (hT₁ : s + 1 ≤ T) (hT₂ : max GST.val s + δ ≤ T) :
     m ∈ ((State.run s₀ instrs T).procs i).S := by
   obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm hsig
   have hact := hh t' j (hj t')
@@ -73,7 +74,8 @@ theorem viewAt_zero (hinit : Init s₀) (j : Fin n) : (viewAt s₀ instrs j 0).v
 
 /-- 正直者 p_i が view k で止まり続けるなら、他の正直者も view k を越えない。越えたなら
     その証明書が p_i に届いて p_i も進むから。 -/
-theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync Δ s₀ instrs)
+theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync Δ GST s₀ instrs)
     {i : Fin n} (hi : Correct s₀ instrs i) {k : Nat} (hk : 1 ≤ k)
     (hstuck : ∀ t, (viewAt s₀ instrs i t).val ≤ k) (hreach : ∃ t₀, k ≤ (viewAt s₀ instrs i t₀).val)
     {j : Fin n} (hj : Correct s₀ instrs j) : ∀ t, (viewAt s₀ instrs j t).val ≤ k := by
@@ -96,13 +98,13 @@ theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : 
     View.val_injective (le_antisymm (hstuck T) (ht₀.trans (viewAt_mono i hT)))
   rcases leave_view_cert hh hj hle hlt with hN | ⟨b, hbv, hM⟩
   · have hNi := nullified_all (j := i) hinit hh hs hj hN
-      (T := max (max hs.GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
+      (T := max (max GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
     have := leave_of_nullified hh hi (hvT _ (by omega)) hNi
     exact absurd (hstuck _) (not_le.mpr this)
   · have hg : b ≠ .gen := by
       intro h; subst h; simp [Block.view] at hbv; omega
     have hMi := mnotarised_all (j := i) hinit hh hs hj hM
-      (T := max (max hs.GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
+      (T := max (max GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
     have := leave_of_mnotarised hh hi ((hvT _ (by omega)).trans hbv.symm) hg hMi
     rw [hbv] at this
     exact absurd (hstuck _) (not_le.mpr this)
@@ -110,7 +112,7 @@ theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : 
 /-- view k に止まる正直者は、timer が 2Δ に達したスロット s で、view k のブロックに投票済みか
     nullify(k) を送っている。 -/
 theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync Δ s₀ instrs)
+    (hs : PartialSync Δ GST s₀ instrs)
     {j : Fin n} (hj : Correct s₀ instrs j) {k : Nat} (hreach : ∃ t, k ≤ (viewAt s₀ instrs j t).val)
     (hstuck : ∀ t, (viewAt s₀ instrs j t).val ≤ k) :
     ∃ s, k ≤ (viewAt s₀ instrs j s).val
@@ -157,7 +159,8 @@ theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 
 /-- 5.5 の本体: すべての正直者が、すべての k について view k 以上に達する。 -/
 theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync Δ s₀ instrs) :
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync Δ GST s₀ instrs)
+    :
     ∀ k : Nat, ∀ i, Correct s₀ instrs i → ∃ t, k ≤ (viewAt s₀ instrs i t).val := by
   intro k
   induction k with
@@ -185,12 +188,12 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       exact Classical.choose_spec (hto j hj)
     have hC := card_correctSet (s₀ := s₀) (instrs := instrs) hb
     have hT₂ : ∀ j ∈ correctSet s₀ instrs,
-        sf j + 1 ≤ max hs.GST.val ((correctSet s₀ instrs).sup sf) + Δ + 1
-        ∧ max hs.GST.val (sf j) + Δ ≤ max hs.GST.val ((correctSet s₀ instrs).sup sf) + Δ + 1 := by
+        sf j + 1 ≤ max GST.val ((correctSet s₀ instrs).sup sf) + Δ + 1
+        ∧ max GST.val (sf j) + Δ ≤ max GST.val ((correctSet s₀ instrs).sup sf) + Δ + 1 := by
       intro j hj
       have := Finset.le_sup (f := sf) hj
       omega
-    set T₂ := max hs.GST.val ((correctSet s₀ instrs).sup sf) + Δ + 1 with hT₂def
+    set T₂ := max GST.val ((correctSet s₀ instrs).sup sf) + Δ + 1 with hT₂def
     -- T₂ 以降、正直者は全員 view k
     have hview : ∀ j, Correct s₀ instrs j → ∀ t, T₂ ≤ t → viewAt s₀ instrs j t = ⟨k⟩ := by
       intro j hj t ht
@@ -268,15 +271,15 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       · exact S_subset_run s₀ instrs j (by have := (hT₂ j hj).1; omega) hm
     -- nullification が i に届き、i が進む
     have hN :
-        Nullified f ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
+        Nullified f ((State.run s₀ instrs (max GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
       have hsub : correctSet s₀ instrs
-          ⊆ nullifiers ((State.run s₀ instrs (max hs.GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ :=
+          ⊆ nullifiers ((State.run s₀ instrs (max GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ :=
         fun j hj => mem_nullifiers.mpr (own_delivered hinit hh hs (mem_correctSet.mp hj)
           (hnull j hj) rfl (by omega) (by omega))
       have := Finset.card_le_card hsub
       unfold Nullified
       omega
-    have hvT₃ : viewAt s₀ instrs i (max hs.GST.val (T₂ + 1) + Δ + 1) = ⟨k⟩ :=
+    have hvT₃ : viewAt s₀ instrs i (max GST.val (T₂ + 1) + Δ + 1) = ⟨k⟩ :=
       hview i hi _ (by omega)
     have := leave_of_nullified hh hi hvT₃ hN
     exact absurd (hstuck _) (not_le.mpr this)
@@ -284,7 +287,7 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
 /-- Lemma 5.5（Progression through views）: 正直者はすべての view に入る。 -/
 theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i) (v : View) :
+    (hs : PartialSync Δ GST s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i) (v : View) :
     ∃ t, v.val ≤ (viewAt s₀ instrs i t).val :=
   progression_aux hn hinit hh hb hs v.val i hi
 

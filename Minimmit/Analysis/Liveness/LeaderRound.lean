@@ -12,7 +12,8 @@ lead(v) は入ったスロット e に提案する、提案は t + 2δ までに
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- 正直者 j の view が v を越えるなら、v から越えるスロットがある。 -/
 theorem exists_leave_slot (hinit : Init s₀) {j : Fin n} {v : View} {t₁ : Nat} (hv : 1 ≤ v.val)
@@ -33,10 +34,10 @@ theorem exists_leave_slot (hinit : Init s₀) {j : Fin n} {v : View} {t₁ : Nat
 
 /-- 正直者がスロット s に view w の証明書を持てば、正直者は全員、期限までにそれを持つ。 -/
 theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
     {j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {w : View} (hw : 1 ≤ w.val)
     (h : Algo.HasCert f ((State.run s₀ instrs s).procs j).S w) {q : Fin n}
-    {T : Nat} (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T) :
+    {T : Nat} (hT₁ : s + 1 ≤ T) (hT₂ : max GST.val s + δ ≤ T) :
     Algo.HasCert f ((State.run s₀ instrs T).procs q).S w := by
   rcases h with h | h
   · exact Or.inl (nullified_all hinit hh hs hj h hT₁ hT₂)
@@ -54,8 +55,8 @@ theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 /-- Lemma 5.6 の第 1 段: 最初の正直者が t に view v に入れば、正直者は全員
     max(t, GST) + δ までに view v に入る。T₀ は t 以上で GST 以上の任意の時刻。 -/
 theorem enter_all_anchor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs) {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t)
-    {T₀ : Nat} (ht : t ≤ T₀) (hgst : hs.GST.val ≤ T₀) {q : Fin n} (hq : Correct s₀ instrs q) :
+    (hs : PartialSync δ GST s₀ instrs) {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t)
+    {T₀ : Nat} (ht : t ≤ T₀) (hgst : GST.val ≤ T₀) {q : Fin n} (hq : Correct s₀ instrs q) :
     v.val ≤ (viewAt s₀ instrs q (T₀ + δ + 1)).val := by
   obtain ⟨j, hj, hjv⟩ := hfirst.entered
   have hδ1 := hs.one_le
@@ -70,8 +71,9 @@ theorem enter_all_anchor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   exact hasCert_all hinit hh hs hj hw1 hcert (by omega) (by omega)
 
 /-- 最初の正直者が t ≥ GST に view v に入れば、正直者は全員 t + δ までに view v に入る。 -/
-theorem enter_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) {q : Fin n}
+theorem enter_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
+    {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) {q : Fin n}
     (hq : Correct s₀ instrs q) : v.val ≤ (viewAt s₀ instrs q (t + δ + 1)).val :=
   enter_all_anchor hinit hh hs hfirst (le_refl t) hgst hq
 
@@ -229,7 +231,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
 
 /-- lead(v) が view v に入るスロット e より前に、正直者は nullify(v) を送らない。 -/
 theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hb : ByzBound f s₀ instrs) (hs : PartialSync δ s₀ instrs) (hδ : δ ≤ Δ) {v : View}
+    (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs) (hδ : δ ≤ Δ) {v : View}
     (hv : 1 ≤ v.val)
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
     (he : e ≤ t + δ) (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val) :
@@ -301,7 +303,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 
 /-- lead(v) が view v に入るスロット e の冒頭の S に、view v の証明書はない。 -/
 theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hb : ByzBound f s₀ instrs) (hs : PartialSync δ s₀ instrs) (hδ : δ ≤ Δ) {v : View}
+    (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs) (hδ : δ ≤ Δ) {v : View}
     (hv : 1 ≤ v.val)
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
     (he : e ≤ t + δ) (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val) :
@@ -328,7 +330,7 @@ theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 
 /-- lead(v) は view v に入るスロット e に、登りを view v で終え、まだ提案していない。 -/
 theorem leader_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hb : ByzBound f s₀ instrs) (hs : PartialSync δ s₀ instrs) (hδ : δ ≤ Δ) {v : View}
+    (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs) (hδ : δ ≤ Δ) {v : View}
     (hv : 1 ≤ v.val)
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
     (he : e ≤ t + δ) (hev : v.val ≤ (viewAt s₀ instrs (lead v) (e + 1)).val)
@@ -365,11 +367,11 @@ theorem leader_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     lead(v) 自身は t ≤ e ≤ t + δ のスロット e に初めて view v 以上になる。δ ≤ Δ は GST 後の
     実際の遅延の上界。 -/
 structure LeaderRound (f Δ δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
-    (instrs : Nat → Instr n Tx) (hs : PartialSync δ s₀ instrs) (v : View) (t e : Nat) : Prop where
+    (instrs : Nat → Instr n Tx) (GST : Time) (v : View) (t e : Nat) : Prop where
   hδ : δ ≤ Δ
   hv : 1 ≤ v.val
   hfirst : FirstEntry s₀ instrs v t
-  hgst : hs.GST.val ≤ t
+  hgst : GST.val ≤ t
   hlc : Correct s₀ instrs (lead v)
   he : e ≤ t + δ
   hev : v.val ≤ (viewAt s₀ instrs (lead v) (e + 1)).val
@@ -394,8 +396,8 @@ theorem leaderBlockAt_parent (f : Nat) (lead : View → Fin n) (s₀ : State n T
 section CorrectLeader
 
 variable (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-  (hs : PartialSync δ s₀ instrs) {v : View} {t e : Nat}
-  (R : LeaderRound f Δ δ lead s₀ instrs hs v t e)
+  (hs : PartialSync δ GST s₀ instrs) {v : View} {t e : Nat}
+  (R : LeaderRound f Δ δ lead s₀ instrs GST v t e)
 
 include hinit hh hb hs R
 
@@ -421,7 +423,7 @@ theorem leader_proposes (j : Fin n) :
   left; left; left; right
   exact Algo.propose_fires (by rw [hview]) hprop j
 
-omit hinit hh hb in
+omit hinit hh hb hs in
 theorem first_entry_le_leader_entry : t ≤ e := R.hfirst.first (lead v) e R.hlc R.hev
 
 /-- ブロックは t + 2δ までに全正直者に届く。 -/
@@ -915,10 +917,10 @@ end CorrectLeader
 
 /-- Lemma 5.6 の設定は、lead(v) が正直で最初の正直者が GST 以降に v に入れば作れる。 -/
 theorem leader_round (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
     (hδ : δ ≤ Δ) {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v)) {t : Nat}
-    (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
-    ∃ e, LeaderRound f Δ δ lead s₀ instrs hs v t e := by
+    (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
+    ∃ e, LeaderRound f Δ δ lead s₀ instrs GST v t e := by
   have hreach : ∃ s, v.val ≤ (viewAt s₀ instrs (lead v) (s + 1)).val :=
     ⟨t + δ, enter_all hinit hh hs hfirst hgst hi⟩
   obtain ⟨e, hev, hemin, hstart⟩ := entry_slot hinit hv hreach

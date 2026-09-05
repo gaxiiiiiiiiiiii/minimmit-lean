@@ -37,11 +37,10 @@ structure Init (s₀ : State n Tx) : Prop where
 def State.Timely (Δ : Nat) (GST : Time) (s : State n Tx) : Prop :=
   ∀ x ∈ s.pool, max GST.val x.sentAt.val + Δ ≤ s.now.val → x.msg ∈ (s.procs x.dst).S
 
-/-- 部分同期（§2）: ある GST があって、t に送られた packet は max(GST, t) + Δ までに
-    宛先の S に入る。Δ は既知、GST は敵が選ぶ。 -/
-structure PartialSync [DecidableEq Tx] (Δ : Nat) (s₀ : State n Tx)
-    (instrs : Nat → Instr n Tx) where
-  GST : Time
+/-- 部分同期（§2）: t に送られた packet は max(GST, t) + Δ までに宛先の S に入る。Δ は既知、
+    GST は敵が選ぶ。 -/
+structure PartialSync [DecidableEq Tx] (Δ : Nat) (GST : Time) (s₀ : State n Tx)
+    (instrs : Nat → Instr n Tx) : Prop where
   timely : ∀ t, (State.run s₀ instrs t).Timely Δ GST
   one_le : 1 ≤ Δ
 

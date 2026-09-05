@@ -19,12 +19,13 @@ import Minimmit.Analysis.Liveness.LeaderRound
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.8 の核: 全正直者の票が t + 2δ までに出て t + 3δ までに届く。 -/
 theorem leaderBlock_lnotarised_by (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ s₀ instrs)
-    {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs hs v t e) {j : Fin n} :
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs)
+    {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs GST v t e) {j : Fin n} :
     LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
     (leaderBlockAt f lead s₀ instrs v e) := by
   have hδ1 := hs.one_le
@@ -46,9 +47,9 @@ theorem leaderBlock_lnotarised_by (hinit : Init s₀)
     全員 t + 3δ までに view v のブロックを finalise し、view v を離れる。 -/
 theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {v : View} (hv : 1 ≤ v.val)
     (hi : Correct s₀ instrs (lead v))
-    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
+    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j →
       (∃ b : Block Tx, b.view = v ∧ LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
       ∧ v.val < (viewAt s₀ instrs j (t + 3 * δ + 1)).val := by

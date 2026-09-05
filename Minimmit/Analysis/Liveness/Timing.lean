@@ -11,7 +11,8 @@ view は減らない、timer は現在の view に入ってからのスロット
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- スロット t の冒頭の p_i の view -/
 def viewAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : View :=
@@ -138,14 +139,10 @@ theorem pool_subset_run {t t' : Nat} (h : t ≤ t') :
   | step _ ih => exact ih.trans (State.pool_subset_step _ _)
 
 /-- 遅延の上界を緩めても部分同期は成り立つ。 -/
-def PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ s₀ instrs) (hδ : δ ≤ Δ) :
-    PartialSync Δ s₀ instrs where
-  GST := hs.GST
+theorem PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ GST s₀ instrs) (hδ : δ ≤ Δ) :
+    PartialSync Δ GST s₀ instrs where
   timely := fun t x hx hT => hs.timely t x hx (by omega)
   one_le := le_trans hs.one_le hδ
-
-theorem PartialSync.mono_GST {δ Δ : Nat} (hs : PartialSync δ s₀ instrs) (hδ : δ ≤ Δ) :
-    (hs.mono hδ).GST = hs.GST := rfl
 
 /-! ### 正直者の送信は届く -/
 
@@ -223,10 +220,11 @@ theorem mem_pool_run_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
 
 /-- 正直者 p_i がスロット t に j へ送った message は、t + 1 以降で期限 max(GST, t) + δ に
     達したスロットの p_j の S にある。 -/
-theorem delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hs : PartialSync δ s₀ instrs)
+theorem delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (instrs t).actions i) {T : Nat} (hT₁ : t + 1 ≤ T)
-    (hT₂ : max hs.GST.val t + δ ≤ T) : m ∈ ((State.run s₀ instrs T).procs j).S := by
+    (hT₂ : max GST.val t + δ ≤ T) : m ∈ ((State.run s₀ instrs T).procs j).S := by
   have hx := mem_pool_run_of_send hinit hh hi h hT₁
   have := hs.timely T ⟨m, j, ⟨t⟩⟩ hx
   rw [run_now hinit] at this
@@ -324,10 +322,10 @@ theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
 
 /-- 正直者 p_i がスロット t に nullification を持つなら、p_j は期限までにそれを持つ。 -/
 theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f ((State.run s₀ instrs t).procs i).S v) {T : Nat} (hT₁ : t + 1 ≤ T)
-    (hT₂ : max hs.GST.val t + δ ≤ T) : Nullified f ((State.run s₀ instrs T).procs j).S v := by
+    (hT₂ : max GST.val t + δ ≤ T) : Nullified f ((State.run s₀ instrs T).procs j).S v := by
   obtain ⟨t', ht', hn', hsend⟩ := forward_nullification hinit hh hi h
   refine hn'.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_nullifiers]
@@ -335,10 +333,10 @@ theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
 
 theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs)
+    (hs : PartialSync δ GST s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx}
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) {T : Nat} (hT₁ : t + 1 ≤ T)
-    (hT₂ : max hs.GST.val t + δ ≤ T) : MNotarised f ((State.run s₀ instrs T).procs j).S b := by
+    (hT₂ : max GST.val t + δ ≤ T) : MNotarised f ((State.run s₀ instrs T).procs j).S b := by
   by_cases hg : b = .gen
   · exact Or.inl hg
   obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation hinit hh hi hg h
@@ -352,9 +350,9 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 
 /-- `nullified_all` の、動作を終えた時点の S についての版 -/
 theorem nullified_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
+    (hs : PartialSync δ GST s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v) {T : Nat}
-    (hT₁ : t + 1 ≤ T) (hT₂ : max hs.GST.val t + δ ≤ T) :
+    (hT₁ : t + 1 ≤ T) (hT₂ : max GST.val t + δ ≤ T) :
     Nullified f ((State.run s₀ instrs T).procs j).S v := by
   obtain ⟨t', ht', hn', hsend⟩ := forward_nullification_end hinit hh hi h
   refine hn'.trans (Finset.card_le_card fun q hq => ?_)
@@ -363,9 +361,10 @@ theorem nullified_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
 
 theorem mnotarised_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx}
+    (hs : PartialSync δ GST s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat}
+    {b : Block Tx}
     (h : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b) {T : Nat}
-    (hT₁ : t + 1 ≤ T) (hT₂ : max hs.GST.val t + δ ≤ T) :
+    (hT₁ : t + 1 ≤ T) (hT₂ : max GST.val t + δ ≤ T) :
     MNotarised f ((State.run s₀ instrs T).procs j).S b := by
   by_cases hg : b = .gen
   · exact Or.inl hg

@@ -117,9 +117,8 @@ theorem pool_delivered (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     exact mem_S_foldl_deliver_of_mem _ _ (Finset.mem_toList.mpr hx) (by rwa [State.tick_pool])
 
 /-- 部分同期: GST = 0 で、期限によらず届いている。 -/
-noncomputable def partialSync (f Δ : Nat) (lead : View → Fin n) (hΔ : 1 ≤ Δ) :
-    PartialSync Δ (init (Tx := Tx)) (instrs f Δ lead) where
-  GST := ⟨0⟩
+theorem partialSync (f Δ : Nat) (lead : View → Fin n) (hΔ : 1 ≤ Δ) :
+    PartialSync Δ ⟨0⟩ (init (Tx := Tx)) (instrs f Δ lead) where
   timely := fun t x hx _ => by
     rw [run_eq] at hx ⊢
     exact pool_delivered f Δ lead t x hx
@@ -132,9 +131,9 @@ end Witness
 theorem constraints_satisfiable (f Δ : Nat) (hΔ : 1 ≤ Δ) (lead : View → Fin n) :
     ∃ (s₀ : State n Tx) (instrs : Nat → Instr n Tx),
       Init s₀ ∧ Honest f Δ lead s₀ instrs ∧ ByzBound f s₀ instrs
-        ∧ Nonempty (PartialSync Δ s₀ instrs) :=
+        ∧ ∃ GST, PartialSync Δ GST s₀ instrs :=
   ⟨Witness.init, Witness.instrs f Δ lead, Witness.init_spec, Witness.honest f Δ lead,
-    Witness.byzBound f Δ lead, ⟨Witness.partialSync f Δ lead hΔ⟩⟩
+    Witness.byzBound f Δ lead, ⟨⟨0⟩, Witness.partialSync f Δ lead hΔ⟩⟩
 
 /-! ### 輪番のリーダー -/
 

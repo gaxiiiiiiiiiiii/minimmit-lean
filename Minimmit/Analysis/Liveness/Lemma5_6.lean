@@ -12,15 +12,16 @@ import Minimmit.Analysis.Liveness.LeaderRound
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.6（Correct leaders finalise blocks）: lead(v) が正直で、最初の正直者が GST 以降に
     view v に入るなら、lead(v) はあるスロットに view v のブロックを全員へ送り、それは
     L-notarisation を受ける。 -/
 theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ s₀ instrs) {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v))
-    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
+    (hs : PartialSync Δ GST s₀ instrs) {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v))
+    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∃ b : Block Tx, b.view = v
       ∧ (∃ t', ∀ j, Action.send (.block (lead v) b) j ∈ (instrs t').actions (lead v))
       ∧ ReceivesL f instrs b := by

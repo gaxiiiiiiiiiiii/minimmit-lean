@@ -23,7 +23,8 @@ import Minimmit.Analysis.Responsiveness.Lemma5_9
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.10（Optimistic responsiveness）: 取引 tr を正直者が初めて受け取るのが t ≥ GST
     なら、正直者は全員 t + δ + (f_a + 1)(2Δ + 3δ) + 3δ までに tr を finalise する。
@@ -31,14 +32,14 @@ variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : N
     lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす）。 -/
 theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {fa : Nat}
+    (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {fa : Nat}
     (hlead : ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa
       ∧ Correct s₀ instrs (lead v'))
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {tr : Tx}
     (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
     (hfirst : ∀ j t', Correct s₀ instrs j → t' < t →
       Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S)
-    (hgst : hs.GST.val ≤ t) :
+    (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j → ∃ b : Block Tx,
       LNotarised f ((State.run s₀ instrs (t + δ + (fa + 1) * (2 * Δ + 3 * δ) + 3 * δ)).procs j).S b
       ∧ tr ∈ b.trStar := by
@@ -114,7 +115,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have h2 := hbound r hr
     omega
   obtain ⟨e, R⟩ := leader_round hinit hh hs hδ hv₁1 hlc hfm (by omega)
-  have hte := first_entry_le_leader_entry hs R
+  have hte := first_entry_le_leader_entry R
   have hmul : (v₁.val - v₀.val) * (2 * Δ + 3 * δ) ≤ (fa + 1) * (2 * Δ + 3 * δ) :=
     Nat.mul_le_mul_right _ (by omega)
   intro j hj

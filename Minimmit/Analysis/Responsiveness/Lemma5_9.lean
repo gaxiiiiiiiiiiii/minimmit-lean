@@ -16,14 +16,15 @@ lead(v) が正直かどうかによらず、正直者は全員 t + 2Δ + 3δ ま
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
+  {instrs : Nat → Instr n Tx}
 
 /-- 正直者が期限までに view v の証明書を持てば、正直者は全員その次のスロットには v を
     離れている。 -/
 theorem leave_all_of_cert (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hs : PartialSync δ s₀ instrs) {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} {v : View}
+    (hs : PartialSync δ GST s₀ instrs) {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} {v : View}
     (hv : 1 ≤ v.val) (hc : Algo.HasCert f ((State.run s₀ instrs s).procs r).S v) {T : Nat}
-    (hT₁ : s + 1 ≤ T) (hT₂ : max hs.GST.val s + δ ≤ T)
+    (hT₁ : s + 1 ≤ T) (hT₂ : max GST.val s + δ ≤ T)
     (henter : ∀ j, Correct s₀ instrs j → v.val ≤ (viewAt s₀ instrs j T).val) :
     ∀ j, Correct s₀ instrs j → v.val < (viewAt s₀ instrs j (T + 1)).val := by
   intro j hj
@@ -37,9 +38,9 @@ theorem leave_all_of_cert (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs
     GST 以上の任意の時刻。 -/
 theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {v : View} (hv : 1 ≤ v.val)
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) {T₀ : Nat} (ht : t ≤ T₀)
-    (hgst : hs.GST.val ≤ T₀) :
+    (hgst : GST.val ≤ T₀) :
     ∀ j, Correct s₀ instrs j → v.val < (viewAt s₀ instrs j (T₀ + 2 * Δ + 3 * δ + 1)).val := by
   classical
   have hδ1 := hs.one_le
@@ -215,8 +216,8 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     よらず、正直者は全員 t + 2Δ + 3δ までに view v を離れる。 -/
 theorem leave_view (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hδ : δ ≤ Δ) (hs : PartialSync δ s₀ instrs) {v : View} (hv : 1 ≤ v.val)
-    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : hs.GST.val ≤ t) :
+    (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {v : View} (hv : 1 ≤ v.val)
+    {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j → v.val < (viewAt s₀ instrs j (t + 2 * Δ + 3 * δ + 1)).val :=
   leave_view_anchor hn hinit hh hb hδ hs hv hfirst (le_refl t) hgst
 

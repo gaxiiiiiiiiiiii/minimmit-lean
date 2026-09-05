@@ -45,7 +45,7 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     omega
   have hlc : Correct s₀ instrs (lead v') := hlv' ▸ hi
   obtain ⟨e, R⟩ := leader_round hinit hh hs (le_refl Δ) hv'1 hlc hfirst (by omega)
-  have hte := t_le_e hs R
+  have hte := first_entry_le_leader_entry hs R
   -- 取引はブロックの Tr* に入る
   have htr' : tr ∈ (leaderBlockAt f lead s₀ instrs v' e).trStar := by
     apply mem_trStar_leaderBlock

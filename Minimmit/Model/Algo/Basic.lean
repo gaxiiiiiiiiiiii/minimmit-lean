@@ -101,7 +101,7 @@ noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
 /-! ### 16〜21 行 -/
 
 /-- S にある message が言及する view の最大 -/
-noncomputable def maxView (S : Finset (Msg n Tx)) : Nat := S.sup Msg.viewNum
+noncomputable def maxView (S : Finset (Msg n Tx)) : Nat := S.sup fun m => m.view.val
 
 /-- S に view v の証明書がある: v の nullification か、view v のブロックの M-notarisation。
     16 行と 19 行の条件。 -/

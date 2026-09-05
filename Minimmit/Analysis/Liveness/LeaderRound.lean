@@ -422,7 +422,7 @@ theorem leader_proposes (j : Fin n) :
   exact Algo.propose_fires (by rw [hview]) hprop j
 
 omit hinit hh hb in
-theorem t_le_e : t ≤ e := R.hfirst.first (lead v) e R.hlc R.hev
+theorem first_entry_le_leader_entry : t ≤ e := R.hfirst.first (lead v) e R.hlc R.hev
 
 /-- ブロックは t + 2δ までに全正直者に届く。 -/
 theorem leader_block_delivered {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
@@ -780,7 +780,7 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
 
 /-- t + 2δ 以降に登りを view v で終える正直者は、そのスロットで 9〜11 行により投票するか、
     既に投票している。 -/
-theorem vote_line11 {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 * δ ≤ s)
+theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 * δ ≤ s)
     (hst1v : (Algo.st1 f r ((State.run s₀ instrs s).procs r)).view = v) :
     ∃ s' ≤ s, ∃ j, Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
       ∈ (instrs s').actions r := by
@@ -900,7 +900,7 @@ theorem vote_by {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 *
   · have heq : (viewAt s₀ instrs r (s + 1)).val = v.val := le_antisymm hge hle
     have hst1v : (Algo.st1 f r ((State.run s₀ instrs s).procs r)).view = v := by
       rw [← viewAt_succ_eq hh hr s]; exact View.val_injective heq
-    exact vote_line11 hinit hh hb hs R hr hT hst1v
+    exact vote_at_climb_end hinit hh hb hs R hr hT hst1v
 
 /-- 全正直者が lead(v) のブロックに投票する。 -/
 theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s₀ instrs r) :

@@ -114,7 +114,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have h2 := hbound r hr
     omega
   obtain ⟨e, R⟩ := leader_round hinit hh hs hδ hv₁1 hlc hfm (by omega)
-  have hte := t_le_e hs R
+  have hte := first_entry_le_leader_entry hs R
   have hmul : (v₁.val - v₀.val) * (2 * Δ + 3 * δ) ≤ (fa + 1) * (2 * Δ + 3 * δ) :=
     Nat.mul_le_mul_right _ (by omega)
   intro j hj

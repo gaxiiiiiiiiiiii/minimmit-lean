@@ -24,12 +24,18 @@ import Minimmit.Model.Constraint.Witness
 #guard_msgs in #print axioms Minimmit.one_vote_per_view
 
 -- Lemma 5.2 (X1)
-/-- info: 'Minimmit.x1' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in #print axioms Minimmit.x1
+/--
+info: 'Minimmit.receivesM_unique_of_receivesL' depends on axioms: [propext, Classical.choice,
+Quot.sound]
+-/
+#guard_msgs in #print axioms Minimmit.receivesM_unique_of_receivesL
 
 -- Lemma 5.3 (X2)
-/-- info: 'Minimmit.x2' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in #print axioms Minimmit.x2
+/--
+info: 'Minimmit.not_receivesNullification_of_receivesL' depends on axioms: [propext,
+Classical.choice, Quot.sound]
+-/
+#guard_msgs in #print axioms Minimmit.not_receivesNullification_of_receivesL
 
 -- Lemma 5.4 Consistency
 /--

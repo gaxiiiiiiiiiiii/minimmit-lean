@@ -11,8 +11,8 @@ Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依�
 | 論文 | 定理 | ファイル |
 |---|---|---|
 | Lemma 5.1 One vote per view | `one_vote_per_view` | Analysis/Consistency/Lemma5_1 |
-| Lemma 5.2 (X1) | `x1` | Analysis/Consistency/Lemma5_2 |
-| Lemma 5.3 (X2) | `x2` | Analysis/Consistency/Lemma5_3 |
+| Lemma 5.2 (X1) | `receivesM_unique_of_receivesL` | Analysis/Consistency/Lemma5_2 |
+| Lemma 5.3 (X2) | `not_receivesNullification_of_receivesL` | Analysis/Consistency/Lemma5_3 |
 | Lemma 5.4 Consistency | `finalised_compatible`, `consistency` | Analysis/Consistency/Lemma5_4 |
 | Lemma 5.5 Progression through views | `progression` | Analysis/Liveness/Lemma5_5 |
 | Lemma 5.6 Correct leaders finalise blocks | `correct_leader_finalises` | Analysis/Liveness/Lemma5_6 |

@@ -11,7 +11,7 @@ variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat 
 
 /-- Lemma 5.2（§3 の (X1)）: b が L-notarisation を受けるなら、同じ view の他のブロックは
     M-notarisation を受けない。 -/
-theorem x1 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+theorem receivesM_unique_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {b b' : Block Tx} (hL : ReceivesL f instrs b) (hview : b'.view = b.view)
     (hM : ReceivesM f instrs b') : b' = b := by

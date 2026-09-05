@@ -48,19 +48,19 @@ theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx}
   exact ⟨hb, trivial, hM⟩
 
 omit [DecidableEq Tx] in
-theorem viewNum_le_maxView {S : Finset (Msg n Tx)} {m : Msg n Tx} (h : m ∈ S) :
-    m.viewNum ≤ maxView S :=
-  Finset.le_sup h
+theorem view_le_maxView {S : Finset (Msg n Tx)} {m : Msg n Tx} (h : m ∈ S) :
+    m.view.val ≤ maxView S :=
+  Finset.le_sup (f := fun m => m.view.val) h
 
 /-- 証明書のある view は、S にある message の view を超えない。 -/
 theorem hasCert_le_maxView {f : Nat} {S : Finset (Msg n Tx)} {v : View} (h : HasCert f S v) :
     v.val ≤ maxView S := by
   rcases h with h | h
   · obtain ⟨q, hq⟩ := Finset.card_pos.mp (lt_of_lt_of_le (Nat.succ_pos _) h)
-    exact viewNum_le_maxView (mem_nullifiers.mp hq)
+    exact view_le_maxView (mem_nullifiers.mp hq)
   · obtain ⟨b, hb⟩ := List.exists_mem_of_ne_nil _ h
     obtain ⟨q, hq⟩ := exists_vote_of_mem_votedBlocks (mem_votedBlocks_of_mem_mNotarisedAt hb)
-    have h1 : b.view.val ≤ maxView S := viewNum_le_maxView hq
+    have h1 : b.view.val ≤ maxView S := view_le_maxView hq
     rw [(mem_mNotarisedAt hb).1] at h1
     exact h1
 
@@ -260,9 +260,9 @@ theorem maxView_advanceOnce (f : Nat) (i : Fin n) (p : Processor n Tx) :
   apply Finset.sup_le
   intro m hm
   rcases mem_S_advanceOnce hm with hm | ⟨b, rfl, hb, _⟩
-  · exact viewNum_le_maxView hm
+  · exact view_le_maxView hm
   · obtain ⟨q, hq⟩ := exists_vote_of_mem_votedBlocks (mem_votedBlocks_of_mem_mNotarisedAt hb)
-    have h1 : b.view.val ≤ maxView p.S := viewNum_le_maxView hq
+    have h1 : b.view.val ≤ maxView p.S := view_le_maxView hq
     exact h1
 
 theorem maxView_climb (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :

@@ -173,10 +173,11 @@ theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   have hne : v.val ≠ b.view.val := by
     intro heq
     have hv : (Block.node v tr p₀).view = b.view := View.val_injective heq
-    have := x1 hn hinit hh hb hL hv hM
+    have := receivesM_unique_of_receivesL hn hinit hh hb hL hv hM
     exact hna (this ▸ Block.Ancestor.refl _)
   obtain ⟨_, hgap⟩ := receivesM_parent hinit hh hb hM
-  exact x2 hn hinit hh hb hL (hgap b.view hlt (lt_of_le_of_ne hge (Ne.symm hne)))
+  exact not_receivesNullification_of_receivesL hn hinit hh hb hL
+    (hgap b.view hlt (lt_of_le_of_ne hge (Ne.symm hne)))
 
 /-- 正直者の S にある L-notarisation は、実行上の L-notarisation。 -/
 theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block Tx}

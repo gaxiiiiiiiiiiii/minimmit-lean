@@ -12,7 +12,7 @@ variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat 
 
 /-- Lemma 5.3（§3 の (X2)）: b が L-notarisation を受けるなら、b の view は nullification を
     受けない。 -/
-theorem x2 (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {b : Block Tx} (hL : ReceivesL f instrs b) : ¬ ReceivesNullification f instrs b.view := by
   intro hN

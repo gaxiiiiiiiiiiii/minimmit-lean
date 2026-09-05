@@ -90,12 +90,12 @@ def Msg.signer : Msg n Tx → Option (Fin n)
   | .nullify q _ => some q
   | .tx _        => none
 
-/-- message が言及する view の番号、取引では 0 -/
-def Msg.viewNum : Msg n Tx → Nat
-  | .block _ b   => b.view.val
-  | .vote _ b    => b.view.val
-  | .nullify _ v => v.val
-  | .tx _        => 0
+/-- message が言及する view、取引では 0 -/
+def Msg.view : Msg n Tx → View
+  | .block _ b   => b.view
+  | .vote _ b    => b.view
+  | .nullify _ v => v
+  | .tx _        => ⟨0⟩
 
 /-- ネットワークに載る単位: message、宛先、送信したスロット。 -/
 structure Packet (n : Nat) (Tx : Type) where

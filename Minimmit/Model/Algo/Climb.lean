@@ -31,7 +31,7 @@ theorem exists_vote_of_mem_votedBlocks {S : Finset (Msg n Tx)} {b : Block Tx}
   simp only [votedBlocks, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at h
   obtain ⟨m, hm, hmb⟩ := h
   cases m with
-  | block q b' => simp at hmb
+  | propose q b' => simp at hmb
   | vote q b' => simp at hmb; subst hmb; exact ⟨q, hm⟩
   | nullify q v => simp at hmb
   | tx tr => simp at hmb

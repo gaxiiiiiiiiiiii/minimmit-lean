@@ -36,7 +36,8 @@ theorem mem_S_forwardNew {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n T
 
 theorem mem_S_propose {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
     {m : Msg n Tx} (hm : m ∈ (propose f lead i q).1.S) :
-    m ∈ q.S ∨ ∃ b, m = Msg.block i b ∧ Action.send (Msg.block i b) i ∈ (propose f lead i q).2 := by
+    m ∈ q.S ∨ ∃ b, m = Msg.propose i b ∧ Action.send (Msg.propose i b) i
+    ∈ (propose f lead i q).2 := by
   unfold propose at hm ⊢
   split_ifs at hm ⊢
   · exact (mem_S_disseminate_or i q _ hm).imp_right
@@ -87,7 +88,8 @@ theorem mem_S_st1 {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
 theorem mem_S_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st2 f lead i p).S) :
     m ∈ (st1 f i p).S
-      ∨ ∃ b, m = Msg.block i b ∧ Action.send (Msg.block i b) i ∈ (propose f lead i (st1 f i p)).2 :=
+      ∨ ∃ b, m = Msg.propose i b ∧ Action.send (Msg.propose i b) i
+      ∈ (propose f lead i (st1 f i p)).2 :=
   mem_S_propose hm
 
 theorem mem_S_st3 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
@@ -161,7 +163,7 @@ theorem send_forwardNew_mem {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg 
 
 theorem send_propose_eq {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (propose f lead i p).2) :
-    ∃ b, m = Msg.block i b := by
+    ∃ b, m = Msg.propose i b := by
   unfold propose at h
   split_ifs at h
   · obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
@@ -182,7 +184,7 @@ theorem leaderBlock_parent (f : Nat) (p : Processor n Tx) :
 
 theorem send_propose_eq' {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (propose f lead i p).2) :
-    m = Msg.block i (leaderBlock f p) ∧ lead p.view = i ∧ p.proposed = false := by
+    m = Msg.propose i (leaderBlock f p) ∧ lead p.view = i ∧ p.proposed = false := by
   unfold propose at h
   split_ifs at h with hg
   · obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
@@ -192,7 +194,7 @@ theorem send_propose_eq' {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Proc
 /-- リーダーで未提案なら、5〜7 行はブロックを全員へ送る。 -/
 theorem propose_fires {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (hl : lead p.view = i) (hp : p.proposed = false) (j : Fin n) :
-    Action.send (Msg.block i (leaderBlock f p)) j ∈ (propose f lead i p).2 := by
+    Action.send (Msg.propose i (leaderBlock f p)) j ∈ (propose f lead i p).2 := by
   unfold propose
   rw [if_pos ⟨hl, hp⟩]
   exact mem_disseminate_snd.mpr ⟨j, rfl⟩

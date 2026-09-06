@@ -79,7 +79,7 @@ printf 'import Minimmit\n#print axioms Minimmit.liveness\n' | lake env lean --st
 | S、v、T | `Processor.S`、`Processor.view`、`Processor.timer` |
 | nullified、proposed、notarised | `Processor` の同名フィールド |
 | lead | `lead` 引数、`Fair`、`roundRobin` |
-| SelectParent、ProposeChild | `selectParent`、`payload`・`propose` |
+| SelectParent、ProposeChild | `selectParent`、`payload`・`propose`、送る message は `Msg.propose` |
 | valid proposal、proof of no progress | `ValidProposal`、`NoProgress` |
 | new nullification / notarisation | `forwardNew`（S にあって prevS にないもの） |
 | Tr* | `Block.trStar` |
@@ -147,14 +147,7 @@ Minimmit
 
 Algorithm 1 は 2 点で論文の擬似コードと違う。証明書が届いている限り同じスロットで view を進め続けること、そして view を進めてから提案と投票をし、転送をスロットの最後に回すこと。論文の擬似コードは各行を上から 1 回ずつ評価するだけなので、1 スロットに進める view は 16〜17 行の nullification で 1 つと続く 19〜21 行の M-notarisation で 1 つの高々 2 つで、view に入ったスロットでは提案できない。論文の証明はどちらの動作も前提にしていて、擬似コードのままでは付録の Lemma E.6（Timely view entry: 正直者が t に view v に入れば、全正直者は max(t, GST) から有界の遅れで v に入る）が成り立たない。
 
-そのほかは、論文の記述を Lean に落とすための調整で、該当ファイルの冒頭の doc に「論文からの差異」として理由つきで書いてある。調整のうち、定理の読み方に関わるものは次の 4 つ。
-
-| 差異 | 論文との関係 | 所在 |
-|---|---|---|
-| message はブロックの祖先を丸ごと運ぶ | 論文は祖先が届くことを Lemma 5.7・5.10 の証明で導く。通信モデルが論文より強い | Model/Transition/Basic |
-| Lemma 5.8〜5.10 の δ は `PartialSync δ` として与える | GST 前に送った message にも GST + δ を課すので、論文の δ より強い仮定 | Analysis/Responsiveness/Lemma5_8 |
-| log と finalise を形式化していない | Consistency と Liveness はブロックについての言明で、論文の log についての言明への還元は非形式的 | Analysis/Consistency/Lemma5_4 |
-| `PartialSync` は Δ ≥ 1 を、Lemma 5.6・5.8・5.9 は v ≥ 1 を仮定に持つ | 論文の「t に送った message は t′ > t に届く」と、view の範囲 ℕ≥1 を明示したもの | Model/Constraint/Basic、各 Lemma |
+そのほかは、論文の記述を Lean に落とすための調整で、該当ファイルの冒頭の doc に「論文からの差異」として理由つきで書いてある。形式化で明示した前提と設計判断は [docs/differences.md](docs/differences.md) にまとめてある。
 
 ## 未証明
 

@@ -206,7 +206,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
     rcases Algo.mem_S_st2 hsigned with hm2 | ⟨b'', hm2, hs2⟩
     · rcases Algo.mem_S_st1 hm2 with hm1 | ⟨_, hm1, _⟩
       · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm1 rfl
-        obtain ⟨hbb, _, _⟩ := send_block_eq hinit hh hlc hj''
+        obtain ⟨hbb, _, _⟩ := send_propose_leaderBlock hinit hh hlc hj''
         have h1 := hemin s' (lt_trans hs' hlt)
         rw [viewAt_succ_eq hh hlc s'] at h1
         have h2 :
@@ -413,7 +413,7 @@ theorem leaderParentAt_view_lt : (leaderParentAt f lead s₀ instrs v e).view.va
 
 /-- lead(v) はスロット e にブロックを全員へ送る。 -/
 theorem leader_proposes (j : Fin n) :
-    Action.send (Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)) j
+    Action.send (Msg.propose (lead v) (leaderBlockAt f lead s₀ instrs v e)) j
       ∈ (instrs e).actions (lead v) := by
   obtain ⟨hview, hprop⟩ :=
     leader_at_entry hinit hh hb hs R.hδ R.hv R.hfirst R.hlc R.he R.hev R.hemin R.hstart
@@ -428,7 +428,7 @@ theorem first_entry_le_leader_entry : t ≤ e := R.hfirst.first (lead v) e R.hlc
 
 /-- ブロックは t + 2δ までに全正直者に届く。 -/
 theorem leader_block_delivered {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
-    Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)
+    Msg.propose (lead v) (leaderBlockAt f lead s₀ instrs v e)
     ∈ ((State.run s₀ instrs T).procs r).S := by
   have hδ1 := hs.one_le
   have hδ := R.hδ
@@ -554,7 +554,8 @@ theorem vote_unique_leaderBlock :
       · injection hm2 with hr' hbb
         subst hbb
         subst hr'
-        have hsend : Action.send (Msg.block (lead v) b) (lead v) ∈ (instrs s).actions (lead v) := by
+        have hsend :
+            Action.send (Msg.propose (lead v) b) (lead v) ∈ (instrs s).actions (lead v) := by
           rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
           apply List.mem_append_left
           simp only [Algo.innerActs, List.mem_append]
@@ -615,7 +616,7 @@ theorem no_timeout_nullify :
     rw [Algo.st2_view, hst1]; exact hview
   have hbLv := leaderBlockAt_view hinit hh hb hs R
   have huniq : ∀ b', b'.view = (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view →
-      Msg.block (lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view) b'
+      Msg.propose (lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view) b'
         ∈ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S →
       b' = leaderBlockAt f lead s₀ instrs v e := by
     intro b' hb'v hb'
@@ -629,7 +630,7 @@ theorem no_timeout_nullify :
       have hP :
           Algo.PropInv (lead v) (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))) :=
         (propInv_run hinit hh hr s).climb (f := f) _
-      have hmem : Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)
+      have hmem : Msg.propose (lead v) (leaderBlockAt f lead s₀ instrs v e)
           ∈ (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))).S :=
         Algo.S_subset_st1 f (lead v) _ (leader_block_delivered hinit hh hb hs R (by omega))
       have hflag := hP.prop_flag _ hmem (by rw [hst1]; exact hbLv.trans hview.symm)
@@ -806,7 +807,7 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
     left; left; left; left
     exact hm
   have huniq : ∀ b', b'.view = (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view →
-      Msg.block (lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view) b'
+      Msg.propose (lead (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).view) b'
         ∈ (Algo.st2 f lead r ((State.run s₀ instrs s).procs r)).S →
       b' = leaderBlockAt f lead s₀ instrs v e := by
     intro b' hb'v hb'
@@ -821,7 +822,7 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
       have hP :
           Algo.PropInv (lead v) (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))) :=
         (propInv_run hinit hh hr s).climb (f := f) _
-      have hmem : Msg.block (lead v) (leaderBlockAt f lead s₀ instrs v e)
+      have hmem : Msg.propose (lead v) (leaderBlockAt f lead s₀ instrs v e)
           ∈ (Algo.st1 f (lead v) ((State.run s₀ instrs s).procs (lead v))).S :=
         hst1S (leader_block_delivered hinit hh hb hs R hT)
       have hflag := hP.prop_flag _ hmem (hbLv.trans hst1v.symm)

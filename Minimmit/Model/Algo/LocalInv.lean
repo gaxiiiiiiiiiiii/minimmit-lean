@@ -481,11 +481,11 @@ end LocalInv
 /-- S にある自分の署名付きブロックと、view・proposed の関係 -/
 structure PropInv (i : Fin n) (p : Processor n Tx) : Prop where
   /-- 自分のブロックの view は現在の view 以下。 -/
-  prop_view : ∀ b, Msg.block i b ∈ p.S → b.view.val ≤ p.view.val
+  prop_view : ∀ b, Msg.propose i b ∈ p.S → b.view.val ≤ p.view.val
   /-- 現在の view の自分のブロックが S にあれば proposed。 -/
-  prop_flag : ∀ b, Msg.block i b ∈ p.S → b.view = p.view → p.proposed = true
+  prop_flag : ∀ b, Msg.propose i b ∈ p.S → b.view = p.view → p.proposed = true
   /-- S にある自分のブロックで view が同じものは一致する。 -/
-  prop_unique : ∀ b b', Msg.block i b ∈ p.S → Msg.block i b' ∈ p.S → b.view = b'.view → b = b'
+  prop_unique : ∀ b b', Msg.propose i b ∈ p.S → Msg.propose i b' ∈ p.S → b.view = b'.view → b = b'
 
 namespace PropInv
 
@@ -493,7 +493,7 @@ variable {f : Nat} {i : Fin n} {p : Processor n Tx}
 
 omit [DecidableEq Tx] in
 theorem of_grow (h : PropInv i p) {q : Processor n Tx} (hv : q.view = p.view)
-    (hp : q.proposed = p.proposed) (hblock : ∀ b, Msg.block i b ∈ q.S → Msg.block i b ∈ p.S) :
+    (hp : q.proposed = p.proposed) (hblock : ∀ b, Msg.propose i b ∈ q.S → Msg.propose i b ∈ p.S) :
     PropInv i q := by
   refine ⟨?_, ?_, ?_⟩
   · intro b hb; rw [hv]; exact h.prop_view b (hblock b hb)
@@ -502,7 +502,7 @@ theorem of_grow (h : PropInv i p) {q : Processor n Tx} (hv : q.view = p.view)
 
 omit [DecidableEq Tx] in
 theorem of_sgrows (h : PropInv i p) {q : Processor n Tx} (hg : p.SGrows q)
-    (hblock : ∀ b, Msg.block i b ∈ q.S → Msg.block i b ∈ p.S) : PropInv i q :=
+    (hblock : ∀ b, Msg.propose i b ∈ q.S → Msg.propose i b ∈ p.S) : PropInv i q :=
   h.of_grow hg.view hg.proposed hblock
 
 omit [DecidableEq Tx] in
@@ -520,10 +520,10 @@ theorem progress (h : PropInv i p) : PropInv i p.progress := by
     simp only [Processor.progress] at this
     omega
 
-theorem send_of_not_block (h : PropInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.block i b)
+theorem send_of_not_propose (h : PropInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.propose i b)
     (j : Fin n) : PropInv i (p.send i m j) := by
   refine h.of_grow (Processor.send_view i p m j)
-    (Processor.send_proposed_of_not_block i p m j fun b hb => absurd hb (hm b)) fun b hb => ?_
+    (Processor.send_proposed_of_not_propose i p m j fun b hb => absurd hb (hm b)) fun b hb => ?_
   exact (PreInv.mem_S_send_iff_of_ne i p j fun h' => hm b h'.symm).mp hb
 
 theorem send_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n) :
@@ -535,23 +535,23 @@ theorem send_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n
   · intro b hb hbv
     rw [hS] at hb; rw [Processor.send_view] at hbv
     have := h.prop_flag b hb hbv
-    by_cases hmb : ∃ b', m = Msg.block i b'
+    by_cases hmb : ∃ b', m = Msg.propose i b'
     · obtain ⟨b', rfl⟩ := hmb
-      rw [Processor.send_block_proposed]
+      rw [Processor.send_propose_proposed]
       split_ifs
       · rfl
       · exact this
-    · rw [Processor.send_proposed_of_not_block i p m j fun b' hb' => absurd ⟨b', hb'⟩ hmb]
+    · rw [Processor.send_proposed_of_not_propose i p m j fun b' hb' => absurd ⟨b', hb'⟩ hmb]
       exact this
   · intro b b' hb hb'; rw [hS] at hb hb'; exact h.prop_unique b b' hb hb'
 
 /-- 同じ view の自分のブロックが S にそれしかなければ、現在の view のブロックを送っても
     保たれる。 -/
-theorem send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
-    (huniq : ∀ b', Msg.block i b' ∈ p.S → b'.view = p.view → b' = b) (j : Fin n) :
-    PropInv i (p.send i (Msg.block i b) j) := by
-  have hS : ∀ b', Msg.block i b' ∈ (p.send i (Msg.block i b) j).S →
-      b' = b ∨ Msg.block i b' ∈ p.S := by
+theorem send_propose (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
+    (huniq : ∀ b', Msg.propose i b' ∈ p.S → b'.view = p.view → b' = b) (j : Fin n) :
+    PropInv i (p.send i (Msg.propose i b) j) := by
+  have hS : ∀ b', Msg.propose i b' ∈ (p.send i (Msg.propose i b) j).S →
+      b' = b ∨ Msg.propose i b' ∈ p.S := by
     intro b' hb'
     rw [Processor.send_S] at hb'
     split_ifs at hb'
@@ -559,7 +559,7 @@ theorem send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
       · exact Or.inl (by cases hb'; rfl)
       · exact Or.inr hb'
     · exact Or.inr hb'
-  have hview := Processor.send_view i p (Msg.block i b) j
+  have hview := Processor.send_view i p (Msg.propose i b) j
   refine ⟨?_, ?_, ?_⟩
   · intro b' hb'
     rw [hview]
@@ -567,7 +567,7 @@ theorem send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
     · rw [hb]
     · exact h.prop_view b' hb'
   · intro b' _ _
-    rw [Processor.send_block_proposed, if_pos hb]
+    rw [Processor.send_propose_proposed, if_pos hb]
   · intro b' b'' hb' hb'' hvv
     rcases hS b' hb' with rfl | hb₁ <;> rcases hS b'' hb'' with rfl | hb₂
     · rfl
@@ -575,11 +575,11 @@ theorem send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
     · exact huniq b' hb₁ (hvv.trans hb)
     · exact h.prop_unique b' b'' hb₁ hb₂ hvv
 
-theorem foldl_send_of_not_block (h : PropInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.block i b)
+theorem foldl_send_of_not_propose (h : PropInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.propose i b)
     (l : List (Fin n)) : PropInv i (l.foldl (fun p j => p.send i m j) p) := by
   induction l generalizing p with
   | nil => exact h
-  | cons j l ih => exact ih (h.send_of_not_block hm j)
+  | cons j l ih => exact ih (h.send_of_not_propose hm j)
 
 theorem foldl_send_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (l : List (Fin n)) :
     PropInv i (l.foldl (fun p j => p.send i m j) p) := by
@@ -587,13 +587,13 @@ theorem foldl_send_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) (l :
   | nil => exact h
   | cons j l ih => exact ih (h.send_of_mem hm j) (Processor.S_subset_send i p m j hm)
 
-theorem foldl_send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
-    (huniq : ∀ b', Msg.block i b' ∈ p.S → b'.view = p.view → b' = b) (l : List (Fin n)) :
-    PropInv i (l.foldl (fun p j => p.send i (Msg.block i b) j) p) := by
+theorem foldl_send_propose (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
+    (huniq : ∀ b', Msg.propose i b' ∈ p.S → b'.view = p.view → b' = b) (l : List (Fin n)) :
+    PropInv i (l.foldl (fun p j => p.send i (Msg.propose i b) j) p) := by
   induction l generalizing p with
   | nil => exact h
   | cons j l ih =>
-    refine ih (h.send_block hb huniq j) (by rw [Processor.send_view]; exact hb) ?_
+    refine ih (h.send_propose hb huniq j) (by rw [Processor.send_view]; exact hb) ?_
     intro b' hb' hbv
     rw [Processor.send_view] at hbv
     rw [Processor.send_S] at hb'
@@ -603,19 +603,20 @@ theorem foldl_send_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
       · exact huniq b' hb' hbv
     · exact huniq b' hb' hbv
 
-theorem disseminate_of_not_block (h : PropInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.block i b) :
+theorem disseminate_of_not_propose (h : PropInv i p) {m : Msg n Tx} (hm : ∀ b, m ≠ Msg.propose i b)
+    :
     PropInv i (disseminate i p m).1 := by
-  rw [disseminate_fst]; exact h.foldl_send_of_not_block hm _
+  rw [disseminate_fst]; exact h.foldl_send_of_not_propose hm _
 
 theorem disseminate_of_mem (h : PropInv i p) {m : Msg n Tx} (hm : m ∈ p.S) :
     PropInv i (disseminate i p m).1 := by
   rw [disseminate_fst]; exact h.foldl_send_of_mem hm _
 
 /-- まだ提案していなければ、現在の view のブロックを全員へ送っても保たれる。 -/
-theorem disseminate_block (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
-    (hp : p.proposed = false) : PropInv i (disseminate i p (Msg.block i b)).1 := by
+theorem disseminate_propose (h : PropInv i p) {b : Block Tx} (hb : b.view = p.view)
+    (hp : p.proposed = false) : PropInv i (disseminate i p (Msg.propose i b)).1 := by
   rw [disseminate_fst]
-  refine h.foldl_send_block hb (fun b' hb' hbv => ?_) _
+  refine h.foldl_send_propose hb (fun b' hb' hbv => ?_) _
   have := h.prop_flag b' hb' hbv
   rw [hp] at this; cases this
 
@@ -635,7 +636,7 @@ theorem forwardNew (h : PropInv i p) : PropInv i (forwardNew f i p).1 := by
 theorem propose (h : PropInv i p) (lead : View → Fin n) : PropInv i (propose f lead i p).1 := by
   unfold Algo.propose
   split_ifs with hg
-  · exact h.disseminate_block rfl hg.2
+  · exact h.disseminate_propose rfl hg.2
   · exact h
 
 theorem voteProposal (h : PropInv i p) (lead : View → Fin n) :
@@ -645,14 +646,14 @@ theorem voteProposal (h : PropInv i p) (lead : View → Fin n) :
   · exact h
   · simp only
     split_ifs
-    · exact h.disseminate_of_not_block fun _ h => by cases h
+    · exact h.disseminate_of_not_propose fun _ h => by cases h
     · exact h
   · exact h
 
 theorem nullifyTimeout (h : PropInv i p) (Δ : Nat) : PropInv i (nullifyTimeout Δ i p).1 := by
   unfold Algo.nullifyTimeout
   split_ifs
-  · exact h.disseminate_of_not_block fun _ h => by cases h
+  · exact h.disseminate_of_not_propose fun _ h => by cases h
   · exact h
 
 theorem advanceM (h : PropInv i p) : PropInv i (advanceM f i p).1 := by
@@ -661,7 +662,7 @@ theorem advanceM (h : PropInv i p) : PropInv i (advanceM f i p).1 := by
   · exact h
   · simp only
     split_ifs
-    · exact (h.disseminate_of_not_block fun _ h => by cases h).progress
+    · exact (h.disseminate_of_not_propose fun _ h => by cases h).progress
     · exact h.progress
 
 theorem advanceOnce (h : PropInv i p) : PropInv i (advanceOnce f i p).1 := by
@@ -680,7 +681,7 @@ theorem climb (h : PropInv i p) (fuel : Nat) : PropInv i (climb f i fuel p).1 :=
 theorem nullifyNoProgress (h : PropInv i p) : PropInv i (nullifyNoProgress f i p).1 := by
   unfold Algo.nullifyNoProgress
   split_ifs
-  · exact h.disseminate_of_not_block fun _ h => by cases h
+  · exact h.disseminate_of_not_propose fun _ h => by cases h
   · exact h
 
 /-- Algorithm 1 の 1 スロット分の動作は不変量を保つ。 -/

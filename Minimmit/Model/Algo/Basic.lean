@@ -86,7 +86,7 @@ noncomputable def votedBlocks (S : Finset (Msg n Tx)) : List (Block Tx) :=
 noncomputable def proposals (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View) :
     List (Block Tx) :=
   (S.toList.filterMap fun m => match m with
-    | .block q b => if q = lead v ∧ b.view = v then some b else none
+    | .propose q b => if q = lead v ∧ b.view = v then some b else none
     | _ => none).dedup
 
 /-- S にある、M-notarisation を持つ view v のブロックを重複なく列挙する。 -/
@@ -196,7 +196,7 @@ noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
   let r₂ :=
     if lead p.view = i ∧ p.proposed = false then
       let parent := selectParent f p.S p.view
-      disseminate i p (.block i (.node p.view (payload p.S parent) parent))
+      disseminate i p (.propose i (.node p.view (payload p.S parent) parent))
     else (p, [])
   let p := r₂.1
   -- 9〜11 行

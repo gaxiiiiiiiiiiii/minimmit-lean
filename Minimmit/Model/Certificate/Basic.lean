@@ -61,9 +61,9 @@ structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)
   /-- (i) b は view v のブロック。 -/
   view : b.view = v
   /-- (i) b は lead(v) の署名付きで S にある。 -/
-  signed : Msg.block (lead v) b ∈ S
+  signed : Msg.propose (lead v) b ∈ S
   /-- (i) lead(v) の署名付きの view v のブロックは S に b しかない。 -/
-  unique : ∀ b', b'.view = v → Msg.block (lead v) b' ∈ S → b' = b
+  unique : ∀ b', b'.view = v → Msg.propose (lead v) b' ∈ S → b' = b
   /-- b は genesis でなく、親を持つ。 -/
   ne_gen : b ≠ .gen
   /-- (ii) 親の M-notarisation -/

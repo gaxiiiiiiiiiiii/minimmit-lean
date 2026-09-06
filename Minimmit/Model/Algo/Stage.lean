@@ -61,7 +61,7 @@ noncomputable def propose (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
     Processor n Tx × List (Action n Tx) :=
   if lead p.view = i ∧ p.proposed = false then
     let parent := selectParent f p.S p.view
-    disseminate i p (.block i (.node p.view (payload p.S parent) parent))
+    disseminate i p (.propose i (.node p.view (payload p.S parent) parent))
   else (p, [])
 
 open Classical in

@@ -23,7 +23,7 @@ theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hs : PartialSync Δ GST s₀ instrs) {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∃ b : Block Tx, b.view = v
-      ∧ (∃ t', ∀ j, Action.send (.block (lead v) b) j ∈ (instrs t').actions (lead v))
+      ∧ (∃ t', ∀ j, Action.send (.propose (lead v) b) j ∈ (instrs t').actions (lead v))
       ∧ ReceivesL f instrs b := by
   obtain ⟨e, R⟩ := leader_round hinit hh hs (le_refl Δ) hv hi hfirst hgst
   refine ⟨leaderBlockAt f lead s₀ instrs v e, leaderBlockAt_view hinit hh hb hs R,

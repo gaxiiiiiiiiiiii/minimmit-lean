@@ -145,18 +145,18 @@ theorem send_nullify_nullified (i : Fin n) (p : Processor n Tx) (v : View) (j : 
   split_ifs <;> rfl
 
 /-- 自分の現在の view のブロックでなければ proposed は変わらない。 -/
-theorem send_proposed_of_not_block (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
-    (h : ∀ b, m = .block i b → b.view ≠ p.view) : (p.send i m j).proposed = p.proposed := by
+theorem send_proposed_of_not_propose (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
+    (h : ∀ b, m = .propose i b → b.view ≠ p.view) : (p.send i m j).proposed = p.proposed := by
   cases m with
-  | block q b =>
+  | propose q b =>
     simp only [send]
     have : ¬ (q = i ∧ b.view = p.view) := fun ⟨hq, hb⟩ => h b (by rw [hq]) hb
     simp only [this, if_false]
     split_ifs <;> rfl
   | _ => simp only [send]; split_ifs <;> rfl
 
-theorem send_block_proposed (i : Fin n) (p : Processor n Tx) (b : Block Tx) (j : Fin n) :
-    (p.send i (.block i b) j).proposed = if b.view = p.view then true else p.proposed := by
+theorem send_propose_proposed (i : Fin n) (p : Processor n Tx) (b : Block Tx) (j : Fin n) :
+    (p.send i (.propose i b) j).proposed = if b.view = p.view then true else p.proposed := by
   simp only [send, true_and]
   split_ifs <;> rfl
 

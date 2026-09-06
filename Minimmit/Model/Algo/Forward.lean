@@ -16,8 +16,8 @@ namespace Algo
 /-! #### 転送と反応のための補題 -/
 
 /-- 転送はブロックを送らない。 -/
-theorem not_block_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block Tx} :
-    Msg.block q b ∉ forwardMsgs f p := by
+theorem not_propose_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block Tx} :
+    Msg.propose q b ∉ forwardMsgs f p := by
   simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter, List.mem_map,
     Finset.mem_toList, decide_eq_true_eq]
   rintro ((⟨v, _, q', _, hq⟩ | ⟨b', _, q', _, hq⟩) | ⟨_, h⟩)
@@ -212,8 +212,8 @@ theorem selectParent_max (f : Nat) (S : Finset (Msg n Tx)) (v : View) {b : Block
 
 /-- lead(v) の署名付きの view v のブロックが S に b しかなければ、`proposals` は [b]。 -/
 theorem proposals_eq_singleton {lead : View → Fin n} {S : Finset (Msg n Tx)} {v : View}
-    {b : Block Tx} (hb : Msg.block (lead v) b ∈ S) (hbv : b.view = v)
-    (huniq : ∀ b', b'.view = v → Msg.block (lead v) b' ∈ S → b' = b) :
+    {b : Block Tx} (hb : Msg.propose (lead v) b ∈ S) (hbv : b.view = v)
+    (huniq : ∀ b', b'.view = v → Msg.propose (lead v) b' ∈ S → b' = b) :
     proposals lead S v = [b] := by
   have hmem : ∀ b', b' ∈ proposals lead S v ↔ b' = b := by
     intro b'
@@ -221,7 +221,7 @@ theorem proposals_eq_singleton {lead : View → Fin n} {S : Finset (Msg n Tx)} {
     constructor
     · rintro ⟨m, hm, hmb⟩
       cases m with
-      | block q b'' =>
+      | propose q b'' =>
         simp only at hmb
         split_ifs at hmb with hq
         obtain rfl := Option.some.inj hmb
@@ -231,7 +231,7 @@ theorem proposals_eq_singleton {lead : View → Fin n} {S : Finset (Msg n Tx)} {
       | tx tr => simp at hmb
     · intro hb'
       rw [hb']
-      exact ⟨Msg.block (lead v) b, hb, by simp [hbv]⟩
+      exact ⟨Msg.propose (lead v) b, hb, by simp [hbv]⟩
   have hnd : (proposals lead S v).Nodup := List.nodup_dedup _
   rcases hl : proposals lead S v with _ | ⟨x, _ | ⟨y, l⟩⟩
   · exact absurd ((hmem b).mpr rfl) (by rw [hl]; simp)

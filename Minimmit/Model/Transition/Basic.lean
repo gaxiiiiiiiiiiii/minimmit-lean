@@ -16,6 +16,10 @@ import Mathlib.Data.Finset.Card
   親はハッシュ参照で、祖先が届くことは Lemma 5.7 と 5.10 の証明が「各祖先は M-notarisation
   を受けるので f + 1 人の正直者が転送する」ことから別に導く。形式化ではこの議論が要らず、
   `liveness`・`optimistic_responsiveness` の結論 tr ∈ b.trStar は b が S に入った時点で成り立つ。
+- ブロックの署名はブロックでなく message `Msg.propose` に付く。論文はブロック自体が lead(v) の
+  署名付きで、票に埋め込まれたブロックも署名を運ぶ。valid proposal の (i) は `Msg.propose` が
+  S にあることで判定するので、論文より厳しい。§5 の証明は提案が全員に届くことを使うので、
+  結論は変わらない。
 - `Block.trStar` は祖先の取引列を連結するだけで、論文の Tr* と違い重複を除去しない。
   Lemma 5.7 の結論 tr ∈ Tr* は重複の有無に依らない。
 - `State.step` は 1 スロットの中の原始関数を 動作 → tick → 配送 → 取引 → 腐敗 の順に
@@ -77,7 +81,7 @@ inductive Block.Ancestor : Block Tx → Block Tx → Prop where
     message に付くので、票に埋め込まれた b は lead(v) の署名を運ばない。取引（§2）は
     環境の署名を持たず、Tx 型の値はすべて取引として扱う。 -/
 inductive Msg (n : Nat) (Tx : Type) : Type where
-  | block (q : Fin n) (b : Block Tx) : Msg n Tx
+  | propose (q : Fin n) (b : Block Tx) : Msg n Tx
   | vote (q : Fin n) (b : Block Tx) : Msg n Tx
   | nullify (q : Fin n) (v : View) : Msg n Tx
   | tx (tr : Tx) : Msg n Tx
@@ -85,14 +89,14 @@ deriving DecidableEq
 
 /-- 署名者、プロセッサの署名を持たない取引では none -/
 def Msg.signer : Msg n Tx → Option (Fin n)
-  | .block q _   => some q
+  | .propose q _   => some q
   | .vote q _    => some q
   | .nullify q _ => some q
   | .tx _        => none
 
 /-- message が言及する view、取引では 0 -/
 def Msg.view : Msg n Tx → View
-  | .block _ b   => b.view
+  | .propose _ b   => b.view
   | .vote _ b    => b.view
   | .nullify _ v => v
   | .tx _        => ⟨0⟩
@@ -146,7 +150,7 @@ def receive [DecidableEq Tx] (p : Processor n Tx) (m : Msg n Tx) : Processor n T
 def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
     Processor n Tx :=
   let p := match m with
-    | .block q b   => if q = i ∧ b.view = p.view then { p with proposed := true } else p
+    | .propose q b   => if q = i ∧ b.view = p.view then { p with proposed := true } else p
     | .vote q b    => if q = i ∧ b.view = p.view then { p with notarised := some b } else p
     | .nullify q v => if q = i ∧ v = p.view then { p with nullified := true } else p
     | .tx _        => p

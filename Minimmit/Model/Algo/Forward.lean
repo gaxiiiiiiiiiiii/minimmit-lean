@@ -18,30 +18,34 @@ namespace Algo
 /-- 転送はブロックを送らない。 -/
 theorem not_block_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block Tx} :
     Msg.block q b ∉ forwardMsgs f p := by
-  simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter, Finset.mem_toList,
-    decide_eq_true_eq]
-  rintro ((⟨v, _, _, q', hq⟩ | ⟨b', _, _, q', hq⟩) | ⟨_, h⟩)
+  simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter, List.mem_map,
+    Finset.mem_toList, decide_eq_true_eq]
+  rintro ((⟨v, _, q', _, hq⟩ | ⟨b', _, q', _, hq⟩) | ⟨_, h⟩)
   · cases hq
   · cases hq
   · simp at h
 
-/-- 新しい nullification を構成する nullify は転送される。 -/
+/-- 新しい nullification の、番号の小さい順 2f + 1 人の nullify は転送される。 -/
 theorem mem_forwardMsgs_nullify {f : Nat} {p : Processor n Tx} {q : Fin n} {v : View}
-    (h1 : Nullified f p.S v) (h2 : ¬ Nullified f p.prevS v) (hm : Msg.nullify q v ∈ p.S) :
+    (h1 : Nullified f p.S v) (h2 : ¬ Nullified f p.prevS v) (hq : q ∈ leastNullifiers f p.S v) :
     Msg.nullify q v ∈ forwardMsgs f p := by
+  have hm : Msg.nullify q v ∈ p.S := (Finset.mem_filter.mp (leastNullifiers_subset f _ _ hq)).2
   simp only [forwardMsgs, List.mem_append]
   left; left
-  simp only [List.mem_flatMap, List.mem_filter, Finset.mem_toList, decide_eq_true_eq]
-  exact ⟨v, ⟨mem_nullifyViews hm, h1, h2⟩, hm, q, rfl⟩
+  simp only [List.mem_flatMap, List.mem_filter, List.mem_map, Finset.mem_toList,
+    decide_eq_true_eq]
+  exact ⟨v, ⟨mem_nullifyViews hm, h1, h2⟩, q, hq, rfl⟩
 
-/-- 新しい M-notarisation を構成する票は転送される。 -/
+/-- 新しい M-notarisation の、番号の小さい順 2f + 1 人の票は転送される。 -/
 theorem mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block Tx}
-    (h1 : MNotarised f p.S b) (h2 : ¬ MNotarised f p.prevS b) (hm : Msg.vote q b ∈ p.S) :
+    (h1 : MNotarised f p.S b) (h2 : ¬ MNotarised f p.prevS b) (hq : q ∈ leastVoters f p.S b) :
     Msg.vote q b ∈ forwardMsgs f p := by
+  have hm : Msg.vote q b ∈ p.S := (Finset.mem_filter.mp (leastVoters_subset f _ _ hq)).2
   simp only [forwardMsgs, List.mem_append]
   left; right
-  simp only [List.mem_flatMap, List.mem_filter, Finset.mem_toList, decide_eq_true_eq]
-  exact ⟨b, ⟨mem_votedBlocks hm, h1, h2⟩, hm, q, rfl⟩
+  simp only [List.mem_flatMap, List.mem_filter, List.mem_map, Finset.mem_toList,
+    decide_eq_true_eq]
+  exact ⟨b, ⟨mem_votedBlocks hm, h1, h2⟩, q, hq, rfl⟩
 
 /-- 新しい取引は転送される。 -/
 theorem mem_forwardMsgs_tx {f : Nat} {p : Processor n Tx} {tr : Tx} (h : Msg.tx tr ∈ p.S)

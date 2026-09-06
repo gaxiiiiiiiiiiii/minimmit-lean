@@ -22,18 +22,39 @@ noncomputable def forwardMsgs (f : Nat) (p : Processor n Tx) : List (Msg n Tx) :
     decide (Nullified f p.S v ∧ ¬ Nullified f p.prevS v)
   let notas := (votedBlocks p.S).filter fun b =>
     decide (MNotarised f p.S b ∧ ¬ MNotarised f p.prevS b)
-  (nulls.flatMap fun v => p.S.toList.filter fun m => decide (∃ q, m = Msg.nullify q v))
-  ++ (notas.flatMap fun b => p.S.toList.filter fun m => decide (∃ q, m = Msg.vote q b))
+  (nulls.flatMap fun v => (leastNullifiers f p.S v).toList.map fun q => Msg.nullify q v)
+  ++ (notas.flatMap fun b => (leastVoters f p.S b).toList.map fun q => Msg.vote q b)
   ++ (p.S.toList.filter fun m => match m with | .tx _ => decide (m ∉ p.prevS) | _ => false)
 
 theorem forwardNew_eq (f : Nat) (i : Fin n) (p : Processor n Tx) :
     forwardNew f i p = disseminateAll i p (forwardMsgs f p) := rfl
 
+theorem leastNullifiers_subset (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
+    leastNullifiers f S v ⊆ nullifiers S v := fun _ hq =>
+  (Finset.mem_sort _).mp (List.mem_of_mem_take (List.mem_toFinset.mp hq))
+
+theorem leastVoters_subset (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) :
+    leastVoters f S b ⊆ voters S b := fun _ hq =>
+  (Finset.mem_sort _).mp (List.mem_of_mem_take (List.mem_toFinset.mp hq))
+
+theorem card_leastNullifiers {f : Nat} {S : Finset (Msg n Tx)} {v : View} (h : Nullified f S v) :
+    (leastNullifiers f S v).card = 2 * f + 1 := by
+  rw [leastNullifiers, List.toFinset_card_of_nodup ((Finset.sort_nodup _ _).sublist
+    (List.take_sublist _ _)), List.length_take, Finset.length_sort, Nat.min_eq_left h]
+
+theorem card_leastVoters {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx}
+    (h : 2 * f + 1 ≤ (voters S b).card) : (leastVoters f S b).card = 2 * f + 1 := by
+  rw [leastVoters, List.toFinset_card_of_nodup ((Finset.sort_nodup _ _).sublist
+    (List.take_sublist _ _)), List.length_take, Finset.length_sort, Nat.min_eq_left h]
+
 theorem mem_S_of_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {m : Msg n Tx}
     (h : m ∈ forwardMsgs f p) : m ∈ p.S := by
-  simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter,
+  simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter, List.mem_map,
     Finset.mem_toList] at h
-  rcases h with (⟨_, _, hm, _⟩ | ⟨_, _, hm, _⟩) | ⟨hm, _⟩ <;> exact hm
+  rcases h with (⟨v, _, q, hq, rfl⟩ | ⟨b, _, q, hq, rfl⟩) | ⟨hm, _⟩
+  · exact (Finset.mem_filter.mp (leastNullifiers_subset f _ _ hq)).2
+  · exact (Finset.mem_filter.mp (leastVoters_subset f _ _ hq)).2
+  · exact hm
 
 /-- 5〜7 行 -/
 noncomputable def propose (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :

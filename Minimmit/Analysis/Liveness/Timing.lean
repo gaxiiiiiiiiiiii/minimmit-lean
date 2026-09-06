@@ -248,18 +248,18 @@ theorem prevS_zero (hinit : Init s₀) (i : Fin n) : ((State.run s₀ instrs 0).
   rw [State.run, hinit.procs i]; rfl
 
 /-- 正直者が動作を終えた時点の S に nullification を持つなら、それが初めて完成した
-    スロット t' ≤ t に、その構成 nullify を全員へ送っている。 -/
+    スロット t' ≤ t に、番号の小さい順 2f + 1 人の nullify を全員へ送っている。 -/
 theorem forward_nullification_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (ht : Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S v) :
     ∃ t' ≤ t, Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v
-      ∧ ∀ q ∈ nullifiers (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
+      ∧ ∀ q ∈ Algo.leastNullifiers f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v,
+        ∀ j,
         Action.send (Msg.nullify q v) j ∈ (instrs t').actions i := by
   classical
   have hex :
       ∃ t', Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
-  rw [mem_nullifiers] at hq
   have hnew : ¬ Nullified f (Algo.st5 f Δ lead i
       ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS v := by
     rw [Algo.st5_prevS]
@@ -274,12 +274,13 @@ theorem forward_nullification_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     (Algo.mem_forwardMsgs_nullify (Nat.find_spec hex) hnew hq) j
 
 /-- 正直者が nullification を持つなら、その動作を終えた時点の S で初めてそれが完成した
-    スロット t' ≤ t に、その構成 nullify を全員へ送っている。 -/
+    スロット t' ≤ t に、番号の小さい順 2f + 1 人の nullify を全員へ送っている。 -/
 theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {v : View}
     (h : Nullified f ((State.run s₀ instrs t).procs i).S v) :
     ∃ t' ≤ t, Nullified f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v
-      ∧ ∀ q ∈ nullifiers (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v, ∀ j,
+      ∧ ∀ q ∈ Algo.leastNullifiers f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S v,
+        ∀ j,
         Action.send (Msg.nullify q v) j ∈ (instrs t').actions i :=
   forward_nullification_end hinit hh hi (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
@@ -287,13 +288,13 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
     (ht : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
-      ∧ ∀ q ∈ voters (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
+      ∧ ∀ q ∈ Algo.leastVoters f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b,
+        ∀ j,
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i := by
   classical
   have hex :
       ∃ t', MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b := ⟨t, ht⟩
   refine ⟨Nat.find hex, Nat.find_min' hex ht, Nat.find_spec hex, fun q hq j => ?_⟩
-  rw [mem_voters] at hq
   have hnew : ¬ MNotarised f (Algo.st5 f Δ lead i
       ((State.run s₀ instrs (Nat.find hex)).procs i)).prevS b := by
     rw [Algo.st5_prevS]
@@ -311,12 +312,13 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     (Algo.mem_forwardMsgs_vote (Nat.find_spec hex) hnew hq) j
 
 /-- 正直者が genesis でないブロックの M-notarisation を持つなら、その動作を終えた時点の S で
-    初めてそれが完成したスロットに、その構成の票を全員へ送っている。 -/
+    初めてそれが完成したスロットに、番号の小さい順 2f + 1 人の票を全員へ送っている。 -/
 theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
-      ∧ ∀ q ∈ voters (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b, ∀ j,
+      ∧ ∀ q ∈ Algo.leastVoters f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b,
+        ∀ j,
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i :=
   forward_mnotarisation_end hinit hh hi hg (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
@@ -327,7 +329,7 @@ theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (h : Nullified f ((State.run s₀ instrs t).procs i).S v) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max GST.val t + δ ≤ T) : Nullified f ((State.run s₀ instrs T).procs j).S v := by
   obtain ⟨t', ht', hn', hsend⟩ := forward_nullification hinit hh hi h
-  refine hn'.trans (Finset.card_le_card fun q hq => ?_)
+  refine (Algo.card_leastNullifiers hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_nullifiers]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
@@ -343,7 +345,7 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   rcases hn' with h' | hn'
   · exact Or.inl h'
   right
-  refine hn'.trans (Finset.card_le_card fun q hq => ?_)
+  refine (Algo.card_leastVoters hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
@@ -355,7 +357,7 @@ theorem nullified_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs
     (hT₁ : t + 1 ≤ T) (hT₂ : max GST.val t + δ ≤ T) :
     Nullified f ((State.run s₀ instrs T).procs j).S v := by
   obtain ⟨t', ht', hn', hsend⟩ := forward_nullification_end hinit hh hi h
-  refine hn'.trans (Finset.card_le_card fun q hq => ?_)
+  refine (Algo.card_leastNullifiers hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_nullifiers]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)
@@ -372,7 +374,7 @@ theorem mnotarised_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
   rcases hn' with h' | hn'
   · exact Or.inl h'
   right
-  refine hn'.trans (Finset.card_le_card fun q hq => ?_)
+  refine (Algo.card_leastVoters hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
     ((Nat.add_le_add_right (max_le_max (le_refl _) ht') δ).trans hT₂)

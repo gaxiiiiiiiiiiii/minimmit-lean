@@ -1,6 +1,7 @@
 import Minimmit.Model.Certificate.Basic
 import Mathlib.Data.List.MinMax
 import Mathlib.Data.Finset.Lattice.Fold
+import Mathlib.Data.Finset.Sort
 
 /-!
 # Algorithm 1
@@ -20,7 +21,9 @@ Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`
   偽にならず、ずれは定数だが、証明の時間計算は書いてあるとおりには通らない。この評価順では
   通る。行順は擬似コードにしかなく、§3 の地の文は「Upon entering view v, p_i finds the
   greatest v′ < v …」「proceeds to view v + 1 immediately upon seeing an M-notarisation」と
-  事象駆動で、この評価順はその順に当たる。
+  条件が成立した時点で処理する書き方で、この評価順はその順に当たる。Commonware の実装仕様
+  （docs/differences.md の参考）も、
+  リーダーは view に入った時点で提案する。
 - 登り切り。16〜21 行は `climb` で、現在の view の証明書がある限り繰り返す。論文の
   Lemma 5.6 の証明と付録の Lemma E.6 は「最初の正直者が t に view v に入れば、全正直者は
   t + Δ までに v に入る」と主張するが、1 回評価では 1 スロットに高々 2 view しか進めず、
@@ -30,12 +33,8 @@ Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`
   登れば別の規則なしに満たされる。通過した view の M-notarised ブロックへ投票する規則は、
   `advanceOnce` が通過する各 view で 19〜20 行を評価することに当たる。リーダーが提案前に
   親の M-notarisation と間の view の nullification を待つ規則は、順に登れば view v に入った
-  時点で揃っている（`leader_parent_mnotarised_all`・`leader_gaps_nullified_all`）。
-- 転送。2〜3 行の転送 `forwardNew` は、新しい証明書を構成する message を S にある分すべて
-  送る。論文は辞書順最小の 2f + 1 個を 1 組選ぶ。§5 の証明が転送に使うのは「新しい証明書を
-  受け取った正直者は全員へ送る」ことだけで、すべて送っても各宛先が受け取る集合は論文の
-  上位集合になる。差が出るのは通信量で、これは形式化していない。§6.4 が閾値署名で証明書を
-  1 つの署名にまとめると、どの票を送るかの差は消える。
+  時点で揃っている（`leader_parent_mnotarised_all`・`leader_gaps_nullified_all`）。Commonware の
+  実装仕様は `enter_view` で現在より大きい view へ直接移り、§6.1 の飛ばす形をとる。
 - 同点の選択。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、S を `Finset.toList` で
   並べた順で先のものを取る。論文の証明は選択の仕方を使わないので、この選択はその一例。
 - finalise。31〜32 行の Finalise は動作を伴わないので `step` に無く、finalise したことは
@@ -153,11 +152,22 @@ noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
 
 /-! ### 2〜3 行と §4 の取引転送 -/
 
+/-- S にある nullify(v) の署名者のうち、番号の小さい順に 2f + 1 人。論文の「辞書順最小の
+    nullification」の署名者。`Nullified f S v` ならちょうど 2f + 1 人。 -/
+def leastNullifiers (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
+  (((nullifiers S v).sort (· ≤ ·)).take (2 * f + 1)).toFinset
+
+/-- S にある b への票の署名者のうち、番号の小さい順に 2f + 1 人。論文の「辞書順最小の
+    M-notarisation」の署名者。 -/
+def leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Finset (Fin n) :=
+  (((voters S b).sort (· ≤ ·)).take (2 * f + 1)).toFinset
+
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
     取引（§4 本文）。「新しい」とは、S にあって prevS にないこと。スロットの最後に評価する
     ので、このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
     その証明書での view 前進は、16〜21 行をスロットの最初に評価するので次のスロット。
-    証明書は、それを構成する message を S にある分だけ全部送る。 -/
+    証明書は、署名者の番号が小さい順に 2f + 1 人分の message を送る。論文の辞書順最小の組に
+    当たる。 -/
 noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   let nulls := (nullifyViews p.S).filter fun v =>
@@ -165,8 +175,8 @@ noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
   let notas := (votedBlocks p.S).filter fun b =>
     decide (MNotarised f p.S b ∧ ¬ MNotarised f p.prevS b)
   let ms :=
-    (nulls.flatMap fun v => p.S.toList.filter fun m => decide (∃ q, m = Msg.nullify q v))
-    ++ (notas.flatMap fun b => p.S.toList.filter fun m => decide (∃ q, m = Msg.vote q b))
+    (nulls.flatMap fun v => (leastNullifiers f p.S v).toList.map fun q => Msg.nullify q v)
+    ++ (notas.flatMap fun b => (leastVoters f p.S b).toList.map fun q => Msg.vote q b)
     ++ (p.S.toList.filter fun m => match m with | .tx _ => decide (m ∉ p.prevS) | _ => false)
   disseminateAll i p ms
 

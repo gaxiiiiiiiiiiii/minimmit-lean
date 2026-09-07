@@ -5,17 +5,6 @@ import Minimmit.Analysis.Responsiveness.Lemma5_9
 # Lemma 5.10（Optimistic responsiveness）
 
 δ ≤ Δ は GST 以後の実際の遅延の上界。
-
-## 論文からの差異
-
-- リーダーの条件は `CorrectLeaderWithin`、どの f_a + 1 個の連続する view にも正直なリーダーが
-  いること。f_a はこの条件のパラメータで、定理は f_a ≤ f を課さない。論文の f_a は実際に
-  腐敗する人数で f 以下、論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとで
-  この条件を満たす（Model/Constraint/Witness の `roundRobin_correct_leader`）ので、論文の設定は
-  この条件の一例。
-- 論文の O(·) は具体的な上界 t + δ + (f_a + 1)(2Δ + 3δ) + 3δ に置き換える。論文の証明は
-  O(f_a Δ + δ) のままで数字を出さない。この上界は、取引が全正直者に届く t + δ に、Lemma 5.9
-  の上界を f_a + 1 view 分と Lemma 5.8 の上界を足したもの。具体的な上界は O(·) の主張を含む。
 -/
 
 namespace Minimmit

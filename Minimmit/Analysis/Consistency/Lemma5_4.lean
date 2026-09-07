@@ -5,13 +5,6 @@ import Minimmit.Analysis.Consistency.Lemma5_3
 
 M-notarisation を受けたブロックの親と祖先も M-notarisation を受けることから、
 L-notarisation を受けた 2 つのブロックは一方が他方の祖先。
-
-## 論文からの差異
-
-- `consistency` は p_i・p_j の正直さを仮定しない。論文は正直者 p_i・p_j について述べるが、
-  署名の遡り `sendsBefore_of_mem_S` は腐敗したプロセッサの S でも成り立つので要らない。
-  §2 の Consistency そのものは Analysis/Log の `satisfies_consistency` で、正直者の log について
-  述べる。
 -/
 
 namespace Minimmit

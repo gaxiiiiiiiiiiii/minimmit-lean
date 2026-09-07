@@ -12,7 +12,7 @@
 
 基準は論文の v7（2026-01-27）。対象は §4 の Algorithm 1 と §5 の 10 補題で、§2 のモデルはそのために必要な範囲で形式化した。
 
-定理が論文のどの主張に当たるかは README の「状態」の表で、論文の概念がどの定義に当たるかは README の「論文との対応」で確かめられる。各定義と定理の意味は docstring に、依存公理は `Minimmit/Axioms.lean` にある。差異の理由の詳細は、各項目が挙げる定義や定理を置くファイルの冒頭 doc の「論文からの差異」にあり、ファイルは README で引ける。定理の仮定 `Init`・`Honest`・`ByzBound`・`PartialSync` が同時に満たせることは Model/Constraint/Witness の `constraints_satisfiable` で示してあり、定理は空虚に真ではない。
+定理が論文のどの主張に当たるかは README の「状態」の表で、論文の概念がどの定義に当たるかは README の「論文との対応」で確かめられる。各定義と定理の意味は docstring に、依存公理は `Minimmit/Axioms.lean` にある。定理の仮定 `Init`・`Honest`・`ByzBound`・`PartialSync` が同時に満たせることは Model/Constraint/Witness の `constraints_satisfiable` で示してあり、定理は空虚に真ではない。
 
 ## 3. Algorithm 1 の実行方式
 

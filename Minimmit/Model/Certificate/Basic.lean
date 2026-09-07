@@ -8,12 +8,6 @@ import Mathlib.Data.Fintype.Card
 §4 の用語（M/L-notarisation・nullification・valid proposal・proof of no progress）を
 message の集合 S 上の述語として定義し、§5.1 の「b が M-notarisation を受ける」などを
 実行上の述語として定義する。
-
-## 論文からの差異
-
-- §5.1 の `ReceivesM`・`ReceivesL` は genesis を無条件に認める。論文の定義は送られた票の
-  勘定で、初期の S にある genesis の notarisation の票は誰も送っていないが、論文の証明は
-  genesis が notarisation を受けたものとして扱う。
 -/
 
 namespace Minimmit

@@ -2,11 +2,6 @@ import Minimmit.Analysis.Liveness.LeaderRound
 
 /-!
 # Lemma 5.6（Correct leaders finalise blocks）
-
-## 論文からの差異
-
-- view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では誰も view 0 にいないので
-  結論が成り立たない。
 -/
 
 namespace Minimmit

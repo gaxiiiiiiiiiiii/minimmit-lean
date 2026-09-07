@@ -5,18 +5,6 @@ import Minimmit.Analysis.Liveness.Finalise
 # Lemma 5.8（Fast finalisation under a correct leader）
 
 δ ≤ Δ は GST 以後の実際の遅延の上界、f_a ≤ f は実際に腐敗する人数。
-
-## 論文からの差異
-
-- δ は `PartialSync δ` として与える。つまり t に送った packet は max(GST, t) + δ までに届き、
-  GST 前に送った packet も GST + δ までに届く。Lewis-Pye と Roughgarden の Permissionless
-  Consensus（arXiv:2304.14701）7.5 節の δ の定義と同じ形。証明は、最初の正直者が証明書を
-  転送した時刻が GST より前であっても、それが t + δ までに全員へ届くことを使う。timeout の
-  2Δ は `Honest` の Δ のまま。
-- 論文の主張の O(·) は具体的な上界 t + 3δ に置き換える。t + 3δ は論文の証明本文が出す数字で、
-  証明の末尾は「receive b together with an L-notarisation … by t + 3δ, and also leave view v
-  by this time」。具体的な上界は O(·) の主張を含む。
-- view v ≥ 1 を仮定に持つ。論文の view は ℕ≥1 で、v = 0 では結論が成り立たない。
 -/
 
 namespace Minimmit

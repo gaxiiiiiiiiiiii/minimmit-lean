@@ -10,36 +10,6 @@ import Mathlib.Data.Finset.Sort
 Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`advanceM`・
 `nullifyNoProgress` として切り出してあり、`step` との一致は `step_eq_stepPair`。補題は段の
 名前で述べる。`step` が送る message が遷移系の送信ガードを通ることは Timing の `Algo.send_guard`。
-
-## 論文からの差異
-
-- 評価順。論文の Algorithm 1 は各スロットで 2〜32 行を上から 1 回評価する。`step` は
-  16〜21、5〜7、9〜11、13〜14、24〜28、2〜3 行の順に評価する。論文の Lemma 5.6 以降の
-  時間の議論は、view に入った時点で提案し、証明書が届いた時点で転送することを使う。
-  論文の行順では、view に入ったスロットで提案できず、そのスロットで完成した証明書を同じ
-  スロットで転送できないので、これが 1〜2 スロット遅れる。行順でも論文の O(·) の主張は
-  偽にならず、ずれは定数だが、証明の時間計算は書いてあるとおりには通らない。この評価順では
-  通る。行順は擬似コードにしかなく、§3 の地の文は「Upon entering view v, p_i finds the
-  greatest v′ < v …」「proceeds to view v + 1 immediately upon seeing an M-notarisation」と
-  条件が成立した時点で処理する書き方で、この評価順はその順に当たる。Commonware の実装仕様
-  （NOTES.md の参考）も、
-  リーダーは view に入った時点で提案する。
-- 登り切り。16〜21 行は `climb` で、現在の view の証明書がある限り繰り返す。論文の
-  Lemma 5.6 の証明と付録の Lemma E.6 は「最初の正直者が t に view v に入れば、全正直者は
-  t + Δ までに v に入る」と主張するが、1 回評価では 1 スロットに高々 2 view しか進めず、
-  GST 前に配送が遅れて証明書が一括で届く正直者について偽になる。繰り返す動作では
-  `enter_all` として成り立ち、論文の議論がそのまま通る。§6.1 の「view を飛ばす」最適化は
-  同じ穴を塞ぐもので、ここでは飛ばさず 1 view ずつ登る。§6.1 が追加する 2 つの規則は、順に
-  登れば別の規則なしに満たされる。通過した view の M-notarised ブロックへ投票する規則は、
-  `advanceOnce` が通過する各 view で 19〜20 行を評価することに当たる。リーダーが提案前に
-  親の M-notarisation と間の view の nullification を待つ規則は、順に登れば view v に入った
-  時点で揃っている（`leader_parent_mnotarised_all`・`leader_gaps_nullified_all`）。Commonware の
-  実装仕様は `enter_view` で現在より大きい view へ直接移り、§6.1 の飛ばす形をとる。
-- 同点の選択。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、S を `Finset.toList` で
-  並べた順で先のものを取る。論文の証明は選択の仕方を使わないので、この選択はその一例。
-- finalise。31〜32 行の Finalise は log を書く動作で、log は S から定まる（Analysis/Log の
-  `log`）ので `step` に無い。finalise したことは Certificate/Basic の `Finalised`、つまり S に
-  L-notarisation があり全祖先を含むことで表す。
 -/
 
 namespace Minimmit

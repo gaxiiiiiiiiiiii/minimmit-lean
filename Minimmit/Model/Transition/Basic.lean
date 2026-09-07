@@ -7,23 +7,6 @@ import Mathlib.Data.Fintype.Basic
 1 スロット分の遷移 `State.step` と、その繰り返しである実行 `State.run` を定義する。
 そのための §2・§4 の型（View・Time・Block・Msg・Packet）、プロセッサの局所状態
 `Processor` と大域状態 `State` とそれぞれの原始関数、および 1 スロット分の指示 `Instr`。
-
-## 論文からの差異
-
-- ブロックは親をハッシュ値でなく親ブロックそのもので持つ。論文は暗号を完全と仮定していて
-  ハッシュは衝突しないので、同一性についてはハッシュで参照することと直接持つことは
-  区別できない。S がブロックを含むこと（§4 の規約）は `containsBlock` で別に言い、それは
-  b を成分に持つ message の有無で決まって親には及ばない。祖先が S に入ることは
-  Analysis/Liveness/Finalise で示す。
-- 署名は、署名者を成分に持つことで表す。ブロックは `Block.node` の署名者、票と nullify は
-  `Msg.vote`・`Msg.nullify` の署名者。提案 `Msg.propose` はブロックそのものを送り、提案の署名は
-  持たない。論文の "lead(v) sends b" もブロック自体を送る。偽造不能は `State.send` のガード
-  `Processor.canSend` で表す: 自分の署名付きか受信済みの message で、成分のブロックも自分の
-  署名付きか S に含まれるものだけを送れる。
-- `State.step` は 1 スロットの中の原始関数を 動作 → tick → 配送 → 取引 → 腐敗 の順に
-  固定して適用する。tick と tick の間で原始関数がどの順に並んでも同じ状態に至ること、
-  およびこの固定順で表せない挙動が「送ったスロットの中で届く配送」だけであることは、
-  可換性による形式化の外の議論に依っていて未証明。
 -/
 
 namespace Minimmit

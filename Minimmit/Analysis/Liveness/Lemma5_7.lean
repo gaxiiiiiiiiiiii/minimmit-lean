@@ -35,10 +35,9 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         (Finset.mem_univ r))) hv'V
   have hv'1 : 1 ≤ v'.val := le_trans (Nat.succ_le_succ (Nat.zero_le _)) hv'V
   have hreach : ∃ s, ∃ r, Correct s₀ instrs r ∧ v'.val ≤ (viewAt s₀ instrs r (s + 1)).val := by
-    obtain ⟨s, hs'⟩ := progression hn hinit hh hb hs hi v'
+    obtain ⟨s, hs'⟩ := reaches_view hn hinit hh hb hs hi v'
     exact ⟨s, i, hi, hs'.trans (viewAt_le_succ i s)⟩
-  have hfirst : FirstEntry s₀ instrs v' (Nat.find hreach) :=
-    ⟨Nat.find_spec hreach, fun r t' hr h => Nat.find_min' hreach ⟨r, hr, h⟩⟩
+  have hfirst : FirstEntry s₀ instrs v' (Nat.find hreach) := firstEntry_of_reach hinit hv'1 hreach
   have hgst : max GST.val t < Nat.find hreach := by
     obtain ⟨r, hr, h⟩ := Nat.find_spec hreach
     by_contra hle
@@ -47,7 +46,7 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     omega
   have hlc : Correct s₀ instrs (lead v') := hlv' ▸ hi
   obtain ⟨e, R⟩ := leader_round hn hinit hh hs (le_refl Δ) hv'1 hlc hfirst (by omega)
-  have hte := first_entry_le_leader_entry R
+  have hte := first_entry_le_leader_entry hinit R
   -- 取引はブロックの Tr* に入る
   have htr' : tr ∈ (leaderBlockAt f lead s₀ instrs v' e).trStar := by
     apply mem_trStar_leaderBlock

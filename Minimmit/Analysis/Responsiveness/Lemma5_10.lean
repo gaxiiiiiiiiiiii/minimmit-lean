@@ -33,8 +33,7 @@ variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx
 theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {fa : Nat}
-    (hlead : ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa
-      ∧ Correct s₀ instrs (lead v'))
+    (hlead : CorrectLeaderWithin s₀ instrs lead fa)
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {tr : Tx}
     (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
     (hfirst : ∀ j t', Correct s₀ instrs j → t' < t →
@@ -70,11 +69,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     intro k
     induction k with
     | zero =>
-      refine ⟨Nat.find hreach₀, ⟨?_, ?_⟩, ?_⟩
-      · obtain ⟨r, hr, h⟩ := Nat.find_spec hreach₀
-        exact ⟨r, hr, h⟩
-      · intro r t' hr h
-        exact Nat.find_min' hreach₀ ⟨r, hr, h⟩
+      refine ⟨Nat.find hreach₀, firstEntry_of_reach hinit hv₀1 hreach₀, ?_⟩
       · have := Nat.find_min' hreach₀ ⟨r₀, hr₀c,
           by rw [show t + δ - 1 + 1 = t + δ by omega, hv₀r]⟩
         omega
@@ -90,7 +85,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         show v₀.val + (k + 1) ≤ _
         omega
       refine ⟨Nat.find hreach,
-        ⟨Nat.find_spec hreach, fun r t' hr h => Nat.find_min' hreach ⟨r, hr, h⟩⟩, ?_⟩
+        firstEntry_of_reach hinit (show 1 ≤ v₀.val + (k + 1) by omega) hreach, ?_⟩
       have h1 := Nat.find_min' hreach (m := t + δ + k * (2 * Δ + 3 * δ) + 2 * Δ + 3 * δ) ⟨i, hi, by
         have h1 : v₀.val + k < (viewAt s₀ instrs i
             (t + δ + k * (2 * Δ + 3 * δ) + 2 * Δ + 3 * δ + 1)).val := hleave i hi
@@ -109,13 +104,13 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   have hv₁1 : 1 ≤ v₁.val := by omega
   -- v₁ への最初の入場は t + δ 以降
   have htm : t + δ ≤ tm := by
-    obtain ⟨r, hr, h⟩ := hfm.entered
+    obtain ⟨r, hr, h⟩ := hfm.entered_ge
     by_contra hlt
     have h1 := viewAt_mono (s₀ := s₀) (instrs := instrs) r (show tm + 1 ≤ t + δ by omega)
     have h2 := hbound r hr
     omega
   obtain ⟨e, R⟩ := leader_round hn hinit hh hs hδ hv₁1 hlc hfm (by omega)
-  have hte := first_entry_le_leader_entry R
+  have hte := first_entry_le_leader_entry hinit R
   have hmul : (v₁.val - v₀.val) * (2 * Δ + 3 * δ) ≤ (fa + 1) * (2 * Δ + 3 * δ) :=
     Nat.mul_le_mul_right _ (by omega)
   intro j hj

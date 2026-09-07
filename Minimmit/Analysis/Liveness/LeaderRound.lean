@@ -58,7 +58,7 @@ theorem enter_all_anchor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs) {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t)
     {T₀ : Nat} (ht : t ≤ T₀) (hgst : GST.val ≤ T₀) {q : Fin n} (hq : Correct s₀ instrs q) :
     v.val ≤ (viewAt s₀ instrs q (T₀ + δ + 1)).val := by
-  obtain ⟨j, hj, hjv⟩ := hfirst.entered
+  obtain ⟨j, hj, hjv⟩ := hfirst.entered_ge
   have hδ1 := hs.one_le
   rw [viewAt_succ_eq hh hq (T₀ + δ)]
   apply Algo.st1_reaches q
@@ -266,7 +266,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     have hstay := viewAt_eq_of_lt_timer hinit r s (2 * Δ - 1) (by rw [htimer]; omega) (2 * Δ - 1)
       (le_refl _)
     rw [show s - (2 * Δ - 1) = (s - 2 * Δ) + 1 by omega, hview] at hstay
-    have := hfirst.first r (s - 2 * Δ) hr (by rw [hstay])
+    have := hfirst.first_ge hinit hv r (s - 2 * Δ) hr (by rw [hstay])
     omega
   · -- 24〜28 行: r は view v のブロック c₀ に投票済みで、その票は e 以降
     obtain ⟨hm, _, c₀, hc₀, _⟩ := Algo.send_nullifyNoProgress_eq hj'
@@ -409,8 +409,8 @@ theorem leader_proposes (j : Fin n) :
   left; left; left; right
   exact Algo.propose_fires (by rw [hview]) hprop j
 
-omit hinit hh hb hs in
-theorem first_entry_le_leader_entry : t ≤ e := R.hfirst.first (lead v) e R.hlc R.hev
+omit hh hb hs in
+theorem first_entry_le_leader_entry : t ≤ e := R.hfirst.first_ge hinit R.hv (lead v) e R.hlc R.hev
 
 /-- ブロックは t + 2δ までに全正直者に届く。 -/
 theorem leader_block_delivered {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ T) :
@@ -578,7 +578,7 @@ theorem no_timeout_nullify :
     (le_refl _)
   rw [show s - (2 * Δ - 1) = (s - 2 * Δ) + 1 by omega, hview] at hstay
   have hT : t + 2 * Δ ≤ s := by
-    have := R.hfirst.first r (s - 2 * Δ) hr (by rw [hstay])
+    have := R.hfirst.first_ge hinit R.hv r (s - 2 * Δ) hr (by rw [hstay])
     omega
   -- lead(v) のブロックは S にあり valid
   have hvalid := leader_valid_at (r := r) hinit hh hb hs R (T := s) (by omega)
@@ -864,7 +864,7 @@ theorem vote_by {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 *
 /-- 全正直者が lead(v) のブロックに投票する。 -/
 theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s₀ instrs r) :
     Sends instrs r (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) := by
-  obtain ⟨T, hT⟩ := progression hn hinit hh hb (hs.mono R.hδ) hr ⟨v.val + 1⟩
+  obtain ⟨T, hT⟩ := reaches_view hn hinit hh hb (hs.mono R.hδ) hr ⟨v.val + 1⟩
   obtain ⟨s, _, hs1, hs2⟩ := exists_leave_slot hinit R.hv (Nat.lt_of_succ_le hT)
   obtain ⟨s', _, j, hj⟩ := vote_at_pass hinit hh hb hs R hr hs1 hs2
   exact ⟨s', j, hj⟩

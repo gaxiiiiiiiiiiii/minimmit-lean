@@ -154,9 +154,10 @@ theorem roundRobin_fair (hn : 0 < n) : Fair (roundRobin hn) := by
 /-- 論文の輪番は、腐敗が fa 人以下で fa + 1 ≤ n なら、どの fa + 1 個の連続する view にも正直な
     リーダーを持つ（Lemma 5.10 のリーダーの仮定）。 -/
 theorem roundRobin_correct_leader {s₀ : State n Tx} {instrs : Nat → Instr n Tx} (hn : 0 < n)
-    {fa : Nat} (hfa : fa + 1 ≤ n) (hb : ByzBound fa s₀ instrs) (v : View) :
-    ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa ∧ Correct s₀ instrs (roundRobin hn v') := by
+    {fa : Nat} (hfa : fa + 1 ≤ n) (hb : ByzBound fa s₀ instrs) :
+    CorrectLeaderWithin s₀ instrs (roundRobin hn) fa := by
   classical
+  intro v
   -- view v〜v + fa のリーダーは相異なる fa + 1 人なので、正直者がいる
   have hinj : Set.InjOn (fun k => roundRobin hn ⟨v.val + k⟩) ↑(Finset.range (fa + 1)) := by
     intro k₁ hk₁ k₂ hk₂ h

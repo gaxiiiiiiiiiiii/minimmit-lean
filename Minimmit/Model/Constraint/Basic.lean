@@ -63,6 +63,12 @@ def ByzBound [DecidableEq Tx] (f : Nat) (s₀ : State n Tx) (instrs : Nat → In
 def Fair (lead : View → Fin n) : Prop :=
   ∀ i : Fin n, ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ lead v' = i
 
+/-- どの fa + 1 個の連続する view にも正直なリーダーがいる（Lemma 5.10 のリーダーの仮定）。
+    論文の輪番は、腐敗が fa 人以下ならこれを満たす。 -/
+def CorrectLeaderWithin [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx)
+    (lead : View → Fin n) (fa : Nat) : Prop :=
+  ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa ∧ Correct s₀ instrs (lead v')
+
 /-! ### プロトコルに従うこと -/
 
 /-- 腐敗していないプロセッサは Algorithm 1 に従う: 全スロット t で、`(run t).byz` にない i

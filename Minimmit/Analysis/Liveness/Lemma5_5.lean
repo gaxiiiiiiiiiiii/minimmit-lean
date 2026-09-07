@@ -20,12 +20,23 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
   {instrs : Nat → Instr n Tx}
 
-/-- 「最初の正直者が view v に入るのはスロット t」: スロット t を終えて view が v 以上に
-    なった正直者がいて、それより前のスロットではいない。v = 1 なら t = 0。 -/
+/-- p_i がスロット t に view v にいる（§5 の "enters view v"）: スロット t の冒頭の view は v 以下で、
+    スロット t + 1 の冒頭の view は v 以上。view は 1 回の前進で 1 しか増えないので、その間に
+    view = v の時点がある。 -/
+def Enters (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (v : View) (t : Nat) :
+    Prop :=
+  (viewAt s₀ instrs i t).val ≤ v.val ∧ v.val ≤ (viewAt s₀ instrs i (t + 1)).val
+
+/-- 「最初の正直者が view v に入るのはスロット t」: スロット t に view v にいる正直者がいて、
+    それより前のスロットにはいない。v = 1 なら t = 0。 -/
 structure FirstEntry (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (v : View) (t : Nat) :
     Prop where
-  entered : ∃ i, Correct s₀ instrs i ∧ v.val ≤ (viewAt s₀ instrs i (t + 1)).val
-  first : ∀ i t', Correct s₀ instrs i → v.val ≤ (viewAt s₀ instrs i (t' + 1)).val → t ≤ t'
+  entered : ∃ i, Correct s₀ instrs i ∧ Enters s₀ instrs i v t
+  first : ∀ i t', Correct s₀ instrs i → Enters s₀ instrs i v t' → t ≤ t'
+
+theorem FirstEntry.entered_ge {v : View} {t : Nat} (h : FirstEntry s₀ instrs v t) :
+    ∃ i, Correct s₀ instrs i ∧ v.val ≤ (viewAt s₀ instrs i (t + 1)).val :=
+  let ⟨i, hi, he⟩ := h.entered; ⟨i, hi, he.2⟩
 
 /-! ### 5.5 の補題 -/
 
@@ -72,6 +83,47 @@ theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 
 theorem viewAt_zero (hinit : Init s₀) (j : Fin n) : (viewAt s₀ instrs j 0).val = 1 := by
   unfold viewAt; rw [State.run, hinit.procs j]; rfl
+
+open Classical in
+/-- view v 以上に達する正直者は、最初にそうなるスロットに v にいる。 -/
+theorem enters_of_reach (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val) {i : Fin n}
+    (hreach : ∃ s, v.val ≤ (viewAt s₀ instrs i (s + 1)).val) :
+    Enters s₀ instrs i v (Nat.find hreach) := by
+  classical
+  refine ⟨?_, Nat.find_spec hreach⟩
+  rcases Nat.eq_zero_or_pos (Nat.find hreach) with h0 | hpos
+  · rw [h0, viewAt_zero hinit]; exact hv
+  · obtain ⟨k, hk⟩ := Nat.exists_eq_add_one_of_ne_zero hpos.ne'
+    have hmin := Nat.find_min hreach (show k < Nat.find hreach by rw [hk]; exact Nat.lt_succ_self k)
+    rw [hk]
+    exact (not_le.mp hmin).le
+
+open Classical in
+/-- view v 以上に達する正直者がいるなら、最初にそうなるスロットが v への最初の入場。 -/
+theorem firstEntry_of_reach (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val)
+    (hreach : ∃ s, ∃ r, Correct s₀ instrs r ∧ v.val ≤ (viewAt s₀ instrs r (s + 1)).val) :
+    FirstEntry s₀ instrs v (Nat.find hreach) := by
+  classical
+  refine ⟨?_, fun i t' hi he => Nat.find_min' hreach ⟨i, hi, he.2⟩⟩
+  obtain ⟨r, hr, h⟩ := Nat.find_spec hreach
+  refine ⟨r, hr, ?_, h⟩
+  rcases Nat.eq_zero_or_pos (Nat.find hreach) with h0 | hpos
+  · rw [h0, viewAt_zero hinit]; exact hv
+  · obtain ⟨k, hk⟩ := Nat.exists_eq_add_one_of_ne_zero hpos.ne'
+    have hmin := Nat.find_min hreach (show k < Nat.find hreach by rw [hk]; exact Nat.lt_succ_self k)
+    rw [hk]
+    by_contra hlt
+    exact hmin ⟨r, hr, (not_le.mp hlt).le⟩
+
+/-- 最初の入場より前に、v 以上に達している正直者はいない。 -/
+theorem FirstEntry.first_ge (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val) {t : Nat}
+    (h : FirstEntry s₀ instrs v t) (i : Fin n) (t' : Nat) (hi : Correct s₀ instrs i)
+    (hle : v.val ≤ (viewAt s₀ instrs i (t' + 1)).val) : t ≤ t' := by
+  classical
+  have hex : ∃ s, ∃ r, Correct s₀ instrs r ∧ v.val ≤ (viewAt s₀ instrs r (s + 1)).val :=
+    ⟨t', i, hi, hle⟩
+  obtain ⟨r, hr, he⟩ := (firstEntry_of_reach hinit hv hex).entered
+  exact (h.first r _ hr he).trans (Nat.find_min' hex ⟨i, hi, hle⟩)
 
 
 /-- 正直者 p_i が view k で止まり続けるなら、他の正直者も view k を越えない。越えたなら
@@ -286,11 +338,22 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have := leave_of_nullified hh hi hvT₃ hN
     exact absurd (hstuck _) (not_le.mpr this)
 
-/-- Lemma 5.5（Progression through views）: 正直者はすべての view に入る。 -/
-theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+/-- 正直者はどの view 以上にも達する。 -/
+theorem reaches_view (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hs : PartialSync Δ GST s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i) (v : View) :
     ∃ t, v.val ≤ (viewAt s₀ instrs i t).val :=
   progression_aux hn hinit hh hb hs v.val i hi
+
+/-- Lemma 5.5（Progression through views）: 正直者はすべての view v ≥ 1 に入る。 -/
+theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+    (hs : PartialSync Δ GST s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i) {v : View}
+    (hv : 1 ≤ v.val) : ∃ t, Enters s₀ instrs i v t := by
+  classical
+  have hreach : ∃ s, v.val ≤ (viewAt s₀ instrs i (s + 1)).val := by
+    obtain ⟨s, hs'⟩ := reaches_view hn hinit hh hb hs hi v
+    exact ⟨s, hs'.trans (viewAt_le_succ i s)⟩
+  exact ⟨Nat.find hreach, enters_of_reach hinit hv hreach⟩
 
 end Minimmit

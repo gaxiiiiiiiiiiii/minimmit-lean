@@ -81,7 +81,7 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       rcases Nat.lt_or_ge (T₀ + δ) e with h | h
       · exact absurd (henter r hr) (not_le.mpr (hemin _ h))
       · exact h
-    have hte : t ≤ e := hfirst.first r e hr hev
+    have hte : t ≤ e := hfirst.first_ge hinit hv r e hr hev
     have hview' : ∀ s, e + 1 ≤ s → s ≤ T₀ + 2 * Δ + 2 * δ + 1 → viewAt s₀ instrs r s = v :=
       fun s h1 h2 => View.val_injective
       (le_antisymm (hstay r hr s h2) (hev.trans (viewAt_mono r h1)))

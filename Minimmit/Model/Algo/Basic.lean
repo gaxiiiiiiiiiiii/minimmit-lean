@@ -22,7 +22,7 @@ Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`
   通る。行順は擬似コードにしかなく、§3 の地の文は「Upon entering view v, p_i finds the
   greatest v′ < v …」「proceeds to view v + 1 immediately upon seeing an M-notarisation」と
   条件が成立した時点で処理する書き方で、この評価順はその順に当たる。Commonware の実装仕様
-  （docs/differences.md の参考）も、
+  （NOTES.md の参考）も、
   リーダーは view に入った時点で提案する。
 - 登り切り。16〜21 行は `climb` で、現在の view の証明書がある限り繰り返す。論文の
   Lemma 5.6 の証明と付録の Lemma E.6 は「最初の正直者が t に view v に入れば、全正直者は

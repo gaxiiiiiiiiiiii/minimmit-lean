@@ -53,7 +53,7 @@ theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j →
-      (∃ b : Block Tx, b.view = v ∧ LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
+      (∃ b : Block n Tx, b.view = v ∧ LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
       ∧ v.val < (viewAt s₀ instrs j (t + 3 * δ + 1)).val := by
   intro j hj
   have hδ1 := hs.one_le
@@ -68,7 +68,7 @@ theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     · right; omega
   have hcert : Algo.HasCert f ((State.run s₀ instrs (t + 3 * δ)).procs j).S v := by
     rw [← hbLv]
-    exact Algo.hasCert_of_mnotarised (Algo.leaderBlock_ne_gen _ _) hM
+    exact Algo.hasCert_of_mnotarised (Algo.leaderBlock_ne_gen _ _ _) hM
   have henter := enter_all hinit hh hs hfirst hgst hj
   rcases lt_trichotomy (viewAt s₀ instrs j (t + 3 * δ)).val v.val with hlt | heq | hgt
   · exfalso

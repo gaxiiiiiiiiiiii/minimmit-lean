@@ -21,12 +21,12 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 omit [DecidableEq Tx] in
-theorem receivesM_of_receivesL (hn : 5 * f + 1 ≤ n) {b : Block Tx} (hL : ReceivesL f instrs b) :
+theorem receivesM_of_receivesL (hn : 5 * f + 1 ≤ n) {b : Block n Tx} (hL : ReceivesL f instrs b) :
     ReceivesM f instrs b :=
   hL.imp_right fun h => le_trans (by omega) h
 
 theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) {b : Block Tx}
+    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) {b : Block n Tx}
     (hL : ReceivesL f instrs b) (hg : b ≠ .gen) : 1 ≤ b.view.val := by
   rcases hL with rfl | hL
   · exact absurd rfl hg
@@ -50,7 +50,7 @@ theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
 /-- M-notarisation を受けた genesis でないブロックには、9〜11 行で投票した正直者がいる。
     その段の入力 st2 の S に valid proposal がある。 -/
 theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hb : ByzBound f s₀ instrs) {b₂ : Block Tx} (hg : b₂ ≠ .gen) (hM : ReceivesM f instrs b₂) :
+    (hb : ByzBound f s₀ instrs) {b₂ : Block n Tx} (hg : b₂ ≠ .gen) (hM : ReceivesM f instrs b₂) :
     ∃ q t, Correct s₀ instrs q
       ∧ (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view = b₂.view
       ∧ ValidProposal f lead (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S
@@ -103,7 +103,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
       subst hbb
       rw [hqv] at hlt
       exact absurd hlt (lt_irrefl _)
-  · obtain ⟨_, hm⟩ := Algo.send_propose_eq hj'; cases hm
+  · obtain ⟨_, hm, _⟩ := Algo.send_propose_eq hj'; cases hm
   · obtain ⟨b', hm, hbv, _, _, hvp, _⟩ := Algo.send_voteProposal_eq hj'
     injection hm with _ hbb
     subst hbb
@@ -113,7 +113,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
 
 /-- 正直者の st2 の S にある M-notarisation は、実行上の M-notarisation。 -/
 theorem receivesM_of_MNotarised_st2 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
-    (hqc : Correct s₀ instrs q) {t : Nat} {b₀ : Block Tx}
+    (hqc : Correct s₀ instrs q) {t : Nat} {b₀ : Block n Tx}
     (h : MNotarised f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S b₀) :
     ReceivesM f instrs b₀ := by
   rcases h with rfl | h
@@ -136,29 +136,29 @@ theorem receivesNullification_of_Nullified_st2 (hinit : Init s₀) (hh : Honest 
 /-- M-notarisation を受けたブロックの親は M-notarisation を受け、親の view と自分の view の
     間の view は nullification を受ける。 -/
 theorem receivesM_parent (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hb : ByzBound f s₀ instrs) {v : View} {tr : List Tx} {p₀ : Block Tx}
-    (hM : ReceivesM f instrs (Block.node v tr p₀)) :
+    (hb : ByzBound f s₀ instrs) {q₀ : Fin n} {v : View} {tr : List Tx} {p₀ : Block n Tx}
+    (hM : ReceivesM f instrs (Block.node q₀ v tr p₀)) :
     ReceivesM f instrs p₀
       ∧ ∀ w : View, p₀.view.val < w.val → w.val < v.val → ReceivesNullification f instrs w := by
   obtain ⟨q, t, hqc, hview, hvp⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hM
-  have hpar : p₀ ∈ (Block.node v tr p₀).parent := by simp [Block.parent]
+  have hpar : p₀ ∈ (Block.node q₀ v tr p₀).parent := by simp [Block.parent]
   refine ⟨receivesM_of_MNotarised_st2 hinit hh hqc (hvp.parent p₀ hpar), fun w h1 h2 => ?_⟩
   refine receivesNullification_of_Nullified_st2 hinit hh hqc (hvp.gaps p₀ hpar w h1 ?_)
   rw [hview]; exact h2
 
 /-- M-notarisation を受けたブロックの祖先は M-notarisation を受ける。 -/
 theorem receivesM_ancestor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
-    (hb : ByzBound f s₀ instrs) {c b : Block Tx} (hanc : Block.Ancestor c b)
+    (hb : ByzBound f s₀ instrs) {c b : Block n Tx} (hanc : Block.Ancestor c b)
     (hM : ReceivesM f instrs b) : ReceivesM f instrs c := by
   induction hanc with
   | refl => exact hM
-  | parent v tr p _ ih => exact ih (receivesM_parent hinit hh hb hM).1
+  | parent q v tr p _ ih => exact ih (receivesM_parent hinit hh hb hM).1
 
 /-- Lemma 5.4（Consistency）の本体: L-notarisation を受けた 2 つのブロックは、一方が他方の
     祖先。 -/
 theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    {b b' : Block Tx} (hL : ReceivesL f instrs b) (hL' : ReceivesL f instrs b') :
+    {b b' : Block n Tx} (hL : ReceivesL f instrs b) (hL' : ReceivesL f instrs b') :
     b.Ancestor b' ∨ b'.Ancestor b := by
   by_contra hcon
   simp only [not_or] at hcon
@@ -166,13 +166,13 @@ theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   · exact H hL' hL ⟨hcon.2, hcon.1⟩ (not_le.mp hle).le
   have hbg : b ≠ .gen := fun h => hcon.1 (h ▸ Block.gen_ancestor b')
   have hv₁ := one_le_view_of_receivesL hn hinit hh hb hL hbg
-  obtain ⟨v, tr, p₀, hanc, hge, hlt⟩ := Block.exists_crossing hv₁ hle
-  have hM : ReceivesM f instrs (Block.node v tr p₀) :=
+  obtain ⟨q, v, tr, p₀, hanc, hge, hlt⟩ := Block.exists_crossing hv₁ hle
+  have hM : ReceivesM f instrs (Block.node q v tr p₀) :=
     receivesM_ancestor hinit hh hb hanc (receivesM_of_receivesL hn hL')
-  have hna : ¬ b.Ancestor (Block.node v tr p₀) := fun h => hcon.1 (h.trans hanc)
+  have hna : ¬ b.Ancestor (Block.node q v tr p₀) := fun h => hcon.1 (h.trans hanc)
   have hne : v.val ≠ b.view.val := by
     intro heq
-    have hv : (Block.node v tr p₀).view = b.view := View.val_injective heq
+    have hv : (Block.node q v tr p₀).view = b.view := View.val_injective heq
     have := receivesM_unique_of_receivesL hn hinit hh hb hL hv hM
     exact hna (this ▸ Block.Ancestor.refl _)
   obtain ⟨_, hgap⟩ := receivesM_parent hinit hh hb hM
@@ -180,7 +180,7 @@ theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hgap b.view hlt (lt_of_le_of_ne hge (Ne.symm hne)))
 
 /-- 正直者の S にある L-notarisation は、実行上の L-notarisation。 -/
-theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block Tx}
+theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block n Tx}
     (h : LNotarised f ((State.run s₀ instrs t).procs i).S b) : ReceivesL f instrs b := by
   rcases h with rfl | h
   · exact Or.inl rfl
@@ -194,7 +194,7 @@ theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
     ブロックは、一方が他方の祖先。 -/
 theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    {i j : Fin n} {t t' : Nat} {b b' : Block Tx}
+    {i j : Fin n} {t t' : Nat} {b b' : Block n Tx}
     (hbi : LNotarised f ((State.run s₀ instrs t).procs i).S b)
     (hbj : LNotarised f ((State.run s₀ instrs t').procs j).S b') :
     b.Ancestor b' ∨ b'.Ancestor b :=

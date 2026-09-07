@@ -36,12 +36,12 @@ theorem mem_S_forwardNew {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n T
 
 theorem mem_S_propose {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
     {m : Msg n Tx} (hm : m ∈ (propose f lead i q).1.S) :
-    m ∈ q.S ∨ ∃ b, m = Msg.propose i b ∧ Action.send (Msg.propose i b) i
+    m ∈ q.S ∨ ∃ b, m = Msg.propose b ∧ b.signer = some i ∧ Action.send (Msg.propose b) i
     ∈ (propose f lead i q).2 := by
   unfold propose at hm ⊢
   split_ifs at hm ⊢
   · exact (mem_S_disseminate_or i q _ hm).imp_right
-      fun h => ⟨_, h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+      fun h => ⟨_, h, rfl, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
   · exact Or.inl hm
 
 theorem mem_S_voteProposal {f : Nat} {lead : View → Fin n} {i : Fin n} {q : Processor n Tx}
@@ -88,7 +88,7 @@ theorem mem_S_st1 {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
 theorem mem_S_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st2 f lead i p).S) :
     m ∈ (st1 f i p).S
-      ∨ ∃ b, m = Msg.propose i b ∧ Action.send (Msg.propose i b) i
+      ∨ ∃ b, m = Msg.propose b ∧ b.signer = some i ∧ Action.send (Msg.propose b) i
       ∈ (propose f lead i (st1 f i p)).2 :=
   mem_S_propose hm
 
@@ -139,11 +139,11 @@ theorem mem_S_stage_or_sent (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p 
   rcases mem_S_st5 h with h | ⟨v, rfl, hs⟩
   · rcases mem_S_st4 h with h | ⟨v, rfl, hs⟩
     · rcases mem_S_st3 h with h | ⟨b, rfl, hs⟩
-      · rcases mem_S_st2 h with h | ⟨b, rfl, hs⟩
+      · rcases mem_S_st2 h with h | ⟨b, rfl, hsig, hs⟩
         · rcases mem_S_st1 h with h | ⟨b, rfl, _, j, hs⟩
           · exact Or.inl h
           · exact Or.inr ⟨rfl, j, by left; left; left; left; exact hs⟩
-        · exact Or.inr ⟨rfl, i, by left; left; left; right; exact hs⟩
+        · exact Or.inr ⟨hsig, i, by left; left; left; right; exact hs⟩
       · exact Or.inr ⟨rfl, i, by left; left; right; exact hs⟩
     · exact Or.inr ⟨rfl, i, by left; right; exact hs⟩
   · exact Or.inr ⟨rfl, i, by right; exact hs⟩
@@ -163,28 +163,33 @@ theorem send_forwardNew_mem {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg 
 
 theorem send_propose_eq {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (propose f lead i p).2) :
-    ∃ b, m = Msg.propose i b := by
+    ∃ b, m = Msg.propose b ∧ b.signer = some i := by
   unfold propose at h
   split_ifs at h
   · obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
-    cases hm; exact ⟨_, rfl⟩
+    cases hm; exact ⟨_, rfl, rfl⟩
   · simp at h
 
 /-- 5〜7 行が送るブロック -/
-noncomputable def leaderBlock (f : Nat) (p : Processor n Tx) : Block Tx :=
-  .node p.view (payload p.S (selectParent f p.S p.view)) (selectParent f p.S p.view)
+noncomputable def leaderBlock (f : Nat) (i : Fin n) (p : Processor n Tx) : Block n Tx :=
+  .node i p.view (payload p.S (selectParent f p.S p.view)) (selectParent f p.S p.view)
 
-theorem leaderBlock_view (f : Nat) (p : Processor n Tx) : (leaderBlock f p).view = p.view := rfl
+theorem leaderBlock_view (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    (leaderBlock f i p).view = p.view := rfl
 
-theorem leaderBlock_ne_gen (f : Nat) (p : Processor n Tx) : leaderBlock f p ≠ .gen := by
+theorem leaderBlock_signer (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    (leaderBlock f i p).signer = some i := rfl
+
+theorem leaderBlock_ne_gen (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    leaderBlock f i p ≠ .gen := by
   simp [leaderBlock]
 
-theorem leaderBlock_parent (f : Nat) (p : Processor n Tx) :
-    (leaderBlock f p).parent = some (selectParent f p.S p.view) := rfl
+theorem leaderBlock_parent (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    (leaderBlock f i p).parent = some (selectParent f p.S p.view) := rfl
 
 theorem send_propose_eq' {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (propose f lead i p).2) :
-    m = Msg.propose i (leaderBlock f p) ∧ lead p.view = i ∧ p.proposed = false := by
+    m = Msg.propose (leaderBlock f i p) ∧ lead p.view = i ∧ p.proposed = false := by
   unfold propose at h
   split_ifs at h with hg
   · obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
@@ -194,7 +199,7 @@ theorem send_propose_eq' {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Proc
 /-- リーダーで未提案なら、5〜7 行はブロックを全員へ送る。 -/
 theorem propose_fires {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (hl : lead p.view = i) (hp : p.proposed = false) (j : Fin n) :
-    Action.send (Msg.propose i (leaderBlock f p)) j ∈ (propose f lead i p).2 := by
+    Action.send (Msg.propose (leaderBlock f i p)) j ∈ (propose f lead i p).2 := by
   unfold propose
   rw [if_pos ⟨hl, hp⟩]
   exact mem_disseminate_snd.mpr ⟨j, rfl⟩
@@ -220,14 +225,14 @@ theorem send_voteProposal_eq {f : Nat} {lead : View → Fin n} {i : Fin n} {p : 
 open Classical in
 /-- lead(v) の view v の提案が S に b だけなら、9〜11 行は b について判定する。 -/
 theorem voteProposal_eq_of_singleton {f : Nat} {lead : View → Fin n} {i : Fin n}
-    {p : Processor n Tx} {b : Block Tx} (h : proposals lead p.S p.view = [b]) :
+    {p : Processor n Tx} {b : Block n Tx} (h : proposals lead p.S p.view = [b]) :
     voteProposal f lead i p
       = if ValidProposal f lead p.S p.view b ∧ p.notarised = none ∧ p.nullified = false then
           disseminate i p (.vote i b)
         else (p, []) := by
   unfold voteProposal; rw [h]
 
-theorem disseminate_vote_notarised {i : Fin n} {p : Processor n Tx} {b : Block Tx}
+theorem disseminate_vote_notarised {i : Fin n} {p : Processor n Tx} {b : Block n Tx}
     (hb : b.view = p.view) : (disseminate i p (Msg.vote i b)).1.notarised = some b := by
   rw [disseminate_fst]
   exact PreInv.foldl_send_vote_notarised hb (List.ne_nil_of_mem (List.mem_finRange i))
@@ -426,7 +431,7 @@ theorem localInv_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proce
 
 /-- 転送以外の段で自分の票を出す条件 -/
 theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
-    (h : LocalInv f i p) {b : Block Tx} {j : Fin n}
+    (h : LocalInv f i p) {b : Block n Tx} {j : Fin n}
     (hv : Action.send (Msg.vote i b) j ∈ innerActs f Δ lead i p) :
     ∃ q : Processor n Tx, LocalInv f i q ∧ q.view = b.view
       ∧ q.notarised = none ∧ q.nullified = false ∧ p.S ⊆ q.S
@@ -444,7 +449,7 @@ theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
     rcases hnew m hm with hm | ⟨b'', rfl, _⟩
     · exact Or.inl hm
     · exact Or.inr rfl
-  · obtain ⟨_, hm⟩ := send_propose_eq hv; cases hm
+  · obtain ⟨_, hm, _⟩ := send_propose_eq hv; cases hm
   · obtain ⟨b', hm, hbv, hnot, hnl, hvp, _⟩ := send_voteProposal_eq hv
     injection hm with _ hbb
     subst hbb
@@ -459,7 +464,7 @@ theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
     view が b の view で、notarised = none、nullified = false、S に M-notarisation か
     valid proposal がある。 -/
 theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
-    (h : LocalInv f i p) {b : Block Tx} {j : Fin n}
+    (h : LocalInv f i p) {b : Block n Tx} {j : Fin n}
     (hv : Action.send (Msg.vote i b) j ∈ Algo.step f Δ lead i p) :
     Msg.vote i b ∈ p.S ∨ ∃ q : Processor n Tx, LocalInv f i q ∧ q.view = b.view
       ∧ q.notarised = none ∧ q.nullified = false ∧ p.S ⊆ q.S
@@ -475,7 +480,7 @@ theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proc
 /-- 自分の nullify(b.view) を出し、b への自分の票が S にあるか同じスロットで出すなら、
     nullify は 24〜28 行で、その段の入力 st4 には b 以外への進捗のなさの証拠がある。 -/
 theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
-    (h : LocalInv f i p) {b : Block Tx} {j j' : Fin n}
+    (h : LocalInv f i p) {b : Block n Tx} {j j' : Fin n}
     (hb : Msg.vote i b ∈ p.S ∨ Action.send (Msg.vote i b) j ∈ Algo.step f Δ lead i p)
     (hn : Action.send (Msg.nullify i b.view) j' ∈ Algo.step f Δ lead i p)
     (hno : Msg.nullify i b.view ∉ p.S) :
@@ -495,7 +500,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
       injection hm with _ hbb
       subst hbb
       exact Or.inl hlt
-    · obtain ⟨_, hm⟩ := send_propose_eq hb; cases hm
+    · obtain ⟨_, hm, _⟩ := send_propose_eq hb; cases hm
     · obtain ⟨b', hm, _, _, _, _, hnot⟩ := send_voteProposal_eq hb
       injection hm with _ hbb
       subst hbb
@@ -525,7 +530,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   simp only [innerActs, List.mem_append] at hn'
   rcases hn' with ((((hn | hn) | hn) | hn) | hn)
   · obtain ⟨_, _, hm, _⟩ := send_climb h hn; cases hm
-  · obtain ⟨_, hm⟩ := send_propose_eq hn; cases hm
+  · obtain ⟨_, hm, _⟩ := send_propose_eq hn; cases hm
   · obtain ⟨_, hm, _⟩ := send_voteProposal_eq hn; cases hm
   · -- 13〜14 行: st3 で notarised = none
     exfalso

@@ -10,8 +10,8 @@ import Minimmit.Analysis.Responsiveness.Lemma5_9
 
 - リーダーの条件は「どの f_a + 1 個の連続する view にも正直なリーダーがいる」。f_a はこの
   条件のパラメータで、定理は f_a ≤ f を課さない。論文の f_a は実際に腐敗する人数で f 以下、
-  論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこの条件を満たすので、
-  論文の設定はこの条件の一例。
+  論文の輪番 lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこの条件を満たす
+  （Model/Constraint/Witness の `roundRobin_correct_leader`）ので、論文の設定はこの条件の一例。
 - 論文の O(·) は具体的な上界 t + δ + (f_a + 1)(2Δ + 3δ) + 3δ に置き換える。論文の証明は
   O(f_a Δ + δ) のままで数字を出さない。この上界は、取引が全正直者に届く t + δ に、Lemma 5.9
   の上界を f_a + 1 view 分と Lemma 5.8 の上界を足したもの。具体的な上界は O(·) の主張を含む。
@@ -29,7 +29,7 @@ variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx
 /-- Lemma 5.10（Optimistic responsiveness）: 取引 tr を正直者が初めて受け取るのが t ≥ GST
     なら、正直者は全員 t + δ + (f_a + 1)(2Δ + 3δ) + 3δ までに tr を finalise する。
     どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する（論文の
-    lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす）。 -/
+    lead(v) = p_{(v mod n)+1} は f_a 人以下の腐敗のもとでこれを満たす、`roundRobin_correct_leader`）。 -/
 theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {fa : Nat}
@@ -40,7 +40,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hfirst : ∀ j t', Correct s₀ instrs j → t' < t →
       Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S)
     (hgst : GST.val ≤ t) :
-    ∀ j, Correct s₀ instrs j → ∃ b : Block Tx,
+    ∀ j, Correct s₀ instrs j → ∃ b : Block n Tx,
       LNotarised f ((State.run s₀ instrs (t + δ + (fa + 1) * (2 * Δ + 3 * δ) + 3 * δ)).procs j).S b
       ∧ tr ∈ b.trStar := by
   classical

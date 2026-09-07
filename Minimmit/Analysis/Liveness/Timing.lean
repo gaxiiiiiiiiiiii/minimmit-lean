@@ -146,26 +146,10 @@ theorem PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ GST s₀ instrs) (h�
 
 /-! ### 正直者の送信は届く -/
 
-/-- Algorithm 1 が送る message はガードを通る。 -/
-theorem Algo.send_guard {p : Processor n Tx} {i : Fin n} {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ Algo.step f Δ lead i p) : m.signer = some i ∨ m ∈ p.S := by
-  rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at h
-  rcases List.mem_append.mp h with h | h
-  · simp only [Algo.innerActs, List.mem_append] at h
-    rcases h with ((((h | h) | h) | h) | h)
-    · rcases Algo.mem_S_climb (Algo.mem_S_of_send_climb h) with hm | ⟨b, rfl, _⟩
-      · exact Or.inr hm
-      · exact Or.inl rfl
-    · obtain ⟨_, rfl⟩ := Algo.send_propose_eq h; exact Or.inl rfl
-    · obtain ⟨_, rfl, _⟩ := Algo.send_voteProposal_eq h; exact Or.inl rfl
-    · obtain ⟨rfl, _⟩ := Algo.send_nullifyTimeout_eq h; exact Or.inl rfl
-    · obtain ⟨rfl, _⟩ := Algo.send_nullifyNoProgress_eq h; exact Or.inl rfl
-  · exact (Algo.mem_S_stage_or f Δ lead i p (Algo.send_forwardNew_mem h)).symm
-
 theorem State.mem_pool_foldl_execute_of_send (s : State n Tx) (i : Fin n)
     {acts : List (Action n Tx)}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ acts)
-    (hg : m.signer = some i ∨ m ∈ (s.procs i).S) :
+    (hg : Processor.GuardOK i (s.procs i) acts) :
     (⟨m, j, s.now⟩ : Packet n Tx) ∈ (acts.foldl (fun s a => s.execute i a) s).pool := by
   induction acts generalizing s with
   | nil => simp at h
@@ -173,17 +157,17 @@ theorem State.mem_pool_foldl_execute_of_send (s : State n Tx) (i : Fin n)
     rw [List.foldl_cons]
     rcases List.mem_cons.mp h with rfl | h
     · apply State.pool_subset_foldl_execute
-      simp only [State.execute, State.send, if_pos hg, State.transmit, State.update_pool,
+      have hc := hg.1 m j rfl
+      simp only [State.execute, State.send, if_pos hc, State.transmit, State.update_pool,
         State.update_now]
       exact Finset.mem_insert_self _ _
-    · have := ih (s.execute i a) h (by
-        rw [State.execute_procs_self]
-        exact hg.imp_right fun hm => Processor.S_subset_execute i _ a hm)
+    · have := ih (s.execute i a) h (by rw [State.execute_procs_self]; exact hg.2)
       rwa [State.execute_now] at this
 
 theorem State.mem_pool_foldl_act_of_send (s : State n Tx) (instr : Instr n Tx) {l : List (Fin n)}
     (hl : l.Nodup) {i : Fin n} (hi : i ∈ l) {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ instr.actions i) (hg : m.signer = some i ∨ m ∈ (s.procs i).S) :
+    (h : Action.send m j ∈ instr.actions i)
+    (hg : Processor.GuardOK i (s.procs i) (instr.actions i)) :
     (⟨m, j, s.now⟩ : Packet n Tx)
       ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
   induction l generalizing s with
@@ -200,7 +184,7 @@ theorem State.mem_pool_foldl_act_of_send (s : State n Tx) (instr : Instr n Tx) {
 
 theorem State.mem_pool_step_of_send (s : State n Tx) (instr : Instr n Tx) {i : Fin n} {m : Msg n Tx}
     {j : Fin n} (h : Action.send m j ∈ instr.actions i)
-    (hg : m.signer = some i ∨ m ∈ (s.procs i).S) :
+    (hg : Processor.GuardOK i (s.procs i) (instr.actions i)) :
     (⟨m, j, s.now⟩ : Packet n Tx) ∈ (s.step instr).pool := by
   rw [State.step_pool]
   exact State.mem_pool_foldl_act_of_send s instr (List.nodup_finRange n) (List.mem_finRange i) h hg
@@ -210,10 +194,8 @@ theorem mem_pool_run_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
     (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (instrs t).actions i) {t' : Nat} (ht : t + 1 ≤ t') :
     (⟨m, j, ⟨t⟩⟩ : Packet n Tx) ∈ (State.run s₀ instrs t').pool := by
-  have hg : m.signer = some i ∨ m ∈ ((State.run s₀ instrs t).procs i).S := by
-    have hact := hh t i (hi t)
-    rw [hact] at h
-    exact Algo.send_guard h
+  have hg : Processor.GuardOK i ((State.run s₀ instrs t).procs i) ((instrs t).actions i) := by
+    rw [hh t i (hi t)]; exact Algo.guardOK_step f Δ lead i _
   have := State.mem_pool_step_of_send (State.run s₀ instrs t) (instrs t) h hg
   rw [run_now hinit] at this
   exact pool_subset_run ht this
@@ -285,7 +267,7 @@ theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
   forward_nullification_end hinit hh hi (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
 theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} (hg : b ≠ .gen)
     (ht : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
       ∧ ∀ q ∈ Algo.leastVoters f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b,
@@ -314,7 +296,7 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
 /-- 正直者が genesis でないブロックの M-notarisation を持つなら、その動作を終えた時点の S で
     初めてそれが完成したスロットに、番号の小さい順 2f + 1 人の票を全員へ送っている。 -/
 theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} (hg : b ≠ .gen)
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} (hg : b ≠ .gen)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b
       ∧ ∀ q ∈ Algo.leastVoters f (Algo.st5 f Δ lead i ((State.run s₀ instrs t').procs i)).S b,
@@ -336,7 +318,7 @@ theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
 
 theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs)
-    {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx}
+    {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx}
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max GST.val t + δ ≤ T) : MNotarised f ((State.run s₀ instrs T).procs j).S b := by
   by_cases hg : b = .gen
@@ -364,7 +346,7 @@ theorem nullified_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs
 
 theorem mnotarised_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs) {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat}
-    {b : Block Tx}
+    {b : Block n Tx}
     (h : MNotarised f (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S b) {T : Nat}
     (hT₁ : t + 1 ≤ T) (hT₂ : max GST.val t + δ ≤ T) :
     MNotarised f ((State.run s₀ instrs T).procs j).S b := by
@@ -444,8 +426,8 @@ theorem S_st5_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : 
       ⊆ ((State.run s₀ instrs (t + 1)).procs i).S :=
   (Algo.S_st5_subset_stepPair f Δ lead i _).trans (S_stepPair_subset_succ hh hi t)
 
-theorem Algo.hasCert_of_mnotarised {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx} (hg : b ≠ .gen)
-    (h : MNotarised f S b) : Algo.HasCert f S b.view := by
+theorem Algo.hasCert_of_mnotarised {f : Nat} {S : Finset (Msg n Tx)} {b : Block n Tx}
+    (hg : b ≠ .gen) (h : MNotarised f S b) : Algo.HasCert f S b.view := by
   right
   rcases h with h' | h'
   · exact absurd h' hg
@@ -470,7 +452,7 @@ theorem leave_of_nullified (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi :
   leave_of_hasCert hh hi hv (Or.inl h)
 
 theorem leave_of_mnotarised (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
-    {t : Nat} {b : Block Tx} (hv : viewAt s₀ instrs i t = b.view) (hg : b ≠ .gen)
+    {t : Nat} {b : Block n Tx} (hv : viewAt s₀ instrs i t = b.view) (hg : b ≠ .gen)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
     b.view.val < (viewAt s₀ instrs i (t + 1)).val :=
   leave_of_hasCert hh hi hv (Algo.hasCert_of_mnotarised hg h)
@@ -541,7 +523,7 @@ theorem timeout (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin
 /-- 投票済みの正直者が、進捗のなさの証拠を持てば、次のスロットまでに nullify を送るか
     view を進めている。 -/
 theorem noprogress_reaction (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {v : View} {b : Block Tx} (hv : viewAt s₀ instrs i t = v)
+    (hi : Correct s₀ instrs i) {t : Nat} {v : View} {b : Block n Tx} (hv : viewAt s₀ instrs i t = v)
     (hb : ((State.run s₀ instrs t).procs i).notarised = some b)
     (h : NoProgress f ((State.run s₀ instrs t).procs i).S v (some b)) :
     Msg.nullify i v ∈ ((State.run s₀ instrs (t + 1)).procs i).S

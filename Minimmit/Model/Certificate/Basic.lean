@@ -25,7 +25,7 @@ variable [DecidableEq Tx]
 /-! ### notarisation と nullification -/
 
 /-- b への票を S に持つ署名者 -/
-def voters (S : Finset (Msg n Tx)) (b : Block Tx) : Finset (Fin n) :=
+def voters (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.vote q b ∈ S
 
 /-- nullify(v) を S に持つ署名者 -/
@@ -33,17 +33,17 @@ def nullifiers (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.nullify q v ∈ S
 
 /-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む。 -/
-def MNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
+def MNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
   b = .gen ∨ 2 * f + 1 ≤ (voters S b).card
 
-instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Decidable (MNotarised f S b) :=
+instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Decidable (MNotarised f S b) :=
   inferInstanceAs (Decidable (_ ∨ _))
 
 /-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む。 -/
-def LNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Prop :=
+def LNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
   b = .gen ∨ n - f ≤ (voters S b).card
 
-instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Decidable (LNotarised f S b) :=
+instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Decidable (LNotarised f S b) :=
   inferInstanceAs (Decidable (_ ∨ _))
 
 /-- S が view v の nullification を含む（§4）: 異なる 2f + 1 人の nullify(v)。 -/
@@ -57,13 +57,15 @@ instance (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Decidable (Nullified f S
 
 /-- S が view v の valid proposal b を含む（§4）。 -/
 structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View)
-    (b : Block Tx) : Prop where
+    (b : Block n Tx) : Prop where
   /-- (i) b は view v のブロック。 -/
   view : b.view = v
-  /-- (i) b は lead(v) の署名付きで S にある。 -/
-  signed : Msg.propose (lead v) b ∈ S
-  /-- (i) lead(v) の署名付きの view v のブロックは S に b しかない。 -/
-  unique : ∀ b', b'.view = v → Msg.propose (lead v) b' ∈ S → b' = b
+  /-- (i) b は lead(v) の署名付き。 -/
+  signed : b.signer = some (lead v)
+  /-- (i) S は b を含む。 -/
+  mem : containsBlock S b
+  /-- (i) lead(v) の署名付きの view v のブロックで S が含むのは b だけ。 -/
+  unique : ∀ b', b'.view = v → b'.signer = some (lead v) → containsBlock S b' → b' = b
   /-- b は genesis でなく、親を持つ。 -/
   ne_gen : b ≠ .gen
   /-- (ii) 親の M-notarisation -/
@@ -76,24 +78,24 @@ structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)
 /-- q が view v の proof of no progress に寄与する（Algorithm 1 の 24〜27 行）: nullify(v)
     を送ったか、notarised 以外の view v のブロックに投票した。論文はこの条件に名前を
     付けておらず、29 行の注釈 "proof of no progress" から名付けた。 -/
-inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block Tx))
+inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block n Tx))
     (q : Fin n) : Prop where
   /-- (i) nullify(v) が S にある。 -/
   | nullify (h : Msg.nullify q v ∈ S) : NoProgressWitness S v notarised q
   /-- (ii) notarised 以外の view v のブロック b への票が S にある。 -/
-  | vote (b : Block Tx) (hv : b.view = v) (hne : some b ≠ notarised)
+  | vote (b : Block n Tx) (hv : b.view = v) (hne : some b ≠ notarised)
       (h : Msg.vote q b ∈ S) : NoProgressWitness S v notarised q
 
 open Classical in
 /-- view v の proof of no progress に寄与する署名者 -/
 noncomputable def noProgressWitnesses (S : Finset (Msg n Tx)) (v : View)
-    (notarised : Option (Block Tx)) : Finset (Fin n) :=
+    (notarised : Option (Block n Tx)) : Finset (Fin n) :=
   Finset.univ.filter (NoProgressWitness S v notarised)
 
 /-- view v の proof of no progress が S にある（Algorithm 1 の 24〜27 行）: 寄与する署名者が
     2f + 1 人以上。 -/
 def NoProgress (f : Nat) (S : Finset (Msg n Tx)) (v : View)
-    (notarised : Option (Block Tx)) : Prop :=
+    (notarised : Option (Block n Tx)) : Prop :=
   2 * f + 1 ≤ (noProgressWitnesses S v notarised).card
 
 end
@@ -103,7 +105,7 @@ end
 
 open Classical in
 /-- b への自分の票を送ったプロセッサ -/
-noncomputable def voteSenders (instrs : Nat → Instr n Tx) (b : Block Tx) : Finset (Fin n) :=
+noncomputable def voteSenders (instrs : Nat → Instr n Tx) (b : Block n Tx) : Finset (Fin n) :=
   Finset.univ.filter fun q => Sends instrs q (.vote q b)
 
 open Classical in
@@ -112,11 +114,11 @@ noncomputable def nullifySenders (instrs : Nat → Instr n Tx) (v : View) : Fins
   Finset.univ.filter fun q => Sends instrs q (.nullify q v)
 
 /-- b が M-notarisation を受ける（§5.1）: b = genesis か、2f + 1 人以上が b に投票した。 -/
-def ReceivesM (f : Nat) (instrs : Nat → Instr n Tx) (b : Block Tx) : Prop :=
+def ReceivesM (f : Nat) (instrs : Nat → Instr n Tx) (b : Block n Tx) : Prop :=
   b = .gen ∨ 2 * f + 1 ≤ (voteSenders instrs b).card
 
 /-- b が L-notarisation を受ける（§5.1）: b = genesis か、n − f 人以上が b に投票した。 -/
-def ReceivesL (f : Nat) (instrs : Nat → Instr n Tx) (b : Block Tx) : Prop :=
+def ReceivesL (f : Nat) (instrs : Nat → Instr n Tx) (b : Block n Tx) : Prop :=
   b = .gen ∨ n - f ≤ (voteSenders instrs b).card
 
 /-- view v が nullification を受ける（§5.1）: 2f + 1 人以上が nullify(v) を送った。 -/

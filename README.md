@@ -64,7 +64,7 @@ printf 'import Minimmit\n#print axioms Minimmit.liveness\n' | lake env lean --st
 |---|---|
 | タイムスロット、現在時刻 | `Time`、`State.now`、`State.run` |
 | プロセッサ、腐敗 | `Processor`、`State.byz`、`Instr.corrupts`、`Correct`、`ByzBound` |
-| 署名の偽造不能 | `Msg.signer` と `State.send` のガード |
+| 署名の偽造不能 | `Block.signer`・`Msg.signer` と `State.send` のガード `Processor.canSend` |
 | 部分同期（GST、Δ） | `PartialSync`、`State.Timely` |
 | 取引 | `Msg.tx`、`Instr.submits` |
 | log、finalise | 形式化していない。S に `LNotarised` があることで表す |
@@ -124,7 +124,7 @@ Minimmit
 │   └── Constraint
 │       ├── Basic.lean          Init、PartialSync、Correct、ByzBound、Fair、Honest
 │       ├── Run.lean            署名の遡り（S にあれば署名者が前に送った）、腐敗の数え上げ、不変量の実行への持ち上げ
-│       └── Witness.lean        Init・Honest・ByzBound・PartialSync を同時に満たす実行の例、輪番の lead が Fair を満たすこと
+│       └── Witness.lean        Init・Honest・ByzBound・PartialSync を同時に満たす実行の例、輪番の lead が Fair と 5.10 のリーダーの仮定を満たすこと
 └── Analysis
     ├── Consistency
     │   ├── Lemma5_1.lean

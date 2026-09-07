@@ -78,21 +78,47 @@ noncomputable def nullifyViews (S : Finset (Msg n Tx)) : List View :=
   (S.toList.filterMap fun m => match m with | .nullify _ v => some v | _ => none).dedup
 
 /-- S にある票のブロックを重複なく列挙する。 -/
-noncomputable def votedBlocks (S : Finset (Msg n Tx)) : List (Block Tx) :=
+noncomputable def votedBlocks (S : Finset (Msg n Tx)) : List (Block n Tx) :=
   (S.toList.filterMap fun m => match m with | .vote _ b => some b | _ => none).dedup
 
-/-- S にある、lead(v) の署名付きの view v のブロックを重複なく列挙する。valid proposal の
+/-- S が含む、lead(v) の署名付きの view v のブロックを重複なく列挙する。valid proposal の
     条件 (i) は、これがちょうど 1 つであること。 -/
 noncomputable def proposals (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View) :
-    List (Block Tx) :=
-  (S.toList.filterMap fun m => match m with
-    | .propose q b => if q = lead v ∧ b.view = v then some b else none
-    | _ => none).dedup
+    List (Block n Tx) :=
+  (S.toList.filterMap fun m => match m.block with
+    | some b => if b.signer = some (lead v) ∧ b.view = v then some b else none
+    | none => none).dedup
+
+theorem containsBlock_of_mem_votedBlocks {S : Finset (Msg n Tx)} {b : Block n Tx}
+    (h : b ∈ votedBlocks S) : containsBlock S b := by
+  simp only [votedBlocks, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at h
+  obtain ⟨m, hm, hmb⟩ := h
+  refine ⟨m, hm, ?_⟩
+  cases m with
+  | vote q b' => simp only [Option.some.injEq] at hmb; subst hmb; rfl
+  | _ => simp at hmb
+
+theorem containsBlock_of_mem_proposals {lead : View → Fin n} {S : Finset (Msg n Tx)} {v : View}
+    {b : Block n Tx} (h : b ∈ proposals lead S v) : containsBlock S b := by
+  simp only [proposals, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at h
+  obtain ⟨m, hm, hmb⟩ := h
+  refine ⟨m, hm, ?_⟩
+  cases hb : m.block with
+  | none => simp [hb] at hmb
+  | some b' =>
+    simp only [hb] at hmb
+    split_ifs at hmb
+    simp only [Option.some.injEq] at hmb; subst hmb; rfl
 
 /-- S にある、M-notarisation を持つ view v のブロックを重複なく列挙する。 -/
 noncomputable def mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
-    List (Block Tx) :=
+    List (Block n Tx) :=
   (votedBlocks S).filter fun b => decide (b.view = v ∧ MNotarised f S b)
+
+theorem containsBlock_of_mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v : View}
+    {b : Block n Tx} (h : b ∈ mNotarisedAt f S v) : containsBlock S b := by
+  simp only [mNotarisedAt, List.mem_filter] at h
+  exact containsBlock_of_mem_votedBlocks h.1
 
 /-! ## 各段の部品
 `step` の評価順に並べる。13〜14 行と 24〜28 行は部品を持たず、`step` に直接書く。 -/
@@ -141,12 +167,12 @@ noncomputable def climb (f : Nat) (i : Fin n) :
 /-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
     最大のもの。票のあるブロックに候補が無ければ genesis。genesis は view 0 で常に
     M-notarisation を持つ。同じ view に複数あれば `votedBlocks` の順で先のもの。 -/
-noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block Tx :=
+noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block n Tx :=
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen
 
 /-- ProposeChild(b, v) の Tr（§4）: 受信済みで b の祖先に含まれない取引。 -/
-noncomputable def payload (S : Finset (Msg n Tx)) (b : Block Tx) : List Tx :=
+noncomputable def payload (S : Finset (Msg n Tx)) (b : Block n Tx) : List Tx :=
   (S.toList.filterMap fun m => match m with | .tx tr => some tr | _ => none).filter
     fun tr => decide (tr ∉ b.trStar)
 
@@ -159,7 +185,7 @@ def leastNullifiers (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n
 
 /-- S にある b への票の署名者のうち、番号の小さい順に 2f + 1 人。論文の「辞書順最小の
     M-notarisation」の署名者。 -/
-def leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block Tx) : Finset (Fin n) :=
+def leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin n) :=
   (((voters S b).sort (· ≤ ·)).take (2 * f + 1)).toFinset
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
@@ -196,7 +222,7 @@ noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
   let r₂ :=
     if lead p.view = i ∧ p.proposed = false then
       let parent := selectParent f p.S p.view
-      disseminate i p (.propose i (.node p.view (payload p.S parent) parent))
+      disseminate i p (.propose (.node i p.view (payload p.S parent) parent))
     else (p, [])
   let p := r₂.1
   -- 9〜11 行

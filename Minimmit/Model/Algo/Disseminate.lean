@@ -75,10 +75,10 @@ theorem mem_S_disseminate_fst (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
 
 /-- ガードを通る message の disseminate は、動作の畳み込みと局所状態が一致する。 -/
 theorem executeAll_disseminate {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
-    (h : m.signer = some i ∨ m ∈ p.S) :
+    (h : p.canSend i m) :
     p.executeAll i (disseminate i p m).2 = (disseminate i p m).1 := by
   rw [disseminate_snd, disseminate_fst]
-  suffices key : ∀ (l : List (Fin n)) (p : Processor n Tx), (m.signer = some i ∨ m ∈ p.S) →
+  suffices key : ∀ (l : List (Fin n)) (p : Processor n Tx), p.canSend i m →
       p.executeAll i (l.map (Action.send m)) = l.foldl (fun p j => p.send i m j) p by
     exact key _ _ h
   intro l
@@ -86,9 +86,25 @@ theorem executeAll_disseminate {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
   | nil => intros; rfl
   | cons j l ih =>
     intro p h
-    simp only [List.map_cons, Processor.executeAll_cons, List.foldl_cons, Processor.execute, h,
-      if_true]
-    exact ih _ (h.imp_right fun hm => Processor.S_subset_send i p m j hm)
+    simp only [List.map_cons, Processor.executeAll_cons, List.foldl_cons, Processor.execute,
+      if_pos h]
+    exact ih _ (Processor.canSend_mono (Processor.S_subset_send i p m j) h)
+
+/-- ガードを通る message の disseminate の各 send は、その時点のガードを通る。 -/
+theorem guardOK_disseminate {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} (h : p.canSend i m) :
+    Processor.GuardOK i p (disseminate i p m).2 := by
+  rw [disseminate_snd]
+  suffices key : ∀ (l : List (Fin n)) (p : Processor n Tx), p.canSend i m →
+      Processor.GuardOK i p (l.map (Action.send m)) by
+    exact key _ _ h
+  intro l
+  induction l with
+  | nil => intros; trivial
+  | cons j l ih =>
+    intro p h
+    simp only [List.map_cons]
+    exact Processor.GuardOK.send_cons h
+      (ih _ (Processor.canSend_mono (Processor.S_subset_send i p m j) h))
 
 /-! ### disseminateAll -/
 
@@ -128,7 +144,7 @@ theorem S_subset_foldl_send_fst (i : Fin n) (ms : List (Msg n Tx)) (p : Processo
   | cons m ms ih => exact (S_subset_disseminate_fst i p m).trans (ih _)
 
 theorem executeAll_disseminateAll {i : Fin n} {p : Processor n Tx} {ms : List (Msg n Tx)}
-    (h : ∀ m ∈ ms, m.signer = some i ∨ m ∈ p.S) :
+    (h : ∀ m ∈ ms, p.canSend i m) :
     p.executeAll i (disseminateAll i p ms).2 = (disseminateAll i p ms).1 := by
   rw [disseminateAll_snd, disseminateAll_fst]
   revert h
@@ -139,7 +155,22 @@ theorem executeAll_disseminateAll {i : Fin n} {p : Processor n Tx} {ms : List (M
     simp only [List.flatMap_cons, List.foldl_cons, Processor.executeAll_append]
     rw [← disseminate_snd i p m, executeAll_disseminate (h m (List.mem_cons_self ..))]
     exact ih fun m' hm' =>
-      (h m' (List.mem_cons_of_mem _ hm')).imp_right fun hm => S_subset_disseminate_fst i p m hm
+      Processor.canSend_mono (S_subset_disseminate_fst i p m) (h m' (List.mem_cons_of_mem _ hm'))
+
+theorem guardOK_disseminateAll {i : Fin n} {p : Processor n Tx} {ms : List (Msg n Tx)}
+    (h : ∀ m ∈ ms, p.canSend i m) : Processor.GuardOK i p (disseminateAll i p ms).2 := by
+  rw [disseminateAll_snd]
+  revert h
+  induction ms generalizing p with
+  | nil => intro _; trivial
+  | cons m ms ih =>
+    intro h
+    simp only [List.flatMap_cons]
+    rw [← disseminate_snd i p m]
+    refine Processor.GuardOK.append (guardOK_disseminate (h m (List.mem_cons_self ..))) ?_
+    rw [executeAll_disseminate (h m (List.mem_cons_self ..))]
+    exact ih fun m' hm' =>
+      Processor.canSend_mono (S_subset_disseminate_fst i p m) (h m' (List.mem_cons_of_mem _ hm'))
 
 end Algo
 

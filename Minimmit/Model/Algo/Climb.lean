@@ -21,27 +21,27 @@ theorem mem_nullifyViews {S : Finset (Msg n Tx)} {q : Fin n} {v : View} (h : Msg
   simp only [nullifyViews, List.mem_dedup, List.mem_filterMap, Finset.mem_toList]
   exact ⟨Msg.nullify q v, h, rfl⟩
 
-theorem mem_votedBlocks {S : Finset (Msg n Tx)} {q : Fin n} {b : Block Tx} (h : Msg.vote q b ∈ S) :
-    b ∈ votedBlocks S := by
+theorem mem_votedBlocks {S : Finset (Msg n Tx)} {q : Fin n} {b : Block n Tx}
+    (h : Msg.vote q b ∈ S) : b ∈ votedBlocks S := by
   simp only [votedBlocks, List.mem_dedup, List.mem_filterMap, Finset.mem_toList]
   exact ⟨Msg.vote q b, h, rfl⟩
 
-theorem exists_vote_of_mem_votedBlocks {S : Finset (Msg n Tx)} {b : Block Tx}
+theorem exists_vote_of_mem_votedBlocks {S : Finset (Msg n Tx)} {b : Block n Tx}
     (h : b ∈ votedBlocks S) : ∃ q, Msg.vote q b ∈ S := by
   simp only [votedBlocks, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at h
   obtain ⟨m, hm, hmb⟩ := h
   cases m with
-  | propose q b' => simp at hmb
+  | propose b' => simp at hmb
   | vote q b' => simp at hmb; subst hmb; exact ⟨q, hm⟩
   | nullify q v => simp at hmb
   | tx tr => simp at hmb
 
 theorem mem_votedBlocks_of_mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v : View}
-    {b : Block Tx} (h : b ∈ mNotarisedAt f S v) : b ∈ votedBlocks S := by
+    {b : Block n Tx} (h : b ∈ mNotarisedAt f S v) : b ∈ votedBlocks S := by
   simp only [mNotarisedAt, List.mem_filter] at h
   exact h.1
 
-theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block Tx}
+theorem mem_mNotarisedAt_of {f : Nat} {S : Finset (Msg n Tx)} {b : Block n Tx}
     (hb : b ∈ votedBlocks S)
     (hM : MNotarised f S b) : b ∈ mNotarisedAt f S b.view := by
   simp only [mNotarisedAt, List.mem_filter, decide_eq_true_eq]

@@ -1,4 +1,5 @@
 import Minimmit.Model.Constraint.Basic
+import Minimmit.Model.Constraint.Run
 import Minimmit.Model.Transition.Execute
 
 /-!
@@ -8,7 +9,8 @@ import Minimmit.Model.Transition.Execute
 `Algo.step` に従い、送った packet がそのスロットのうちに届く実行を、スロットの冒頭の状態から
 そのスロットの指示を作る再帰で定義する。§5 の補題の仮定が矛盾しないことを
 `constraints_satisfiable` として示す。あわせて、論文の輪番のリーダー関数が `Fair` を満たすことを
-`roundRobin_fair` として示す。
+`roundRobin_fair` として、Lemma 5.10 のリーダーの仮定を満たすことを `roundRobin_correct_leader`
+として示す。
 -/
 
 namespace Minimmit
@@ -150,5 +152,30 @@ theorem roundRobin_fair (hn : 0 < n) : Fair (roundRobin hn) := by
   · apply Fin.ext
     show (i.val + (v.val / n + 1) * n) % n = i.val
     rw [Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt i.isLt]
+
+/-- 論文の輪番は、腐敗が fa 人以下で fa + 1 ≤ n なら、どの fa + 1 個の連続する view にも正直な
+    リーダーを持つ（Lemma 5.10 のリーダーの仮定）。 -/
+theorem roundRobin_correct_leader {s₀ : State n Tx} {instrs : Nat → Instr n Tx} (hn : 0 < n)
+    {fa : Nat} (hfa : fa + 1 ≤ n) (hb : ByzBound fa s₀ instrs) (v : View) :
+    ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa ∧ Correct s₀ instrs (roundRobin hn v') := by
+  classical
+  -- view v〜v + fa のリーダーは相異なる fa + 1 人なので、正直者がいる
+  have hinj : Set.InjOn (fun k => roundRobin hn ⟨v.val + k⟩) ↑(Finset.range (fa + 1)) := by
+    intro k₁ hk₁ k₂ hk₂ h
+    rw [Finset.mem_coe, Finset.mem_range] at hk₁ hk₂
+    have h' : (v.val + k₁) % n = (v.val + k₂) % n := congrArg Fin.val h
+    rcases le_total k₁ k₂ with hle | hle
+    · have h0 := Nat.sub_mod_eq_zero_of_mod_eq h'.symm
+      rw [Nat.add_sub_add_left, Nat.mod_eq_of_lt (by omega)] at h0
+      omega
+    · have h0 := Nat.sub_mod_eq_zero_of_mod_eq h'
+      rw [Nat.add_sub_add_left, Nat.mod_eq_of_lt (by omega)] at h0
+      omega
+  have hcard : fa < ((Finset.range (fa + 1)).image fun k => roundRobin hn ⟨v.val + k⟩).card := by
+    rw [Finset.card_image_of_injOn hinj, Finset.card_range]; exact Nat.lt_succ_self fa
+  obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hcard
+  obtain ⟨k, hk, rfl⟩ := Finset.mem_image.mp hq
+  have hk := Finset.mem_range.mp hk
+  exact ⟨⟨v.val + k⟩, Nat.le_add_right _ _, by show v.val + k ≤ v.val + fa; omega, hqc⟩
 
 end Minimmit

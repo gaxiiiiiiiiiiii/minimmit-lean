@@ -14,7 +14,7 @@ variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat 
     受けない。 -/
 theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    {b : Block Tx} (hL : ReceivesL f instrs b) : ¬ ReceivesNullification f instrs b.view := by
+    {b : Block n Tx} (hL : ReceivesL f instrs b) : ¬ ReceivesNullification f instrs b.view := by
   intro hN
   classical
   rcases hL with rfl | hL

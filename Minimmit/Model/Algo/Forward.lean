@@ -16,8 +16,8 @@ namespace Algo
 /-! #### 転送と反応のための補題 -/
 
 /-- 転送はブロックを送らない。 -/
-theorem not_propose_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block Tx} :
-    Msg.propose q b ∉ forwardMsgs f p := by
+theorem not_propose_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {b : Block n Tx} :
+    Msg.propose b ∉ forwardMsgs f p := by
   simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter, List.mem_map,
     Finset.mem_toList, decide_eq_true_eq]
   rintro ((⟨v, _, q', _, hq⟩ | ⟨b', _, q', _, hq⟩) | ⟨_, h⟩)
@@ -37,7 +37,7 @@ theorem mem_forwardMsgs_nullify {f : Nat} {p : Processor n Tx} {q : Fin n} {v : 
   exact ⟨v, ⟨mem_nullifyViews hm, h1, h2⟩, q, hq, rfl⟩
 
 /-- 新しい M-notarisation の、番号の小さい順 2f + 1 人の票は転送される。 -/
-theorem mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block Tx}
+theorem mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block n Tx}
     (h1 : MNotarised f p.S b) (h2 : ¬ MNotarised f p.prevS b) (hq : q ∈ leastVoters f p.S b) :
     Msg.vote q b ∈ forwardMsgs f p := by
   have hm : Msg.vote q b ∈ p.S := (Finset.mem_filter.mp (leastVoters_subset f _ _ hq)).2
@@ -191,7 +191,7 @@ theorem selectParent_view_lt (f : Nat) (S : Finset (Msg n Tx)) {v : View} (hv : 
     exact hb.2.1
 
 /-- SelectParent は、M-notarisation を持つ v 未満の view のブロックのうち view 最大のものを選ぶ。 -/
-theorem selectParent_max (f : Nat) (S : Finset (Msg n Tx)) (v : View) {b : Block Tx}
+theorem selectParent_max (f : Nat) (S : Finset (Msg n Tx)) (v : View) {b : Block n Tx}
     (hb : b ∈ votedBlocks S) (hlt : b.view.val < v.val) (hM : MNotarised f S b) :
     b.view.val ≤ (selectParent f S v).view.val := by
   unfold selectParent
@@ -208,30 +208,31 @@ theorem selectParent_max (f : Nat) (S : Finset (Msg n Tx)) (v : View) {b : Block
     simp at hmem
   | some m =>
     show b.view.val ≤ m.view.val
-    exact List.le_of_mem_argmax (f := fun b : Block Tx => b.view.val) hmem (Option.mem_def.mpr hl)
+    exact List.le_of_mem_argmax (f := fun b : Block n Tx => b.view.val) hmem (Option.mem_def.mpr hl)
 
-/-- lead(v) の署名付きの view v のブロックが S に b しかなければ、`proposals` は [b]。 -/
+/-- lead(v) の署名付きの view v のブロックを S が b 以外に含まなければ、`proposals` は [b]。 -/
 theorem proposals_eq_singleton {lead : View → Fin n} {S : Finset (Msg n Tx)} {v : View}
-    {b : Block Tx} (hb : Msg.propose (lead v) b ∈ S) (hbv : b.view = v)
-    (huniq : ∀ b', b'.view = v → Msg.propose (lead v) b' ∈ S → b' = b) :
+    {b : Block n Tx} (hb : containsBlock S b) (hsig : b.signer = some (lead v)) (hbv : b.view = v)
+    (huniq : ∀ b', b'.view = v → b'.signer = some (lead v) → containsBlock S b' → b' = b) :
     proposals lead S v = [b] := by
   have hmem : ∀ b', b' ∈ proposals lead S v ↔ b' = b := by
     intro b'
-    simp only [proposals, List.mem_dedup, List.mem_filterMap, Finset.mem_toList]
     constructor
-    · rintro ⟨m, hm, hmb⟩
-      cases m with
-      | propose q b'' =>
-        simp only at hmb
+    · intro h
+      have hc := containsBlock_of_mem_proposals h
+      simp only [proposals, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at h
+      obtain ⟨m, hm, hmb⟩ := h
+      cases hb' : m.block with
+      | none => simp [hb'] at hmb
+      | some b'' =>
+        simp only [hb'] at hmb
         split_ifs at hmb with hq
-        obtain rfl := Option.some.inj hmb
-        exact huniq _ hq.2 (hq.1 ▸ hm)
-      | vote q b'' => simp at hmb
-      | nullify q w => simp at hmb
-      | tx tr => simp at hmb
-    · intro hb'
-      rw [hb']
-      exact ⟨Msg.propose (lead v) b, hb, by simp [hbv]⟩
+        simp only [Option.some.injEq] at hmb; subst hmb
+        exact huniq _ hq.2 hq.1 hc
+    · rintro rfl
+      obtain ⟨m, hm, hmb⟩ := hb
+      simp only [proposals, List.mem_dedup, List.mem_filterMap, Finset.mem_toList]
+      exact ⟨m, hm, by simp [hmb, hsig, hbv]⟩
   have hnd : (proposals lead S v).Nodup := List.nodup_dedup _
   rcases hl : proposals lead S v with _ | ⟨x, _ | ⟨y, l⟩⟩
   · exact absurd ((hmem b).mpr rfl) (by rw [hl]; simp)
@@ -249,7 +250,7 @@ theorem nullifyTimeout_fires {Δ : Nat} {i : Fin n} {q : Processor n Tx} (ht : q
   rw [if_pos ⟨ht, hnl, hnot⟩]
   exact mem_S_disseminate_fst i q _
 
-theorem nullifyNoProgress_fires {f : Nat} {i : Fin n} {q : Processor n Tx} {c : Block Tx}
+theorem nullifyNoProgress_fires {f : Nat} {i : Fin n} {q : Processor n Tx} {c : Block n Tx}
     (hnl : q.nullified = false) (hnot : q.notarised = some c)
     (hnp : NoProgress f q.S q.view (some c)) :
     Msg.nullify i q.view ∈ (nullifyNoProgress f i q).1.S := by

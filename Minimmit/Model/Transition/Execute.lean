@@ -28,6 +28,41 @@ namespace Processor
 @[simp] theorem tick_S (p : Processor n Tx) : p.tick.S = p.S := rfl
 @[simp] theorem tick_prevS (p : Processor n Tx) : p.tick.prevS = p.S := rfl
 
+/-! ### 送信の制約の単調性 -/
+
+theorem _root_.Minimmit.containsBlock_mono [DecidableEq Tx] {S S' : Finset (Msg n Tx)} (h : S ⊆ S')
+    {b : Block n Tx} (hb : containsBlock S b) : containsBlock S' b :=
+  let ⟨m, hm, hmb⟩ := hb; ⟨m, h hm, hmb⟩
+
+theorem blockOK_mono [DecidableEq Tx] {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {i : Fin n}
+    {o : Option (Block n Tx)} (ho : blockOK S i o) : blockOK S' i o := by
+  cases o with
+  | none => trivial
+  | some b => exact ho.imp_right (containsBlock_mono h)
+
+theorem canSend_mono [DecidableEq Tx] {p q : Processor n Tx} (hS : p.S ⊆ q.S) {i : Fin n}
+    {m : Msg n Tx} (h : p.canSend i m) : q.canSend i m :=
+  ⟨h.1.imp_right fun hm => hS hm, blockOK_mono hS h.2⟩
+
+theorem canSend_of_mem [DecidableEq Tx] {p : Processor n Tx} {i : Fin n} {m : Msg n Tx}
+    (hm : m ∈ p.S) : p.canSend i m := by
+  refine ⟨Or.inr hm, ?_⟩
+  cases hb : m.block with
+  | none => trivial
+  | some b => exact Or.inr ⟨m, hm, hb⟩
+
+theorem canSend_propose [DecidableEq Tx] {p : Processor n Tx} {i : Fin n} {b : Block n Tx}
+    (hb : b.signer = some i) : p.canSend i (.propose b) :=
+  ⟨Or.inl hb, Or.inl hb⟩
+
+theorem canSend_vote [DecidableEq Tx] {p : Processor n Tx} {i : Fin n} {b : Block n Tx}
+    (hb : containsBlock p.S b) : p.canSend i (.vote i b) :=
+  ⟨Or.inl rfl, Or.inr hb⟩
+
+theorem canSend_nullify [DecidableEq Tx] {p : Processor n Tx} {i : Fin n} {v : View} :
+    p.canSend i (.nullify i v) :=
+  ⟨Or.inl rfl, trivial⟩
+
 /-! ### S だけが増える関係 -/
 
 /-- q から p へ、S が増える以外は変わらない。配送・取引が局所状態に与える効果はこの形。 -/
@@ -56,7 +91,7 @@ theorem SGrows.receive (p : Processor n Tx) (m : Msg n Tx) : p.SGrows (p.receive
 /-- 動作 a の局所効果: `State.execute` が procs i に与える効果と一致する。send には
     `State.send` と同じガードが付く。 -/
 def execute (i : Fin n) (p : Processor n Tx) : Action n Tx → Processor n Tx
-  | .send m j => if m.signer = some i ∨ m ∈ p.S then p.send i m j else p
+  | .send m j => if p.canSend i m then p.send i m j else p
   | .progress => p.progress
 
 /-- 動作の列の局所効果 -/
@@ -94,6 +129,28 @@ theorem S_subset_executeAll (i : Fin n) (p : Processor n Tx) (acts : List (Actio
   | nil => exact Finset.Subset.refl _
   | cons a acts ih => exact (S_subset_execute i p a).trans (ih _)
 
+/-! ### 動作の列のガード -/
+
+/-- 動作の列の各 send が、その時点の局所状態のガードを通る。 -/
+def GuardOK (i : Fin n) : Processor n Tx → List (Action n Tx) → Prop
+  | _, [] => True
+  | p, a :: acts => (∀ m j, a = .send m j → p.canSend i m) ∧ GuardOK i (p.execute i a) acts
+
+theorem GuardOK.append {i : Fin n} {p : Processor n Tx} {l₁ l₂ : List (Action n Tx)}
+    (h₁ : GuardOK i p l₁) (h₂ : GuardOK i (p.executeAll i l₁) l₂) : GuardOK i p (l₁ ++ l₂) := by
+  induction l₁ generalizing p with
+  | nil => exact h₂
+  | cons a l₁ ih => exact ⟨h₁.1, ih h₁.2 h₂⟩
+
+theorem GuardOK.send_cons {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
+    {acts : List (Action n Tx)} (h : p.canSend i m) (h' : GuardOK i (p.send i m j) acts) :
+    GuardOK i p (.send m j :: acts) :=
+  ⟨fun _ _ he => (by cases he; exact h), (by simpa only [execute, if_pos h] using h')⟩
+
+theorem GuardOK.progress_cons {i : Fin n} {p : Processor n Tx} {acts : List (Action n Tx)}
+    (h' : GuardOK i p.progress acts) : GuardOK i p (.progress :: acts) :=
+  ⟨fun _ _ he => (nomatch he), h'⟩
+
 /-! ### send の効果 -/
 
 @[simp] theorem send_view (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
@@ -123,7 +180,7 @@ theorem send_notarised_of_not_vote (i : Fin n) (p : Processor n Tx) (m : Msg n T
     split_ifs <;> rfl
   | _ => simp only [send]; split_ifs <;> rfl
 
-theorem send_vote_notarised (i : Fin n) (p : Processor n Tx) (b : Block Tx) (j : Fin n) :
+theorem send_vote_notarised (i : Fin n) (p : Processor n Tx) (b : Block n Tx) (j : Fin n) :
     (p.send i (.vote i b) j).notarised = if b.view = p.view then some b else p.notarised := by
   simp only [send, true_and]
   split_ifs <;> rfl
@@ -144,20 +201,22 @@ theorem send_nullify_nullified (i : Fin n) (p : Processor n Tx) (v : View) (j : 
   simp only [send, true_and]
   split_ifs <;> rfl
 
-/-- 自分の現在の view のブロックでなければ proposed は変わらない。 -/
+/-- 自分の署名付きの現在の view のブロックの提案でなければ proposed は変わらない。 -/
 theorem send_proposed_of_not_propose (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
-    (h : ∀ b, m = .propose i b → b.view ≠ p.view) : (p.send i m j).proposed = p.proposed := by
+    (h : ∀ b, m = .propose b → ¬ (b.signer = some i ∧ b.view = p.view)) :
+    (p.send i m j).proposed = p.proposed := by
   cases m with
-  | propose q b =>
+  | propose b =>
     simp only [send]
-    have : ¬ (q = i ∧ b.view = p.view) := fun ⟨hq, hb⟩ => h b (by rw [hq]) hb
+    have : ¬ (b.signer = some i ∧ b.view = p.view) := h b rfl
     simp only [this, if_false]
     split_ifs <;> rfl
   | _ => simp only [send]; split_ifs <;> rfl
 
-theorem send_propose_proposed (i : Fin n) (p : Processor n Tx) (b : Block Tx) (j : Fin n) :
-    (p.send i (.propose i b) j).proposed = if b.view = p.view then true else p.proposed := by
-  simp only [send, true_and]
+theorem send_propose_proposed (i : Fin n) (p : Processor n Tx) (b : Block n Tx) (j : Fin n) :
+    (p.send i (.propose b) j).proposed =
+      if b.signer = some i ∧ b.view = p.view then true else p.proposed := by
+  simp only [send]
   split_ifs <;> rfl
 
 /-- 署名者が k でない message が k の動作の後に S にあるなら、動作の前からあった。 -/
@@ -205,6 +264,36 @@ theorem mem_S_executeAll (k : Fin n) (p : Processor n Tx) (acts : List (Action n
         · exact Or.inl h
       | progress => exact Or.inl h
     · exact Or.inr ⟨j, List.mem_cons_of_mem _ hj⟩
+
+/-- k の動作の後の S が含むブロックは、前から含まれていたか、k の署名付きで、k がこの動作の列で
+    送った message の成分。 -/
+theorem containsBlock_executeAll (k : Fin n) (p : Processor n Tx)
+    (acts : List (Action n Tx)) {b : Block n Tx} (hb : containsBlock (p.executeAll k acts).S b) :
+    containsBlock p.S b
+      ∨ (b.signer = some k ∧ ∃ m j, m.block = some b ∧ Action.send m j ∈ acts) := by
+  induction acts generalizing p with
+  | nil => exact Or.inl hb
+  | cons a acts ih =>
+    rw [executeAll_cons] at hb
+    rcases ih _ hb with h | ⟨hs, m, j, hmb, hj⟩
+    · cases a with
+      | send m' j' =>
+        obtain ⟨m, hm, hmb⟩ := h
+        simp only [execute] at hm
+        split_ifs at hm with hg
+        · rw [send_S] at hm
+          split_ifs at hm
+          · rcases Finset.mem_insert.mp hm with rfl | hm
+            · have hok : b.signer = some k ∨ containsBlock p.S b := by
+                have := hg.2; rwa [hmb] at this
+              rcases hok with hs | hc
+              · exact Or.inr ⟨hs, m, j', hmb, List.mem_cons_self ..⟩
+              · exact Or.inl hc
+            · exact Or.inl ⟨m, hm, hmb⟩
+          · exact Or.inl ⟨m, hm, hmb⟩
+        · exact Or.inl ⟨m, hm, hmb⟩
+      | progress => exact Or.inl h
+    · exact Or.inr ⟨hs, m, j, hmb, List.mem_cons_of_mem _ hj⟩
 
 /-! ### receive は S 以外を変えない -/
 
@@ -368,7 +457,7 @@ theorem execute_pool_subset (s : State n Tx) (i : Fin n) (a : Action n Tx) :
 theorem mem_pool_execute {s : State n Tx} {i : Fin n} {a : Action n Tx} {x : Packet n Tx}
     (hx : x ∈ (s.execute i a).pool) :
     x ∈ s.pool ∨ ∃ m j, a = Action.send m j ∧ x = ⟨m, j, s.now⟩
-      ∧ (m.signer = some i ∨ m ∈ (s.procs i).S) := by
+      ∧ (s.procs i).canSend i m := by
   cases a with
   | send m j =>
     simp only [execute, send] at hx
@@ -389,7 +478,7 @@ theorem foldl_execute_now (s : State n Tx) (i : Fin n) (acts : List (Action n Tx
 theorem mem_pool_foldl_execute {s : State n Tx} {i : Fin n} {acts : List (Action n Tx)}
     {x : Packet n Tx} (hx : x ∈ (acts.foldl (fun s a => s.execute i a) s).pool) :
     x ∈ s.pool ∨ ∃ m j, Action.send m j ∈ acts ∧ x = ⟨m, j, s.now⟩
-      ∧ (m.signer = some i ∨ m ∈ ((s.procs i).executeAll i acts).S) := by
+      ∧ ((s.procs i).executeAll i acts).canSend i m := by
   induction acts generalizing s with
   | nil => exact Or.inl hx
   | cons a acts ih =>
@@ -397,9 +486,9 @@ theorem mem_pool_foldl_execute {s : State n Tx} {i : Fin n} {acts : List (Action
     rcases ih hx with hx | ⟨m, j, hm, hxe, hg⟩
     · rcases mem_pool_execute hx with hx | ⟨m, j, rfl, hxe, hg⟩
       · exact Or.inl hx
-      · refine Or.inr ⟨m, j, List.mem_cons_self .., hxe, hg.imp_right fun hm => ?_⟩
+      · refine Or.inr ⟨m, j, List.mem_cons_self .., hxe, Processor.canSend_mono ?_ hg⟩
         rw [Processor.executeAll_cons]
-        exact Processor.S_subset_executeAll i _ acts (Processor.S_subset_execute i _ _ hm)
+        exact (Processor.S_subset_execute i _ _).trans (Processor.S_subset_executeAll i _ acts)
     · refine Or.inr ⟨m, j, List.mem_cons_of_mem _ hm, ?_, ?_⟩
       · rw [hxe, execute_now]
       · rw [execute_procs_self] at hg
@@ -418,7 +507,7 @@ theorem mem_pool_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin 
     (hl : l.Nodup) {x : Packet n Tx}
     (hx : x ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool) :
     x ∈ s.pool ∨ ∃ k ∈ l, ∃ m j, Action.send m j ∈ instr.actions k ∧ x = ⟨m, j, s.now⟩
-      ∧ (m.signer = some k ∨ m ∈ ((s.procs k).executeAll k (instr.actions k)).S) := by
+      ∧ ((s.procs k).executeAll k (instr.actions k)).canSend k m := by
   induction l generalizing s with
   | nil => exact Or.inl hx
   | cons k l ih =>
@@ -437,7 +526,7 @@ theorem mem_pool_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin 
 theorem mem_pool_act {s : State n Tx} {instr : Instr n Tx} {x : Packet n Tx}
     (hx : x ∈ (s.act instr).pool) :
     x ∈ s.pool ∨ ∃ k m j, Action.send m j ∈ instr.actions k ∧ x = ⟨m, j, s.now⟩
-      ∧ (m.signer = some k ∨ m ∈ ((s.act instr).procs k).S) := by
+      ∧ ((s.act instr).procs k).canSend k m := by
   rcases mem_pool_foldl_act (List.nodup_finRange n) hx with hx | ⟨k, _, m, j, hm, hxe, hg⟩
   · exact Or.inl hx
   · exact Or.inr ⟨k, m, j, hm, hxe, by rwa [act_procs]⟩

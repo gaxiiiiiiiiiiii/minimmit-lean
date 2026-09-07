@@ -86,3 +86,9 @@ info: 'Minimmit.constraints_satisfiable' depends on axioms: [propext, Classical.
 
 /-- info: 'Minimmit.roundRobin_fair' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in #print axioms Minimmit.roundRobin_fair
+
+/--
+info: 'Minimmit.roundRobin_correct_leader' depends on axioms: [propext, Classical.choice,
+Quot.sound]
+-/
+#guard_msgs in #print axioms Minimmit.roundRobin_correct_leader

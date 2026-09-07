@@ -16,10 +16,11 @@ import Mathlib.Data.Finset.Card
   親はハッシュ参照で、祖先が届くことは Lemma 5.7 と 5.10 の証明が「各祖先は M-notarisation
   を受けるので f + 1 人の正直者が転送する」ことから別に導く。形式化ではこの議論が要らず、
   `liveness`・`optimistic_responsiveness` の結論 tr ∈ b.trStar は b が S に入った時点で成り立つ。
-- ブロックの署名はブロックでなく message `Msg.propose` に付く。論文はブロック自体が lead(v) の
-  署名付きで、票に埋め込まれたブロックも署名を運ぶ。valid proposal の (i) は `Msg.propose` が
-  S にあることで判定するので、論文より厳しい。§5 の証明は提案が全員に届くことを使うので、
-  結論は変わらない。
+- 署名は、署名者を成分に持つことで表す。ブロックは `Block.node` の署名者、票と nullify は
+  `Msg.vote`・`Msg.nullify` の署名者。提案 `Msg.propose` はブロックそのものを送り、提案の署名は
+  持たない。論文の "lead(v) sends b" もブロック自体を送る。偽造不能は `State.send` のガード
+  `Processor.canSend` で表す: 自分の署名付きか受信済みの message で、成分のブロックも自分の
+  署名付きか S に含まれるものだけを送れる。
 - `Block.trStar` は祖先の取引列を連結するだけで、論文の Tr* と違い重複を除去しない。
   Lemma 5.7 の結論 tr ∈ Tr* は重複の有無に依らない。
 - `State.step` は 1 スロットの中の原始関数を 動作 → tick → 配送 → 取引 → 腐敗 の順に
@@ -44,62 +45,82 @@ structure Time where
   val : Nat
 deriving DecidableEq
 
-/-- ブロック（§4）: genesis か、(view, 取引列, 親) の組。親はハッシュ値
-    でなく親ブロックそのもの。取引列が相異なることは型に含まない。 -/
-inductive Block (Tx : Type) : Type where
-  | gen : Block Tx
-  | node (v : View) (tr : List Tx) (parent : Block Tx) : Block Tx
+/-- ブロック（§4）: genesis か、署名者と (view, 取引列, 親) の組。論文のブロックは lead(v) の
+    署名付きの組で、その署名者を成分として持つ。親はハッシュ値でなく親ブロックそのもの。
+    取引列が相異なることは型に含まない。 -/
+inductive Block (n : Nat) (Tx : Type) : Type where
+  | gen : Block n Tx
+  | node (signer : Fin n) (v : View) (tr : List Tx) (parent : Block n Tx) : Block n Tx
 deriving DecidableEq
 
+/-- b の署名者、genesis なら none -/
+def Block.signer : Block n Tx → Option (Fin n)
+  | .gen => none
+  | .node q _ _ _ => some q
+
 /-- b の view、genesis なら 0 -/
-def Block.view : Block Tx → View
+def Block.view : Block n Tx → View
   | .gen => ⟨0⟩
-  | .node v _ _ => v
+  | .node _ v _ _ => v
 
 /-- b の取引列 Tr、genesis なら空 -/
-def Block.tr : Block Tx → List Tx
+def Block.tr : Block n Tx → List Tx
   | .gen => []
-  | .node _ tr _ => tr
+  | .node _ _ tr _ => tr
 
 /-- b の親、genesis には無い -/
-def Block.parent : Block Tx → Option (Block Tx)
+def Block.parent : Block n Tx → Option (Block n Tx)
   | .gen => none
-  | .node _ _ parent => some parent
+  | .node _ _ _ parent => some parent
 
 /-- b の Tr*（§2）: b と全祖先の取引列を古い順に連結した列。重複は除去しない。 -/
-def Block.trStar : Block Tx → List Tx
+def Block.trStar : Block n Tx → List Tx
   | .gen => []
-  | .node _ tr parent => parent.trStar ++ tr
+  | .node _ _ tr parent => parent.trStar ++ tr
 
 /-- `Ancestor a b`: a は b の祖先（§2）。b 自身か、b の親の祖先。 -/
-inductive Block.Ancestor : Block Tx → Block Tx → Prop where
-  | refl (b : Block Tx) : Block.Ancestor b b
-  | parent {a : Block Tx} (v : View) (tr : List Tx) (p : Block Tx) :
-      Block.Ancestor a p → Block.Ancestor a (.node v tr p)
+inductive Block.Ancestor : Block n Tx → Block n Tx → Prop where
+  | refl (b : Block n Tx) : Block.Ancestor b b
+  | parent {a : Block n Tx} (q : Fin n) (v : View) (tr : List Tx) (p : Block n Tx) :
+      Block.Ancestor a p → Block.Ancestor a (.node q v tr p)
 
-/-- message（§4）: 提案・票・nullify は署名者 q を持つ。ブロックの署名はブロックでなく
-    message に付くので、票に埋め込まれた b は lead(v) の署名を運ばない。取引（§2）は
-    環境の署名を持たず、Tx 型の値はすべて取引として扱う。 -/
+/-- message（§4）: 提案はブロックそのもので、署名者はブロックの署名者。票と nullify は
+    署名者 q を持つ。取引（§2）は環境が出すので署名者を持たず、Tx 型の値はすべて取引として
+    扱う。 -/
 inductive Msg (n : Nat) (Tx : Type) : Type where
-  | propose (q : Fin n) (b : Block Tx) : Msg n Tx
-  | vote (q : Fin n) (b : Block Tx) : Msg n Tx
+  | propose (b : Block n Tx) : Msg n Tx
+  | vote (q : Fin n) (b : Block n Tx) : Msg n Tx
   | nullify (q : Fin n) (v : View) : Msg n Tx
   | tx (tr : Tx) : Msg n Tx
 deriving DecidableEq
 
 /-- 署名者、プロセッサの署名を持たない取引では none -/
 def Msg.signer : Msg n Tx → Option (Fin n)
-  | .propose q _   => some q
+  | .propose b   => b.signer
   | .vote q _    => some q
   | .nullify q _ => some q
   | .tx _        => none
 
 /-- message が言及する view、取引では 0 -/
 def Msg.view : Msg n Tx → View
-  | .propose _ b   => b.view
+  | .propose b   => b.view
   | .vote _ b    => b.view
   | .nullify _ v => v
   | .tx _        => ⟨0⟩
+
+/-- message の成分にあるブロック、提案と票が持つ。 -/
+def Msg.block : Msg n Tx → Option (Block n Tx)
+  | .propose b => some b
+  | .vote _ b  => some b
+  | _          => none
+
+/-- S がブロック b を含む（§4）: 成分に b を持つ message が S にある。 -/
+def containsBlock [DecidableEq Tx] (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
+  ∃ m ∈ S, m.block = some b
+
+instance [DecidableEq Tx] (S : Finset (Msg n Tx)) (b : Block n Tx) :
+    Decidable (containsBlock S b) :=
+  inferInstanceAs (Decidable (∃ m ∈ S, _))
 
 /-- ネットワークに載る単位: message、宛先、送信したスロット。 -/
 structure Packet (n : Nat) (Tx : Type) where
@@ -125,7 +146,7 @@ structure Processor (n : Nat) (Tx : Type) where
   /-- この view で提案したか。 -/
   proposed : Bool
   /-- この view で投票したブロック、未投票なら none -/
-  notarised : Option (Block Tx)
+  notarised : Option (Block n Tx)
   /-- 受信した message の集合 -/
   S : Finset (Msg n Tx)
   /-- 前スロットの動作を終えた時点の S、`tick` で退避する -/
@@ -150,7 +171,7 @@ def receive [DecidableEq Tx] (p : Processor n Tx) (m : Msg n Tx) : Processor n T
 def send [DecidableEq Tx] (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n) :
     Processor n Tx :=
   let p := match m with
-    | .propose q b   => if q = i ∧ b.view = p.view then { p with proposed := true } else p
+    | .propose b   => if b.signer = some i ∧ b.view = p.view then { p with proposed := true } else p
     | .vote q b    => if q = i ∧ b.view = p.view then { p with notarised := some b } else p
     | .nullify q v => if q = i ∧ v = p.view then { p with nullified := true } else p
     | .tx _        => p
@@ -165,6 +186,24 @@ def progress (p : Processor n Tx) : Processor n Tx :=
 /-- スロット境界: タイマー T を 1 進め、S を prevS に退避する。 -/
 def tick (p : Processor n Tx) : Processor n Tx :=
   { p with timer := p.timer + 1, prevS := p.S }
+
+/-- m の成分のブロックが、自分の署名付きか S に含まれている。成分がなければ真。 -/
+def blockOK [DecidableEq Tx] (S : Finset (Msg n Tx)) (i : Fin n) : Option (Block n Tx) → Prop
+  | none => True
+  | some b => b.signer = some i ∨ containsBlock S b
+
+instance [DecidableEq Tx] (S : Finset (Msg n Tx)) (i : Fin n) (o : Option (Block n Tx)) :
+    Decidable (blockOK S i o) := by
+  cases o <;> simp only [blockOK] <;> infer_instance
+
+/-- p_i が m を送れる（§2 の署名の偽造不能）: m が自分の署名付きか受信済みで、m の成分の
+    ブロックも自分の署名付きか S に含まれている。 -/
+def canSend [DecidableEq Tx] (p : Processor n Tx) (i : Fin n) (m : Msg n Tx) : Prop :=
+  (m.signer = some i ∨ m ∈ p.S) ∧ blockOK p.S i m.block
+
+instance [DecidableEq Tx] (p : Processor n Tx) (i : Fin n) (m : Msg n Tx) :
+    Decidable (p.canSend i m) :=
+  inferInstanceAs (Decidable (_ ∧ _))
 
 end Processor
 
@@ -194,12 +233,12 @@ def update (s : State n Tx) (i : Fin n) (f : Processor n Tx → Processor n Tx) 
 def transmit [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   { s with pool := insert x s.pool }
 
-/-- p_i が m を j へ送る。m が自分の署名付きか受信済みのときだけ送り、そうでなければ
-    何もしない。§2 の、署名は偽造できないという仮定に当たる。局所状態には
-    `Processor.send` の効果、ネットワークには now 付きの packet。 -/
+/-- p_i が m を j へ送る。`Processor.canSend` を満たすときだけ送り、そうでなければ何もしない。
+    §2 の、署名は偽造できないという仮定に当たる。局所状態には `Processor.send` の効果、
+    ネットワークには now 付きの packet。 -/
 def send [DecidableEq Tx] (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n) :
     State n Tx :=
-  if m.signer = some i ∨ m ∈ (s.procs i).S then
+  if (s.procs i).canSend i m then
     (s.update i (·.send i m j)).transmit ⟨m, j, s.now⟩
   else s
 

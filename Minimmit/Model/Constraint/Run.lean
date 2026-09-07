@@ -6,9 +6,11 @@ import Mathlib.Data.Fintype.Card
 # 実行の補題
 
 `State.run` に沿って成り立つ事実。前半は正直/腐敗によらない: 署名の偽造不能の帰結（S や
-pool にある署名付き message は、その署名者が前に送った）、byz の単調性、定足数の交わり。
+pool にある署名付き message は、その署名者が前に送った。S や pool が含む署名付きブロックは、
+その署名者が前に送った message の成分）、byz の単調性、定足数の交わり。
 後半は正直者について: 局所不変量 `LocalInv`・`PropInv` が全スロットで成り立つこと、
-送るブロックは登りの後の `leaderBlock` であること、同じ view のブロックを 2 つ送らないこと。
+送るブロックは登りの後の `leaderBlock` であること、自分の署名付きのブロックは自分の S に
+含まれること、同じ view の自分の署名付きのブロックは 1 つしかないこと。
 -/
 
 namespace Minimmit
@@ -92,6 +94,72 @@ theorem sends_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} 
     (hm : m ∈ ((State.run s₀ instrs t).procs k).S) (hq : m.signer = some q) :
     Sends instrs q m :=
   (sendsBefore_of_mem_S hinit hm hq).sends
+
+/-- p_q がスロット t より前に、b を成分に持つ message を送る。 -/
+def SendsBlockBefore (instrs : Nat → Instr n Tx) (q : Fin n) (b : Block n Tx) (t : Nat) : Prop :=
+  ∃ t' < t, ∃ m j, m.block = some b ∧ Action.send m j ∈ (instrs t').actions q
+
+omit [DecidableEq Tx] in
+theorem SendsBlockBefore.mono {q : Fin n} {b : Block n Tx} {t t' : Nat}
+    (h : SendsBlockBefore instrs q b t) (htt : t ≤ t') : SendsBlockBefore instrs q b t' :=
+  let ⟨t₀, ht₀, m, j, hm, hj⟩ := h; ⟨t₀, lt_of_lt_of_le ht₀ htt, m, j, hm, hj⟩
+
+/-- スロット t の S か pool が含む、q の署名付きのブロックは、q が t より前に送った message の
+    成分。 -/
+theorem sendsBlockBefore_of_containsBlock (hinit : Init s₀) (t : Nat) :
+    (∀ k (b : Block n Tx) q, containsBlock ((State.run s₀ instrs t).procs k).S b →
+      b.signer = some q → SendsBlockBefore instrs q b t)
+    ∧ (∀ x ∈ (State.run s₀ instrs t).pool, ∀ (b : Block n Tx) q, x.msg.block = some b →
+      b.signer = some q → SendsBlockBefore instrs q b t) := by
+  induction t with
+  | zero =>
+    refine ⟨fun k b q hb _ => ?_, fun x hx _ _ _ _ => ?_⟩
+    · obtain ⟨m, hm, _⟩ := hb
+      rw [State.run, hinit.procs k] at hm; simp [Processor.init] at hm
+    · rw [State.run, hinit.pool] at hx; simp at hx
+  | succ t ih =>
+    obtain ⟨ihS, ihP⟩ := ih
+    have hrun : State.run s₀ instrs (t + 1) = (State.run s₀ instrs t).step (instrs t) := rfl
+    -- 動作の後の S
+    have hactS : ∀ k (b : Block n Tx) q,
+        containsBlock (((State.run s₀ instrs t).act (instrs t)).procs k).S b →
+        b.signer = some q → SendsBlockBefore instrs q b (t + 1) := by
+      intro k b q hb hq
+      rw [State.act_procs] at hb
+      rcases Processor.containsBlock_executeAll k _ _ hb with hb | ⟨hk, m, j, hmb, hj⟩
+      · exact (ihS k b q hb hq).mono (Nat.le_succ t)
+      · rw [hq] at hk
+        obtain rfl := Option.some.inj hk
+        exact ⟨t, Nat.lt_succ_self t, m, j, hmb, hj⟩
+    -- 動作の後の pool
+    have hactP : ∀ x ∈ ((State.run s₀ instrs t).act (instrs t)).pool, ∀ (b : Block n Tx) q,
+        x.msg.block = some b → b.signer = some q → SendsBlockBefore instrs q b (t + 1) := by
+      intro x hx b q hb hq
+      rcases State.mem_pool_act hx with hx | ⟨k, m, j, hm, rfl, hg⟩
+      · exact (ihP x hx b q hb hq).mono (Nat.le_succ t)
+      · simp only at hb
+        have hok : b.signer = some k
+            ∨ containsBlock (((State.run s₀ instrs t).act (instrs t)).procs k).S b := by
+          have := hg.2; rwa [hb] at this
+        rcases hok with hk | hc
+        · rw [hq] at hk
+          obtain rfl := Option.some.inj hk
+          exact ⟨t, Nat.lt_succ_self t, m, j, hb, hm⟩
+        · exact hactS k b q hc hq
+    refine ⟨fun k b q hb hq => ?_, fun x hx b q hb hq => ?_⟩
+    · obtain ⟨m, hm, hmb⟩ := hb
+      rw [hrun] at hm
+      rcases State.mem_S_step hm with hm | ⟨x, _, hxp, _, hxm⟩ | ⟨tr, rfl⟩
+      · exact hactS k b q ⟨m, hm, hmb⟩ hq
+      · rw [hxm] at hmb; exact hactP x hxp b q hmb hq
+      · cases hmb
+    · rw [hrun, State.step_pool] at hx
+      exact hactP x hx b q hb hq
+
+theorem sendsBlockBefore_of_containsBlock_S (hinit : Init s₀) {t : Nat} {k : Fin n}
+    {b : Block n Tx} {q : Fin n} (hb : containsBlock ((State.run s₀ instrs t).procs k).S b)
+    (hq : b.signer = some q) : SendsBlockBefore instrs q b t :=
+  (sendsBlockBefore_of_containsBlock hinit t).1 k b q hb hq
 
 /-! ### 腐敗 -/
 
@@ -179,6 +247,40 @@ theorem own_mem_act_of_mem_succ (hinit : Init s₀) (hh : Honest f Δ lead s₀ 
     rw [hact] at hj
     exact Algo.mem_S_of_send_step hj
 
+/-- 正直者 p_i がスロット t に送った message の成分のブロックは、スロット t + 1 の S に含まれる。 -/
+theorem containsBlock_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n} {b : Block n Tx}
+    (h : Action.send m j ∈ (instrs t).actions i) (hmb : m.block = some b) :
+    containsBlock ((State.run s₀ instrs (t + 1)).procs i).S b :=
+  ⟨m, mem_S_succ_of_send hh hi h, hmb⟩
+
+/-- 正直者 p_i の署名付きのブロックがスロット t + 1 の S に含まれれば、スロット t の動作の後の
+    S に既に含まれる。配送で初めて入ることはない。 -/
+theorem own_containsBlock_act_of_succ (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} (hb : b.signer = some i)
+    (h : containsBlock ((State.run s₀ instrs (t + 1)).procs i).S b) :
+    containsBlock (((State.run s₀ instrs t).act (instrs t)).procs i).S b := by
+  obtain ⟨t', ht', m, j, hmb, hj⟩ := sendsBlockBefore_of_containsBlock_S hinit h hb
+  refine ⟨m, ?_, hmb⟩
+  rcases Nat.lt_succ_iff_lt_or_eq.mp ht' with ht' | rfl
+  · have hmem := mem_S_succ_of_send hh hi hj
+    have hsub := S_subset_run s₀ instrs i (Nat.succ_le_of_lt ht')
+    rw [State.act_procs]
+    exact Processor.S_subset_executeAll i _ _ (hsub hmem)
+  · have hact := hh t' i (hi t')
+    rw [State.act_procs, hact, Algo.executeAll_step]
+    rw [hact] at hj
+    exact Algo.mem_S_of_send_step hj
+
+/-- 正直者 p_i の署名付きのブロックは、どのプロセッサの S に含まれていても、同じスロットの p_i
+    自身の S に含まれる。 -/
+theorem own_containsBlock_of_containsBlock (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+    {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {k : Fin n} {b : Block n Tx}
+    (hb : b.signer = some i) (h : containsBlock ((State.run s₀ instrs t).procs k).S b) :
+    containsBlock ((State.run s₀ instrs t).procs i).S b := by
+  obtain ⟨t', ht', m, j, hmb, hj⟩ := sendsBlockBefore_of_containsBlock_S hinit h hb
+  exact ⟨m, S_subset_run s₀ instrs i (Nat.succ_le_of_lt ht') (mem_S_succ_of_send hh hi hj), hmb⟩
+
 omit [DecidableEq Tx] in
 theorem localInv_init (hinit : Init s₀) (i : Fin n) : Algo.LocalInv f i (s₀.procs i) := by
   rw [hinit.procs i]
@@ -202,10 +304,9 @@ theorem localInv_run (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
   | 0 => localInv_init hinit i
   | t + 1 => localInv_step hinit hh hi t (localInv_run hinit hh hi t)
 
-omit [DecidableEq Tx] in
 theorem propInv_init (hinit : Init s₀) (i : Fin n) : Algo.PropInv i (s₀.procs i) := by
   rw [hinit.procs i]
-  refine ⟨?_, ?_, ?_⟩ <;> simp [Processor.init]
+  refine ⟨?_, ?_, ?_⟩ <;> simp [Processor.init, Algo.OwnBlock, containsBlock]
 
 theorem propInv_step (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) (t : Nat) (h : Algo.PropInv i ((State.run s₀ instrs t).procs i)) :
@@ -215,8 +316,8 @@ theorem propInv_step (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
       ((instrs t).actions i)).tick) := by
     rw [hact, Algo.executeAll_step]
     exact (h.stepPair (f := f) Δ lead).tick
-  refine hloc.of_sgrows (State.step_procs _ _ i) fun b hb => ?_
-  rw [Processor.tick_S, ← State.act_procs]; exact own_mem_act_of_mem_succ hinit hh hi rfl hb
+  refine hloc.of_sgrows (State.step_procs _ _ i) fun b ⟨hs, hb⟩ => ⟨hs, ?_⟩
+  rw [Processor.tick_S, ← State.act_procs]; exact own_containsBlock_act_of_succ hinit hh hi hs hb
 
 /-- 正直者 p_i の提案の不変量は全スロットで成り立つ。 -/
 theorem propInv_run (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
@@ -227,9 +328,9 @@ theorem propInv_run (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i :
 
 /-- 正直者がスロット t に送るブロックは、登りの後の状態の `leaderBlock`。 -/
 theorem send_propose_leaderBlock (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {b : Block Tx} {j : Fin n}
-    (h : Action.send (Msg.propose i b) j ∈ (instrs t).actions i) :
-    b = Algo.leaderBlock f (Algo.st1 f i ((State.run s₀ instrs t).procs i))
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} {j : Fin n}
+    (h : Action.send (Msg.propose b) j ∈ (instrs t).actions i) :
+    b = Algo.leaderBlock f i (Algo.st1 f i ((State.run s₀ instrs t).procs i))
       ∧ lead (Algo.st1 f i ((State.run s₀ instrs t).procs i)).view = i
       ∧ (Algo.st1 f i ((State.run s₀ instrs t).procs i)).proposed = false := by
   rw [hh t i (hi t), Algo.step_eq_stepPair, Algo.stepPair_snd] at h
@@ -238,7 +339,7 @@ theorem send_propose_leaderBlock (hinit : Init s₀) (hh : Honest f Δ lead s₀
   · obtain ⟨_, _, hm, _⟩ := Algo.send_climb (localInv_run hinit hh hi t) h
     cases hm
   · obtain ⟨hm, hl, hp⟩ := Algo.send_propose_eq' h
-    injection hm with _ hbb
+    injection hm with hbb
     exact ⟨hbb, hl, hp⟩
   · obtain ⟨_, hm, _⟩ := Algo.send_voteProposal_eq h; cases hm
   · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq h; cases hm
@@ -248,34 +349,41 @@ theorem send_propose_leaderBlock (hinit : Init s₀) (hh : Honest f Δ lead s₀
     cases hmm
     exact absurd hm' Algo.not_propose_mem_forwardMsgs
 
-/-- 正直者が同じ view のブロックを 2 つ送ることはない。 -/
-theorem leader_block_unique (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t₁ t₂ : Nat} {b₁ b₂ : Block Tx} {j₁ j₂ : Fin n}
-    (h₁ : Action.send (Msg.propose i b₁) j₁ ∈ (instrs t₁).actions i)
-    (h₂ : Action.send (Msg.propose i b₂) j₂ ∈ (instrs t₂).actions i) (hv : b₁.view = b₂.view) :
-    b₁ = b₂ := by
-  -- 同じスロットなら同じブロック。違うスロットなら、先のブロックが S にあって proposed が立つ
-  wlog hle : t₁ ≤ t₂ generalizing t₁ t₂ b₁ b₂ j₁ j₂
-  · exact (this h₂ h₁ hv.symm (Nat.le_of_not_le hle)).symm
-  obtain ⟨hb₁, _, _⟩ := send_propose_leaderBlock hinit hh hi h₁
-  obtain ⟨hb₂, _, hp₂⟩ := send_propose_leaderBlock hinit hh hi h₂
-  rcases Nat.eq_or_lt_of_le hle with rfl | hlt
-  · rw [hb₁, hb₂]
-  · exfalso
-    have hmem : Msg.propose i b₁ ∈ ((State.run s₀ instrs t₂).procs i).S :=
-      S_subset_run s₀ instrs i hlt (mem_S_succ_of_send hh hi h₁)
-    have hP := (propInv_run hinit hh hi t₂).climb (f := f)
-      (Algo.maxView ((State.run s₀ instrs t₂).procs i).S + 1)
-    have hmem1 : Msg.propose i b₁ ∈ (Algo.st1 f i ((State.run s₀ instrs t₂).procs i)).S :=
-      Algo.S_subset_st1 f i _ hmem
-    have hv1 : b₁.view = (Algo.st1 f i ((State.run s₀ instrs t₂).procs i)).view := by
-      rw [hv, hb₂]; rfl
-    have := hP.prop_flag b₁ hmem1 hv1
-    have h' : (Algo.st1 f i ((State.run s₀ instrs t₂).procs i)).proposed = true := this
-    rw [hp₂] at h'; cases h'
+/-- 正直者 p_i の署名付きのブロックがどこかの S に含まれるなら、その view は同じスロットの p_i の
+    view 以下。 -/
+theorem own_block_view_le (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {k : Fin n} {b : Block n Tx} (hb : b.signer = some i)
+    (h : containsBlock ((State.run s₀ instrs t).procs k).S b) :
+    b.view.val ≤ ((State.run s₀ instrs t).procs i).view.val :=
+  (propInv_run hinit hh hi t).prop_view b ⟨hb, own_containsBlock_of_containsBlock hinit hh hi hb h⟩
+
+/-- 正直者 p_i の署名付きで view が同じ 2 つのブロックが、それぞれどこかの S に含まれるなら
+    一致する。 -/
+theorem own_block_unique (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t₁ t₂ : Nat} {k₁ k₂ : Fin n} {b₁ b₂ : Block n Tx}
+    (h₁ : containsBlock ((State.run s₀ instrs t₁).procs k₁).S b₁)
+    (h₂ : containsBlock ((State.run s₀ instrs t₂).procs k₂).S b₂)
+    (hs₁ : b₁.signer = some i) (hs₂ : b₂.signer = some i) (hv : b₁.view = b₂.view) : b₁ = b₂ := by
+  wlog hle : t₁ ≤ t₂ generalizing t₁ t₂ k₁ k₂ b₁ b₂
+  · exact (this h₂ h₁ hs₂ hs₁ hv.symm (Nat.le_of_not_le hle)).symm
+  have h₁' := own_containsBlock_of_containsBlock hinit hh hi hs₁ h₁
+  have h₂' := own_containsBlock_of_containsBlock hinit hh hi hs₂ h₂
+  exact (propInv_run hinit hh hi t₂).prop_unique b₁ b₂
+    ⟨hs₁, containsBlock_mono (S_subset_run s₀ instrs i hle) h₁'⟩ ⟨hs₂, h₂'⟩ hv
+
+/-- 正直者 p_i の署名付きのブロックがどこかの S に含まれ、p_i が同じ view のブロックを送るなら、
+    両者は一致する。 -/
+theorem own_block_eq_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t t' : Nat} {k : Fin n} {b b' : Block n Tx} {j : Fin n}
+    (hb : containsBlock ((State.run s₀ instrs t).procs k).S b) (hs : b.signer = some i)
+    (h' : Action.send (Msg.propose b') j ∈ (instrs t').actions i) (hv : b.view = b'.view) :
+    b = b' := by
+  obtain ⟨hb', _, _⟩ := send_propose_leaderBlock hinit hh hi h'
+  exact own_block_unique hinit hh hi hb (containsBlock_succ_of_send hh hi h' rfl) hs
+    (by rw [hb']; rfl) hv
 
 omit [DecidableEq Tx] in
-theorem mem_voteSenders {q : Fin n} {b : Block Tx} :
+theorem mem_voteSenders {q : Fin n} {b : Block n Tx} :
     q ∈ voteSenders instrs b ↔ Sends instrs q (Msg.vote q b) := by
   simp [voteSenders]
 

@@ -7,7 +7,8 @@ import Minimmit.Analysis.Liveness.Finalise
 ## 論文からの差異
 
 - `liveness` は p_j の正直さを仮定しない。論文は正直者 p_j について述べるが、`PartialSync` は
-  腐敗したプロセッサ宛の配送も保証するので要らない。論文の主張を含む。
+  腐敗したプロセッサ宛の配送も保証するので要らない。§2 の Liveness そのものは Analysis/Log の
+  `satisfies_liveness` で、正直者の log について述べる。
 -/
 
 namespace Minimmit

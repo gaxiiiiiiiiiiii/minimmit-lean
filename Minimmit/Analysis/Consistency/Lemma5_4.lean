@@ -10,9 +10,8 @@ L-notarisation を受けた 2 つのブロックは一方が他方の祖先。
 
 - `consistency` は p_i・p_j の正直さを仮定しない。論文は正直者 p_i・p_j について述べるが、
   署名の遡り `sendsBefore_of_mem_S` は腐敗したプロセッサの S でも成り立つので要らない。
-  論文の主張を含む。
-- log は形式化していない。論文の log_i(t) は、時刻 t に p_i の S が L-notarisation を持つ
-  ブロックの Tr* に当たり、`consistency` はその 2 つのブロックについて述べる。
+  §2 の Consistency そのものは Analysis/Log の `satisfies_consistency` で、正直者の log について
+  述べる。
 -/
 
 namespace Minimmit

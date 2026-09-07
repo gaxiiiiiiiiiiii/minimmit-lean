@@ -14,8 +14,9 @@ import Minimmit.Model.Algo.Basic
 - 配送の期限はスロット境界で判定する。状態はスロットの冒頭にしかないので、論文の
   「max(GST, t) + Δ までに届く」を、そのスロットの冒頭で宛先の S にあることとして述べる。
 - リーダー関数 lead は輪番に固定せず、任意の関数。論文の証明が輪番を使うのは Lemma 5.7 と
-  5.10 の 2 箇所で、それぞれ `Fair` と Lemma 5.10 のリーダー条件が引き受ける。論文の
-  lead(v) = p_{(v mod n)+1} は `Fair` を満たすので、論文の設定を含む。
+  5.10 の 2 箇所で、それぞれ `Fair` と `CorrectLeaderWithin` が引き受ける。論文の
+  lead(v) = p_{(v mod n)+1} はどちらも満たす（Witness の `roundRobin_fair`・
+  `roundRobin_correct_leader`）ので、論文の設定を含む。
 -/
 
 namespace Minimmit

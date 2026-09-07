@@ -37,8 +37,9 @@ Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`
   実装仕様は `enter_view` で現在より大きい view へ直接移り、§6.1 の飛ばす形をとる。
 - 同点の選択。論文が「辞書順最小」や「some b」で 1 つ選ぶ箇所は、S を `Finset.toList` で
   並べた順で先のものを取る。論文の証明は選択の仕方を使わないので、この選択はその一例。
-- finalise。31〜32 行の Finalise は動作を伴わないので `step` に無く、finalise したことは
-  S に L-notarisation があることで表す。これは 31 行の条件そのもの。
+- finalise。31〜32 行の Finalise は log を書く動作で、log は S から定まる（Analysis/Log の
+  `log`）ので `step` に無い。finalise したことは Certificate/Basic の `Finalised`、つまり S に
+  L-notarisation があり全祖先を含むことで表す。
 -/
 
 namespace Minimmit
@@ -165,8 +166,8 @@ noncomputable def climb (f : Nat) (i : Fin n) :
 /-! ### 5〜7 行（SelectParent と ProposeChild） -/
 
 /-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
-    最大のもの。票のあるブロックに候補が無ければ genesis。genesis は view 0 で常に
-    M-notarisation を持つ。同じ view に複数あれば `votedBlocks` の順で先のもの。 -/
+    最大のもの。票のあるブロックに候補が無ければ genesis。genesis は view 0 で、初期の S の
+    票により M-notarisation を持つ。同じ view に複数あれば `votedBlocks` の順で先のもの。 -/
 noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block n Tx :=
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen

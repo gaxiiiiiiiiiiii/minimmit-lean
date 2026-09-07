@@ -21,6 +21,8 @@ import Minimmit.Analysis.Liveness.Lemma5_5
 import Minimmit.Analysis.Liveness.LeaderRound
 import Minimmit.Analysis.Liveness.Lemma5_6
 import Minimmit.Analysis.Liveness.Lemma5_7
+import Minimmit.Analysis.Liveness.Finalise
+import Minimmit.Analysis.Log
 import Minimmit.Analysis.Responsiveness.Lemma5_8
 import Minimmit.Analysis.Responsiveness.Lemma5_9
 import Minimmit.Analysis.Responsiveness.Lemma5_10

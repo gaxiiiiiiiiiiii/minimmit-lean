@@ -77,6 +77,45 @@ theorem Block.Ancestor.trans {a b c : Block n Tx} (hab : Block.Ancestor a b)
   | refl => exact hab
   | parent q v tr p _ ih => exact Block.Ancestor.parent q v tr p ih
 
+theorem Block.mem_trStar_node {q : Fin n} {v : View} {tr : List Tx} {p : Block n Tx} {x : Tx} :
+    x ∈ (Block.node q v tr p).trStar ↔ x ∈ p.trStar ∨ x ∈ tr := by
+  simp only [Block.trStar, List.mem_append, List.mem_eraseDups, List.mem_filter,
+    decide_eq_true_eq]
+  constructor
+  · rintro (h | ⟨h, _⟩)
+    · exact Or.inl h
+    · exact Or.inr h
+  · rintro (h | h)
+    · exact Or.inl h
+    · by_cases hp : x ∈ p.trStar
+      · exact Or.inl hp
+      · exact Or.inr ⟨h, hp⟩
+
+/-- 祖先の Tr* は接頭辞。 -/
+theorem Block.trStar_prefix_of_ancestor {a b : Block n Tx} (h : Block.Ancestor a b) :
+    a.trStar <+: b.trStar := by
+  induction h with
+  | refl => exact List.prefix_rfl
+  | parent q v tr p _ ih => exact ih.trans (List.prefix_append _ _)
+
+omit [DecidableEq Tx] in
+theorem Block.depth_le_of_ancestor {a b : Block n Tx} (h : Block.Ancestor a b) :
+    a.depth ≤ b.depth := by
+  induction h with
+  | refl => exact le_refl _
+  | parent q v tr p _ ih => exact ih.trans (Nat.le_succ _)
+
+omit [DecidableEq Tx] in
+/-- 深さが同じ祖先は自分自身。 -/
+theorem Block.eq_of_ancestor_of_depth_le {a b : Block n Tx} (h : Block.Ancestor a b)
+    (hd : b.depth ≤ a.depth) : a = b := by
+  cases h with
+  | refl => rfl
+  | parent q v tr p hp =>
+    have := Block.depth_le_of_ancestor hp
+    simp [Block.depth] at hd
+    omega
+
 omit [DecidableEq Tx] in
 /-- view が 1 以上のブロックは genesis でない。 -/
 theorem Block.ne_gen_of_one_le {b : Block n Tx} (h : 1 ≤ b.view.val) : b ≠ .gen := by

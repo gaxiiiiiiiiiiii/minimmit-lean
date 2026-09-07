@@ -8,6 +8,7 @@ import Minimmit.Analysis.Liveness.Lemma5_7
 import Minimmit.Analysis.Responsiveness.Lemma5_8
 import Minimmit.Analysis.Responsiveness.Lemma5_9
 import Minimmit.Analysis.Responsiveness.Lemma5_10
+import Minimmit.Analysis.Log
 import Minimmit.Model.Constraint.Witness
 
 /-!
@@ -46,6 +47,11 @@ info: 'Minimmit.finalised_compatible' depends on axioms: [propext, Classical.cho
 /-- info: 'Minimmit.consistency' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in #print axioms Minimmit.consistency
 
+/--
+info: 'Minimmit.satisfies_consistency' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in #print axioms Minimmit.satisfies_consistency
+
 -- Lemma 5.5 Progression through views
 /-- info: 'Minimmit.progression' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in #print axioms Minimmit.progression
@@ -59,6 +65,9 @@ info: 'Minimmit.correct_leader_finalises' depends on axioms: [propext, Classical
 -- Lemma 5.7 Liveness
 /-- info: 'Minimmit.liveness' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in #print axioms Minimmit.liveness
+
+/-- info: 'Minimmit.satisfies_liveness' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in #print axioms Minimmit.satisfies_liveness
 
 -- Lemma 5.8
 /--

@@ -72,10 +72,18 @@ def Block.parent : Block n Tx → Option (Block n Tx)
   | .gen => none
   | .node _ _ _ parent => some parent
 
-/-- b の Tr*（§2）: b と全祖先の取引列を古い順に連結し、重複を先の出現だけ残して除いた列 -/
+/-- b の Tr*（§2）: b と全祖先の取引列を古い順に連結し、重複を先の出現だけ残して除いた列。
+    親の Tr* にある取引を除いた自分の取引列を親の Tr* の後ろに付けるので、祖先の Tr* は
+    接頭辞になる。 -/
 def Block.trStar [DecidableEq Tx] : Block n Tx → List Tx
   | .gen => []
-  | .node _ _ tr parent => (parent.trStar ++ tr).eraseDups
+  | .node _ _ tr parent =>
+    parent.trStar ++ (tr.filter fun x => decide (x ∉ parent.trStar)).eraseDups
+
+/-- b の深さ: genesis からの距離。祖先の数より 1 少ない。 -/
+def Block.depth : Block n Tx → Nat
+  | .gen => 0
+  | .node _ _ _ parent => parent.depth + 1
 
 /-- `Ancestor a b`: a は b の祖先（§2）。b 自身か、b の親の祖先。 -/
 inductive Block.Ancestor : Block n Tx → Block n Tx → Prop where

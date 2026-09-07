@@ -21,7 +21,7 @@ Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依�
 | Lemma 5.9 | `leave_view` | Analysis/Responsiveness/Lemma5_9 |
 | Lemma 5.10 Optimistic responsiveness | `optimistic_responsiveness` | Analysis/Responsiveness/Lemma5_10 |
 
-Lemma 5.4 と 5.7 は、§2 の Consistency・Liveness の定義（正直者の log について）を `satisfies_consistency`・`satisfies_liveness` として証明する。`consistency`・`liveness` はそれをブロックの形で述べたもので、p_i・p_j の正直さを仮定しない。`finalised_compatible` は、実行上で L-notarisation を受けた 2 つのブロックについて述べる。
+論文からの差異とその理由は [NOTES.md](NOTES.md) にまとめてある。
 
 ## ビルド
 
@@ -147,7 +147,3 @@ Minimmit
         ├── Lemma5_9.lean
         └── Lemma5_10.lean
 ```
-
-## 形式化の注記
-
-論文からの差異とその理由は [NOTES.md](NOTES.md) にまとめてある。Algorithm 1 は、証明書が届いている限り同じスロットで view を進め続けることと、view を進めてから提案と投票をし転送をスロットの最後に回すことの 2 点で論文の擬似コードと違い、論文の証明はどちらの動作も前提にしている。そのほかの差異は論文の記述を Lean に落とすための調整で、NOTES.md の 4 にある。スロット内の動作の順序を固定していることが挙動を狭めないことは、形式化の外の議論に依っていて未証明。

@@ -117,7 +117,7 @@ theorem exists_bound {α : Type} {Q : Finset α} {P : α → Nat → Prop} (h : 
 /-- lead(v) の提案の Tr* には、その時点で受信済みの取引がすべて入る。 -/
 theorem mem_trStar_leaderBlock {f : Nat} {i : Fin n} {p : Processor n Tx} {tr : Tx}
     (h : Msg.tx tr ∈ p.S) : tr ∈ (Algo.leaderBlock f i p).trStar := by
-  simp only [Algo.leaderBlock, Block.trStar, List.mem_append]
+  simp only [Algo.leaderBlock, Block.trStar, List.mem_eraseDups, List.mem_append]
   by_cases hp : tr ∈ (Algo.selectParent f p.S p.view).trStar
   · exact Or.inl hp
   · right

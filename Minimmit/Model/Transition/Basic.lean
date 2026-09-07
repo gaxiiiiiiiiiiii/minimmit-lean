@@ -21,8 +21,6 @@ import Mathlib.Data.Finset.Card
   持たない。論文の "lead(v) sends b" もブロック自体を送る。偽造不能は `State.send` のガード
   `Processor.canSend` で表す: 自分の署名付きか受信済みの message で、成分のブロックも自分の
   署名付きか S に含まれるものだけを送れる。
-- `Block.trStar` は祖先の取引列を連結するだけで、論文の Tr* と違い重複を除去しない。
-  Lemma 5.7 の結論 tr ∈ Tr* は重複の有無に依らない。
 - `State.step` は 1 スロットの中の原始関数を 動作 → tick → 配送 → 取引 → 腐敗 の順に
   固定して適用する。tick と tick の間で原始関数がどの順に並んでも同じ状態に至ること、
   およびこの固定順で表せない挙動が「送ったスロットの中で届く配送」だけであることは、
@@ -73,10 +71,10 @@ def Block.parent : Block n Tx → Option (Block n Tx)
   | .gen => none
   | .node _ _ _ parent => some parent
 
-/-- b の Tr*（§2）: b と全祖先の取引列を古い順に連結した列。重複は除去しない。 -/
-def Block.trStar : Block n Tx → List Tx
+/-- b の Tr*（§2）: b と全祖先の取引列を古い順に連結し、重複を先の出現だけ残して除いた列 -/
+def Block.trStar [DecidableEq Tx] : Block n Tx → List Tx
   | .gen => []
-  | .node _ _ tr parent => parent.trStar ++ tr
+  | .node _ _ tr parent => (parent.trStar ++ tr).eraseDups
 
 /-- `Ancestor a b`: a は b の祖先（§2）。b 自身か、b の親の祖先。 -/
 inductive Block.Ancestor : Block n Tx → Block n Tx → Prop where

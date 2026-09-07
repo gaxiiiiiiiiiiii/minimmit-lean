@@ -19,7 +19,6 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 
 namespace Witness
 
-omit [DecidableEq Tx] in
 /-- 初期状態: 全員 `Processor.init`、byz と pool は空、now は 0。 -/
 def init : State n Tx :=
   { procs := fun _ => Processor.init, byz := ∅, pool := ∅, now := ⟨0⟩ }
@@ -66,7 +65,6 @@ theorem run_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
   | zero => rfl
   | succ t ih => simp only [State.run, ih]; rfl
 
-omit [DecidableEq Tx] in
 theorem init_spec : Init (init (n := n) (Tx := Tx)) :=
   ⟨fun _ => rfl, rfl, rfl, rfl⟩
 

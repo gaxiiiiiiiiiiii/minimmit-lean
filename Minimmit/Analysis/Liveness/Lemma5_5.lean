@@ -60,7 +60,9 @@ theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hm : m ∈ ((State.run s₀ instrs (s + 1)).procs j).S) (hsig : m.signer = some j) {T : Nat}
     (hT₁ : s + 1 ≤ T) (hT₂ : max GST.val s + δ ≤ T) :
     m ∈ ((State.run s₀ instrs T).procs i).S := by
-  obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm hsig
+  by_cases hg : m = .vote j .gen
+  · subst hg; exact genesisS_subset_run hinit i T (mem_genesisS.mpr ⟨j, rfl⟩)
+  obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm hsig hg
   have hact := hh t' j (hj t')
   have hsend : Action.send m i ∈ (instrs t').actions j := by
     rw [hact] at hj' ⊢
@@ -105,7 +107,7 @@ theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
       intro h; subst h; simp [Block.view] at hbv; omega
     have hMi := mnotarised_all (j := i) hinit hh hs hj hM
       (T := max (max GST.val (t + 1) + Δ) (max (t + 2) t₀)) (by omega) (by omega)
-    have := leave_of_mnotarised hh hi ((hvT _ (by omega)).trans hbv.symm) hg hMi
+    have := leave_of_mnotarised hh hi ((hvT _ (by omega)).trans hbv.symm) hMi
     rw [hbv] at this
     exact absurd (hstuck _) (not_le.mpr this)
 
@@ -220,21 +222,21 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
         have hmT : Msg.vote j b ∈ ((State.run s₀ instrs T₂).procs j).S :=
           S_subset_run s₀ instrs j (hT₂ j hj).1 hm
         have hL := localInv_run hinit hh hjc T₂
+        have hg : b ≠ .gen := by
+          intro h; subst h; simp [Block.view] at hbv; omega
         have hnot : ((State.run s₀ instrs T₂).procs j).notarised = some b := by
-          refine ((hL.notar b hmT).2.resolve_left ?_).2
+          refine ((hL.notar b hg hmT).2.resolve_left ?_).2
           rw [hbv]
           change ¬ k < (viewAt s₀ instrs j T₂).val
           rw [hvT]; exact lt_irrefl _
-        have hg : b ≠ .gen := by
-          intro h; subst h; simp [Block.view] at hbv; omega
         have hnoM : ¬ MNotarised f ((State.run s₀ instrs T₂).procs j).S b := by
           intro hM
-          have := leave_of_mnotarised hh hjc (hvT.trans hbv.symm) hg hM
+          have := leave_of_mnotarised hh hjc (hvT.trans hbv.symm) hM
           rw [hbv] at this
           exact absurd (hall j hjc (T₂ + 1)) (not_le.mpr this)
         have hvoters : (voters ((State.run s₀ instrs T₂).procs j).S b).card ≤ 2 * f := by
           by_contra h
-          exact hnoM (Or.inr (not_le.mp h))
+          exact hnoM (not_le.mp h)
         have hnp : NoProgress f ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) := by
           have hCsub : correctSet s₀ instrs ⊆
               (correctSet s₀ instrs).filter

@@ -50,7 +50,7 @@ theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
       omega
     have := mnotarised_all (j := q) hinit hh hs hj hM hT₁ hT₂
     rw [← hbv]
-    exact Algo.hasCert_of_mnotarised hg this
+    exact Algo.hasCert_of_mnotarised this
 
 /-- Lemma 5.6 の第 1 段: 最初の正直者が t に view v に入れば、正直者は全員
     max(t, GST) + δ までに view v に入る。T₀ は t 以上で GST 以上の任意の時刻。 -/
@@ -86,7 +86,7 @@ theorem tx_forwarded (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
   have hnew : Msg.tx tr ∉ (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).prevS := by
     rw [Algo.st5_prevS]
     cases t with
-    | zero => rw [prevS_zero hinit]; simp
+    | zero => rw [prevS_zero hinit]; simp [mem_genesisS]
     | succ t' =>
       rw [prevS_run_honest hh hi]
       intro hm
@@ -174,7 +174,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
         with hm | ⟨_, j', hs'⟩
-      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl (by simpa using hg)
         exact absurd (ih s' hs' r hr b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
       · exact ⟨j', hs'⟩
   have hsend : Action.send (Msg.vote r b) j' ∈ (instrs s).actions r := by
@@ -187,11 +187,10 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
       Algo.send_climb (localInv_run hinit hh hr s) hj'
     injection hm with _ hbb
     subst hbb
-    rcases hM with hg' | hM
-    · exact hg hg'
-    obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM)
+    obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
+      (lt_of_lt_of_le (by omega) (show 2 * f + 1 ≤ _ from hM))
     rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt'⟩
-    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl
+    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl (by simpa using hg)
       exact absurd (ih s' hs' w hwc b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
     · injection hb'' with _ hbb
       subst hbb
@@ -239,7 +238,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
         with hm | ⟨_, j', hs'⟩
-      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl nofun
         exact absurd (ih s' hs' r hr j'' hj'') (not_le.mpr (lt_trans hs' hlt))
       · exact ⟨j', hs'⟩
   simp only [Algo.innerActs, List.mem_append] at hj'
@@ -278,6 +277,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hvote)
       with hm' | ⟨_, j'', hs''⟩
     · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+        (Msg.vote_ne_gen_vote (by rw [hcv]; omega))
       exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' r hr c₀ hcv j₃ hj₃)
         (not_le.mpr (lt_trans hs' hlt))
     · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
@@ -297,20 +297,21 @@ theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   · have hcard := card_le_of_byz hb (nullifiers ((State.run s₀ instrs e).procs (lead v)).S v)
       fun q hq => exists_byz_of_not_correct fun hqc => ?_
     · unfold Nullified at hN; omega
-    · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_nullifiers.mp hq) rfl
+    · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_nullifiers.mp hq) rfl (by simp)
       exact absurd (nullify_slot_ge hinit hh hb hs hδ hv hfirst hlc he hemin s' q hqc j hj)
         (not_le.mpr hs')
   · obtain ⟨b', hb'⟩ := List.exists_mem_of_ne_nil _ hM
     obtain ⟨hbv, hM'⟩ := Algo.mem_mNotarisedAt hb'
-    rcases hM' with hg | hM'
-    · subst hg
+    have hg : b' ≠ .gen := by
+      intro hg; subst hg
       have : v.val = 0 := by rw [← hbv]; rfl
       omega
-    · have hcard := card_le_of_byz hb (voters ((State.run s₀ instrs e).procs (lead v)).S b')
-        fun q hq => exists_byz_of_not_correct fun hqc => ?_
-      · omega
-      · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_voters.mp hq) rfl
-        exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' q hqc b' hbv j hj) (not_le.mpr hs')
+    have hcard := card_le_of_byz hb (voters ((State.run s₀ instrs e).procs (lead v)).S b')
+      fun q hq => exists_byz_of_not_correct fun hqc => ?_
+    · unfold MNotarised at hM'; omega
+    · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_voters.mp hq) rfl
+        (by simpa using hg)
+      exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' q hqc b' hbv j hj) (not_le.mpr hs')
 
 /-- lead(v) は view v に入るスロット e に、登りを view v で終え、まだ提案していない。 -/
 theorem leader_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
@@ -352,6 +353,7 @@ theorem leader_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     実際の遅延の上界。 -/
 structure LeaderRound (f Δ δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) (GST : Time) (v : View) (t e : Nat) : Prop where
+  hn : 5 * f + 1 ≤ n
   hδ : δ ≤ Δ
   hv : 1 ≤ v.val
   hfirst : FirstEntry s₀ instrs v t
@@ -428,7 +430,9 @@ theorem leader_parent_mnotarised_all {r : Fin n} {T : Nat} (hT : t + 2 * δ ≤ 
   have he := R.he
   have hgst := R.hgst
   have h1 : MNotarised f (Algo.st1 f (lead v) ((State.run s₀ instrs e).procs (lead v))).S
-      (leaderParentAt f lead s₀ instrs v e) := Algo.selectParent_mnotarised f _ _
+      (leaderParentAt f lead s₀ instrs v e) :=
+    Algo.selectParent_mnotarised (by have := R.hn; omega)
+      ((genesisS_subset_run hinit (lead v) e).trans (Algo.S_subset_st1 f (lead v) _)) _
   have h5 := h1.mono (Algo.S_st1_subset_st5 f Δ lead (lead v) _)
   exact mnotarised_all_end hinit hh hs R.hlc h5 (by omega) (by omega)
 
@@ -512,11 +516,10 @@ theorem vote_unique_leaderBlock :
         Algo.send_climb (localInv_run hinit hh hr s) hj'
       injection hm with _ hbb
       subst hbb
-      rcases hM with hg' | hM
-      · exact absurd hg' hg
-      obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM)
+      obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
+        (lt_of_lt_of_le (by omega) (show 2 * f + 1 ≤ _ from hM))
       rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt'⟩
-      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl
+      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl (by simpa using hg)
         exact ih s' hs' w hwc b hbv j'' hj''
       · injection hb'' with _ hbb
         subst hbb
@@ -540,7 +543,7 @@ theorem vote_unique_leaderBlock :
   · exact hinner j hj
   · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
       with hm | ⟨_, j', hs'⟩
-    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl (by simpa using hg)
       exact ih s' hs' r hr b hbv j'' hj''
     · exact hinner j' hs'
 
@@ -648,6 +651,7 @@ theorem no_nullify_v :
         rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hvote)
           with hm' | ⟨_, j'', hs''⟩
         · obtain ⟨s', _, j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+            (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
           exact vote_unique_leaderBlock hinit hh hb hs R s' r hr c₀ hcv j₃ hj₃
         · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
             rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
@@ -660,7 +664,7 @@ theorem no_nullify_v :
         by_cases hwr : w = r
         · subst hwr
           rcases Algo.mem_S_st4_nullify hwn with hm' | hs''
-          · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+          · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl nofun
             exact ih s' hs' w hwc j₃ hj₃
           · exact no_timeout_nullify hinit hh hb hs R s w hwc w hs''
         · have hm' : Msg.nullify w v ∈ ((State.run s₀ instrs s).procs r).S := by
@@ -669,13 +673,14 @@ theorem no_nullify_v :
             · exact hm'
             · simp only [Msg.signer, Option.some.injEq] at hsig
               exact absurd hsig hwr
-          obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+          obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl nofun
           exact ih s' hs' w hwc j₃ hj₃
       · -- 正直者 w の、lead(v) のブロック以外への票はない
         have hb''eq : b'' = leaderBlockAt f lead s₀ instrs v e := by
           rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hwv)
             with hm' | ⟨hsig, j'', hs''⟩
           · obtain ⟨s', _, j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+              (Msg.vote_ne_gen_vote (by rw [hb''v]; exact R.hv))
             exact vote_unique_leaderBlock hinit hh hb hs R s' w hwc b'' hb''v j₃ hj₃
           · simp only [Msg.signer, Option.some.injEq] at hsig
             subst hsig
@@ -689,7 +694,7 @@ theorem no_nullify_v :
   · exact hinner j hj
   · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
       with hm | ⟨_, j', hs'⟩
-    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl
+    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl nofun
       exact ih s' hs' r hr j'' hj''
     · exact hinner j' hs'
 
@@ -711,7 +716,7 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
       fun w hw => exists_byz_of_not_correct fun hwc => ?_
     · unfold Nullified at hN; omega
     · rcases hnew _ (mem_nullifiers.mp hw) with hm | ⟨_, hm, _⟩
-      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm rfl
+      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm rfl nofun
         exact no_nullify_v hinit hh hb hs R s' w hwc j hj
       · cases hm
   have hM : Algo.mNotarisedAt f q.S q.view ≠ [] := by
@@ -732,10 +737,11 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
       rw [← this]; exact hsend'
     · have hmem := hLq.null_mem hnl
       rw [hqv] at hmem
-      obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc hmem) rfl
+      obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc hmem) rfl nofun
       exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
   · have hcv := (hLq.notar_view c hnot).trans hqv
     obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc (hLq.notar_mem c hnot)) rfl
+      (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
     have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
     refine ⟨s', Nat.lt_succ_iff.mp hs', j, ?_⟩
     rw [← this]; exact hj
@@ -820,6 +826,7 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
       have hcv : c.view = v := (hL1.notar_view c hc).trans hst1v
       rcases Algo.mem_S_st1 (hL1.notar_mem c hc) with hm1 | ⟨b', hb', _, j, hj⟩
       · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+          (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
         have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
         refine ⟨s', hs'.le, j, ?_⟩
         rw [← this]; exact hj
@@ -833,7 +840,7 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
       have hmem := hL1.null_mem hnl
       rw [hst1v] at hmem
       rcases Algo.mem_S_st1 hmem with hm1 | ⟨_, hb', _⟩
-      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl nofun
         exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
       · cases hb'
 
@@ -866,7 +873,7 @@ end CorrectLeader
 
 
 /-- Lemma 5.6 の設定は、lead(v) が正直で最初の正直者が GST 以降に v に入れば作れる。 -/
-theorem leader_round (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
+theorem leader_round (hn : 5 * f + 1 ≤ n) (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs)
     (hδ : δ ≤ Δ) {v : View} (hv : 1 ≤ v.val) (hi : Correct s₀ instrs (lead v)) {t : Nat}
     (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
@@ -878,6 +885,6 @@ theorem leader_round (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     rcases Nat.lt_or_ge (t + δ) e with h | h
     · exact absurd (enter_all hinit hh hs hfirst hgst hi) (not_le.mpr (hemin (t + δ) h))
     · exact h
-  exact ⟨e, ⟨hδ, hv, hfirst, hgst, hi, he, hev, hemin, hstart⟩⟩
+  exact ⟨e, ⟨hn, hδ, hv, hfirst, hgst, hi, he, hev, hemin, hstart⟩⟩
 
 end Minimmit

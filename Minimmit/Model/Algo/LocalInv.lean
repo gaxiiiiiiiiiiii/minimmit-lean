@@ -20,9 +20,10 @@ Lemma 5.1・5.3 の核。S にある自分の票・nullify と、view・notarise
 structure PreInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop where
   /-- view は 1 以上。 -/
   view_pos : 1 ≤ p.view.val
-  /-- 自分の票 (vote, c) が S にあれば、c は view 1 以上のブロックで、現在の view より前の
-      ものか、現在の view のもので notarised に記録されている。 -/
-  notar : ∀ c, Msg.vote i c ∈ p.S →
+  /-- 自分の票 (vote, c) が S にあれば、c が初期の S にある genesis への票のものでない限り、
+      c は view 1 以上のブロックで、現在の view より前のものか、現在の view のもので
+      notarised に記録されている。 -/
+  notar : ∀ c, c ≠ .gen → Msg.vote i c ∈ p.S →
     1 ≤ c.view.val ∧ (c.view.val < p.view.val ∨ (c.view = p.view ∧ p.notarised = some c))
   /-- S にある自分の票で view が同じものは一致する。 -/
   unique : ∀ c c', Msg.vote i c ∈ p.S → Msg.vote i c' ∈ p.S → c.view = c'.view → c = c'
@@ -49,13 +50,19 @@ namespace PreInv
 variable {f : Nat} {i : Fin n} {p : Processor n Tx}
 
 omit [DecidableEq Tx] in
+/-- view が現在の view と等しいブロックは genesis でない。 -/
+theorem ne_gen_of_view_eq (h : PreInv f i p) {b : Block n Tx} (hb : b.view = p.view) :
+    b ≠ .gen :=
+  Block.ne_gen_of_one_le (by rw [hb]; exact h.view_pos)
+
+omit [DecidableEq Tx] in
 /-- view・notarised・nullified・S が等しい状態にも成り立つ。 -/
 theorem congr (h : PreInv f i p) {q : Processor n Tx} (hv : q.view = p.view)
     (hn : q.notarised = p.notarised) (hnl : q.nullified = p.nullified) (hS : q.S = p.S) :
     PreInv f i q := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hv]; exact h.view_pos
-  · intro c hc; rw [hS] at hc; rw [hv, hn]; exact h.notar c hc
+  · intro c hg hc; rw [hS] at hc; rw [hv, hn]; exact h.notar c hg hc
   · intro c c' hc hc'; rw [hS] at hc hc'; exact h.unique c c' hc hc'
   · intro c hc; rw [hn] at hc; rw [hv]; exact h.notar_view c hc
   · intro w hw; rw [hS] at hw; rw [hv]; exact h.null_view w hw
@@ -71,7 +78,7 @@ theorem of_grow (h : PreInv f i p) {q : Processor n Tx} (hv : q.view = p.view)
     (hnull : ∀ w, Msg.nullify i w ∈ q.S → Msg.nullify i w ∈ p.S) : PreInv f i q := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hv]; exact h.view_pos
-  · intro c hc; rw [hv, hn]; exact h.notar c (hvote c hc)
+  · intro c hg hc; rw [hv, hn]; exact h.notar c hg (hvote c hc)
   · intro c c' hc hc'; exact h.unique c c' (hvote c hc) (hvote c' hc')
   · intro c hc; rw [hn] at hc; rw [hv]; exact h.notar_view c hc
   · intro w hw; rw [hv]; exact h.null_view w (hnull w hw)
@@ -110,7 +117,8 @@ theorem send_of_mem_eq (h : PreInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : F
     · obtain ⟨b, rfl⟩ := hv
       rw [Processor.send_vote_notarised]
       split_ifs with hb
-      · exact ((h.notar b hm).2.resolve_left (by rw [hb]; exact lt_irrefl _)).2.symm
+      · exact ((h.notar b (h.ne_gen_of_view_eq hb) hm).2.resolve_left
+          (by rw [hb]; exact lt_irrefl _)).2.symm
       · rfl
     · exact Processor.send_notarised_of_not_vote i p m j fun b hb => absurd ⟨b, hb⟩ hv
   · by_cases hn : ∃ v, m = Msg.nullify i v
@@ -144,7 +152,7 @@ theorem send_vote (h : PreInv f i p) {b : Block n Tx} (hb : b.view = p.view)
     fun w hw => (mem_S_send_iff_of_ne i p j (by simp)).mp hw
   have hcur : ∀ c, Msg.vote i c ∈ p.S → c.view = p.view → c = b := by
     intro c hc hcv
-    rcases (h.notar c hc).2 with hlt | ⟨_, hcn⟩
+    rcases (h.notar c (h.ne_gen_of_view_eq hcv) hc).2 with hlt | ⟨_, hcn⟩
     · rw [hcv] at hlt; exact absurd hlt (lt_irrefl _)
     · rcases hn with hn | hn
       · rw [hn] at hcn; cases hcn
@@ -154,11 +162,11 @@ theorem send_vote (h : PreInv f i p) {b : Block n Tx} (hb : b.view = p.view)
   rw [if_pos hb] at hnot
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hview]; exact h.view_pos
-  · intro c hc
+  · intro c hg hc
     rw [hview, hnot]
     rcases hS c hc with rfl | hc
     · exact ⟨by rw [hb]; exact h.view_pos, Or.inr ⟨hb, rfl⟩⟩
-    · obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
+    · obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hg hc
       · exact ⟨hpos, Or.inl hlt⟩
       · exact ⟨hpos, Or.inr ⟨hce, congrArg some (hcur c hc hce).symm⟩⟩
   · intro c c' hc hc' hv
@@ -203,7 +211,7 @@ theorem send_nullify (h : PreInv f i p)
   rw [if_pos rfl] at hnl
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hview]; exact h.view_pos
-  · intro c hc; rw [hview, hnot]; exact h.notar c (hV c hc)
+  · intro c hg hc; rw [hview, hnot]; exact h.notar c hg (hV c hc)
   · intro c c' hc hc'; exact h.unique c c' (hV c hc) (hV c' hc')
   · intro c hc; rw [hnot] at hc; rw [hview]; exact h.notar_view c hc
   · intro w hw
@@ -215,7 +223,7 @@ theorem send_nullify (h : PreInv f i p)
   · intro w c hw hc hcw
     have hc' := hV c hc
     rcases hN w hw with rfl | hw
-    · obtain ⟨_, hlt | ⟨_, hcn⟩⟩ := h.notar c hc'
+    · obtain ⟨_, hlt | ⟨_, hcn⟩⟩ := h.notar c (h.ne_gen_of_view_eq hcw) hc'
       · rw [hcw] at hlt; exact absurd hlt (lt_irrefl _)
       · rcases hH with hH | ⟨c₀, hc₀, hnp⟩
         · rw [hH] at hcn; cases hcn
@@ -229,8 +237,8 @@ omit [DecidableEq Tx] in
 theorem progress (h : PreInv f i p) : PreInv f i p.progress := by
   refine ⟨Nat.le_succ_of_le h.view_pos, ?_, fun c c' hc hc' hv => h.unique c c' hc hc' hv,
     ?_, ?_, ?_, ?_⟩
-  · intro c hc
-    obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hc
+  · intro c hg hc
+    obtain ⟨hpos, hlt | ⟨hce, _⟩⟩ := h.notar c hg hc
     · exact ⟨hpos, Or.inl (Nat.lt_succ_of_lt hlt)⟩
     · exact ⟨hpos, Or.inl (by simp only [Processor.progress]; rw [hce]; exact Nat.lt_succ_self _)⟩
   · intro c hc; simp [Processor.progress] at hc

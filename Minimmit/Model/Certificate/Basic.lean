@@ -1,5 +1,6 @@
 import Minimmit.Model.Transition.Basic
 import Mathlib.Data.Fintype.Basic
+import Mathlib.Data.Fintype.Card
 
 /-!
 # 証明書
@@ -10,9 +11,9 @@ message の集合 S 上の述語として定義し、§5.1 の「b が M-notaris
 
 ## 論文からの差異
 
-- 初期状態の S は空で、Table 2 が初期の S に含める genesis の M/L-notarisation は、
-  `MNotarised`・`LNotarised` が genesis を無条件に認めることで表す。S 上の述語の値は、
-  初期 S に genesis の notarisation を含めた場合と同じ。
+- §5.1 の `ReceivesM`・`ReceivesL` は genesis を無条件に認める。論文の定義は送られた票の
+  勘定で、初期の S にある genesis の notarisation の票は誰も送っていないが、論文の証明は
+  genesis が notarisation を受けたものとして扱う。
 -/
 
 namespace Minimmit
@@ -32,19 +33,58 @@ def voters (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin n) :=
 def nullifiers (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.nullify q v ∈ S
 
-/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票。genesis は常に含む。 -/
+/-- S が b の M-notarisation を含む（§4）: 異なる 2f + 1 人の票 -/
 def MNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
-  b = .gen ∨ 2 * f + 1 ≤ (voters S b).card
+  2 * f + 1 ≤ (voters S b).card
 
 instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Decidable (MNotarised f S b) :=
-  inferInstanceAs (Decidable (_ ∨ _))
+  inferInstanceAs (Decidable (_ ≤ _))
 
-/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票。genesis は常に含む。 -/
+/-- S が b の L-notarisation を含む（§4）: 異なる n − f 人の票 -/
 def LNotarised (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
-  b = .gen ∨ n - f ≤ (voters S b).card
+  n - f ≤ (voters S b).card
 
 instance (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Decidable (LNotarised f S b) :=
-  inferInstanceAs (Decidable (_ ∨ _))
+  inferInstanceAs (Decidable (_ ≤ _))
+
+/-- 初期の S を含む S では、genesis への票が全員分ある。 -/
+theorem voters_gen_eq_univ {S : Finset (Msg n Tx)} (h : genesisS n Tx ⊆ S) :
+    voters S .gen = Finset.univ := by
+  ext q
+  simp only [voters, Finset.mem_filter, Finset.mem_univ, true_and, iff_true]
+  exact h (mem_genesisS.mpr ⟨q, rfl⟩)
+
+/-- 初期の S を含む S は、2f + 1 ≤ n なら genesis の M-notarisation を含む。 -/
+theorem MNotarised.gen {f : Nat} {S : Finset (Msg n Tx)} (hn : 2 * f + 1 ≤ n)
+    (h : genesisS n Tx ⊆ S) : MNotarised f S .gen := by
+  unfold MNotarised; rw [voters_gen_eq_univ h, Finset.card_univ, Fintype.card_fin]; exact hn
+
+/-- genesis の M-notarisation をどこかの S が含むなら、初期の S を含むどの S も含む。 -/
+theorem MNotarised.gen_of {f : Nat} {S S' : Finset (Msg n Tx)} (h : MNotarised f S .gen)
+    (h' : genesisS n Tx ⊆ S') : MNotarised f S' .gen := by
+  unfold MNotarised at *
+  rw [voters_gen_eq_univ h', Finset.card_univ, Fintype.card_fin]
+  exact h.trans ((Finset.card_le_univ _).trans (by rw [Fintype.card_fin]))
+
+/-- 初期の S には、genesis 以外への票はない。 -/
+theorem voters_genesisS_of_ne_gen {b : Block n Tx} (hg : b ≠ .gen) :
+    voters (genesisS n Tx) b = ∅ := by
+  ext q
+  simp only [voters, Finset.mem_filter, Finset.mem_univ, true_and, mem_genesisS,
+    Finset.notMem_empty, iff_false, not_exists]
+  intro q' h
+  injection h with _ hb
+  exact hg hb
+
+/-- 初期の S には nullify はない。 -/
+theorem nullifiers_genesisS (v : View) : nullifiers (genesisS n Tx) v = ∅ := by
+  ext q
+  simp [nullifiers, mem_genesisS]
+
+/-- 初期の S を含む S は、genesis の L-notarisation を含む。 -/
+theorem LNotarised.gen {f : Nat} {S : Finset (Msg n Tx)} (h : genesisS n Tx ⊆ S) :
+    LNotarised f S .gen := by
+  unfold LNotarised; rw [voters_gen_eq_univ h, Finset.card_univ, Fintype.card_fin]; omega
 
 /-- S が view v の nullification を含む（§4）: 異なる 2f + 1 人の nullify(v)。 -/
 def Nullified (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Prop :=

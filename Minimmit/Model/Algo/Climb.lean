@@ -100,12 +100,9 @@ theorem hasCert_of_votes_lt {f : Nat} {i : Fin n} {S S' : Finset (Msg n Tx)} {w 
         exact absurd hlt (lt_irrefl _)
     obtain ⟨q, hq⟩ := exists_vote_of_mem_votedBlocks (mem_votedBlocks_of_mem_mNotarisedAt hb)
     have hM : MNotarised f S b := by
-      rcases hb'.2 with hg | hM
-      · exact Or.inl hg
-      · right
-        refine hM.trans (Finset.card_le_card fun q' hq' => ?_)
-        rw [mem_voters] at hq' ⊢
-        exact hvote q' hq'
+      refine hb'.2.trans (Finset.card_le_card fun q' hq' => ?_)
+      rw [mem_voters] at hq' ⊢
+      exact hvote q' hq'
     apply List.ne_nil_of_mem (a := b)
     rw [← hb'.1]
     exact mem_mNotarisedAt_of (mem_votedBlocks (hvote q hq)) hM

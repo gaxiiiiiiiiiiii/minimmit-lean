@@ -226,7 +226,8 @@ theorem prevS_run_honest (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : C
       = (Algo.st5 f Δ lead i ((State.run s₀ instrs t).procs i)).S := by
   rw [prevS_run, hh t i (hi t), Algo.executeAll_step, Algo.stepPair_S]
 
-theorem prevS_zero (hinit : Init s₀) (i : Fin n) : ((State.run s₀ instrs 0).procs i).prevS = ∅ := by
+theorem prevS_zero (hinit : Init s₀) (i : Fin n) :
+    ((State.run s₀ instrs 0).procs i).prevS = genesisS n Tx := by
   rw [State.run, hinit.procs i]; rfl
 
 /-- 正直者が動作を終えた時点の S に nullification を持つなら、それが初めて完成した
@@ -247,7 +248,7 @@ theorem forward_nullification_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
-      simp [Nullified, nullifiers]
+      simp [Nullified, nullifiers_genesisS]
     · obtain ⟨t'', ht''⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
       rw [ht'', prevS_run_honest hh hi]
       exact Nat.find_min hex (by rw [ht'']; exact Nat.lt_succ_self t'')
@@ -283,9 +284,9 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
       intro hM
-      rcases hM with hM | hM
-      · exact hg hM
-      · simp [voters] at hM
+      unfold MNotarised at hM
+      rw [voters_genesisS_of_ne_gen hg] at hM
+      simp at hM
     · obtain ⟨t'', ht''⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
       rw [ht'', prevS_run_honest hh hi]
       exact Nat.find_min hex (by rw [ht'']; exact Nat.lt_succ_self t'')
@@ -322,11 +323,8 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max GST.val t + δ ≤ T) : MNotarised f ((State.run s₀ instrs T).procs j).S b := by
   by_cases hg : b = .gen
-  · exact Or.inl hg
+  · subst hg; exact MNotarised.gen_of h (genesisS_subset_run hinit j T)
   obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation hinit hh hi hg h
-  rcases hn' with h' | hn'
-  · exact Or.inl h'
-  right
   refine (Algo.card_leastVoters hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
@@ -351,11 +349,8 @@ theorem mnotarised_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
     (hT₁ : t + 1 ≤ T) (hT₂ : max GST.val t + δ ≤ T) :
     MNotarised f ((State.run s₀ instrs T).procs j).S b := by
   by_cases hg : b = .gen
-  · exact Or.inl hg
+  · subst hg; exact MNotarised.gen_of h (genesisS_subset_run hinit j T)
   obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation_end hinit hh hi hg h
-  rcases hn' with h' | hn'
-  · exact Or.inl h'
-  right
   refine (Algo.card_leastVoters hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
@@ -427,13 +422,10 @@ theorem S_st5_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : 
   (Algo.S_st5_subset_stepPair f Δ lead i _).trans (S_stepPair_subset_succ hh hi t)
 
 theorem Algo.hasCert_of_mnotarised {f : Nat} {S : Finset (Msg n Tx)} {b : Block n Tx}
-    (hg : b ≠ .gen) (h : MNotarised f S b) : Algo.HasCert f S b.view := by
+    (h : MNotarised f S b) : Algo.HasCert f S b.view := by
   right
-  rcases h with h' | h'
-  · exact absurd h' hg
-  · obtain ⟨q, hq⟩ := Finset.card_pos.mp (lt_of_lt_of_le (Nat.succ_pos _) h')
-    exact List.ne_nil_of_mem
-      (Algo.mem_mNotarisedAt_of (Algo.mem_votedBlocks (mem_voters.mp hq)) (Or.inr h'))
+  obtain ⟨q, hq⟩ := Finset.card_pos.mp (lt_of_lt_of_le (Nat.succ_pos _) h)
+  exact List.ne_nil_of_mem (Algo.mem_mNotarisedAt_of (Algo.mem_votedBlocks (mem_voters.mp hq)) h)
 
 /-- 現在の view の証明書を持つ正直者は、次のスロットには view を進めている。 -/
 theorem leave_of_hasCert (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
@@ -452,10 +444,10 @@ theorem leave_of_nullified (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi :
   leave_of_hasCert hh hi hv (Or.inl h)
 
 theorem leave_of_mnotarised (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
-    {t : Nat} {b : Block n Tx} (hv : viewAt s₀ instrs i t = b.view) (hg : b ≠ .gen)
+    {t : Nat} {b : Block n Tx} (hv : viewAt s₀ instrs i t = b.view)
     (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) :
     b.view.val < (viewAt s₀ instrs i (t + 1)).val :=
-  leave_of_hasCert hh hi hv (Algo.hasCert_of_mnotarised hg h)
+  leave_of_hasCert hh hi hv (Algo.hasCert_of_mnotarised h)
 
 theorem Algo.view_le_st5 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     p.view.val ≤ (Algo.st5 f Δ lead i p).view.val := by
@@ -543,7 +535,8 @@ theorem noprogress_reaction (hinit : Init s₀) (hh : Honest f Δ lead s₀ inst
     Algo.S_subset_st4 f Δ lead i _ (hLp.notar_mem b hb)
   have hbv : b.view = v := (hLp.notar_view b hb).trans hv
   have hnot5 : (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).notarised = some b :=
-    ((hL5.notar b hvote).2.resolve_left (by rw [hbv, h5v]; exact lt_irrefl _)).2
+    ((hL5.notar b (hL5.ne_gen_of_view_eq (hbv.trans h5v.symm)) hvote).2.resolve_left
+      (by rw [hbv, h5v]; exact lt_irrefl _)).2
   have hnp5 : NoProgress f (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).S
       (Algo.st4 f Δ lead i ((State.run s₀ instrs t).procs i)).view (some b) := by
     rw [h5v]; exact h.mono (Algo.S_subset_st4 f Δ lead i _)

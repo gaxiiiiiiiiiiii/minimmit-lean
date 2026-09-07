@@ -161,6 +161,13 @@ theorem send_forwardNew_mem {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg 
   cases hm
   exact mem_S_of_mem_forwardMsgs hm'
 
+theorem send_forwardNew_mem_forwardMsgs {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    {j : Fin n} (h : Action.send m j ∈ (forwardNew f i p).2) : m ∈ forwardMsgs f p := by
+  rw [forwardNew_eq] at h
+  obtain ⟨m', hm', _, hm⟩ := mem_disseminateAll_snd.mp h
+  cases hm
+  exact hm'
+
 theorem send_propose_eq {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (propose f lead i p).2) :
     ∃ b, m = Msg.propose b ∧ b.signer = some i := by
@@ -537,7 +544,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
     obtain ⟨hm, _, hnot3, _⟩ := send_nullifyTimeout_eq hn
     injection hm with _ hv3
     rcases hvote with hb | hlt | ⟨_, hnot⟩
-    · have := ((h3.notar b (S_subset_st3 f lead i p hb)).2.resolve_left
+    · have := ((h3.notar b (h3.ne_gen_of_view_eq hv3) (S_subset_st3 f lead i p hb)).2.resolve_left
         (by rw [hv3]; exact lt_irrefl _)).2
       rw [hnot3] at this; cases this
     · have h1 : b.view.val = (st1 f i p).view.val := by rw [hv3, st3_view]
@@ -553,7 +560,8 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
         have h1 : b.view.val = (st1 f i p).view.val := by rw [hv4, st4_view]
         omega
       · exact S_st3_subset_st4 f Δ lead i p hb3
-    have hnot4 := ((h4.notar b hvote4).2.resolve_left (by rw [hv4]; exact lt_irrefl _)).2
+    have hnot4 := ((h4.notar b (h4.ne_gen_of_view_eq hv4) hvote4).2.resolve_left
+      (by rw [hv4]; exact lt_irrefl _)).2
     rw [hc₀] at hnot4
     obtain rfl := Option.some.inj hnot4
     refine ⟨h4, hv4.symm, hnl4, hvote4, ?_⟩

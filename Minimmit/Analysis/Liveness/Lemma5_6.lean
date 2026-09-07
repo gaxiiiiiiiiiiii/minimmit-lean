@@ -25,7 +25,7 @@ theorem correct_leader_finalises (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     ∃ b : Block n Tx, b.view = v ∧ b.signer = some (lead v)
       ∧ (∃ t', ∀ j, Action.send (.propose b) j ∈ (instrs t').actions (lead v))
       ∧ ReceivesL f instrs b := by
-  obtain ⟨e, R⟩ := leader_round hinit hh hs (le_refl Δ) hv hi hfirst hgst
+  obtain ⟨e, R⟩ := leader_round hn hinit hh hs (le_refl Δ) hv hi hfirst hgst
   refine ⟨leaderBlockAt f lead s₀ instrs v e, leaderBlockAt_view hinit hh hb hs R, rfl,
     ⟨e, fun j => leader_proposes hinit hh hb hs R j⟩, ?_⟩
   right

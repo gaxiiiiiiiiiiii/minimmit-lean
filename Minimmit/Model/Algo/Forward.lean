@@ -47,6 +47,16 @@ theorem mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Blo
     decide_eq_true_eq]
   exact ⟨b, ⟨mem_votedBlocks hm, h1, h2⟩, q, hq, rfl⟩
 
+/-- 転送される票のブロックは、S で M-notarised で prevS ではそうでない。 -/
+theorem of_mem_forwardMsgs_vote {f : Nat} {p : Processor n Tx} {q : Fin n} {b : Block n Tx}
+    (h : Msg.vote q b ∈ forwardMsgs f p) : MNotarised f p.S b ∧ ¬ MNotarised f p.prevS b := by
+  simp only [forwardMsgs, List.mem_append, List.mem_flatMap, List.mem_filter, List.mem_map,
+    Finset.mem_toList, decide_eq_true_eq] at h
+  rcases h with (⟨v, _, q', _, hq⟩ | ⟨b', ⟨_, h1, h2⟩, q', _, hq⟩) | ⟨_, h⟩
+  · cases hq
+  · injection hq with _ hb; subst hb; exact ⟨h1, h2⟩
+  · simp at h
+
 /-- 新しい取引は転送される。 -/
 theorem mem_forwardMsgs_tx {f : Nat} {p : Processor n Tx} {tr : Tx} (h : Msg.tx tr ∈ p.S)
     (hnew : Msg.tx tr ∉ p.prevS) : Msg.tx tr ∈ forwardMsgs f p := by
@@ -164,14 +174,16 @@ theorem stepPair_timer (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
 
 /-! #### SelectParent と valid proposal -/
 
-theorem selectParent_mnotarised (f : Nat) (S : Finset (Msg n Tx)) (v : View) :
-    MNotarised f S (selectParent f S v) := by
+/-- 初期の S を含む S では、2f + 1 ≤ n なら SelectParent の返すブロックは M-notarised。候補が
+    無ければ genesis で、genesis は初期の S の票で M-notarised。 -/
+theorem selectParent_mnotarised {f : Nat} (hn : 2 * f + 1 ≤ n) {S : Finset (Msg n Tx)}
+    (hS : genesisS n Tx ⊆ S) (v : View) : MNotarised f S (selectParent f S v) := by
   unfold selectParent
   generalize hl :
       ((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     (fun b => b.view.val) = o
   cases o with
-  | none => exact Or.inl rfl
+  | none => exact MNotarised.gen hn hS
   | some b =>
     have hb := List.argmax_mem (Option.mem_def.mpr hl)
     simp only [List.mem_filter, decide_eq_true_eq] at hb

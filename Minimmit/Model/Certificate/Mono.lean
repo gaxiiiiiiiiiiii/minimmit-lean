@@ -22,11 +22,11 @@ theorem nullifiers_subset {S S' : Finset (Msg n Tx)} (h : S ⊆ S') (v : View) :
 
 theorem MNotarised.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b : Block n Tx}
     (hb : MNotarised f S b) : MNotarised f S' b :=
-  hb.imp_right fun hc => hc.trans (Finset.card_le_card (voters_subset h b))
+  hb.trans (Finset.card_le_card (voters_subset h b))
 
 theorem LNotarised.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b : Block n Tx}
     (hb : LNotarised f S b) : LNotarised f S' b :=
-  hb.imp_right fun hc => hc.trans (Finset.card_le_card (voters_subset h b))
+  hb.trans (Finset.card_le_card (voters_subset h b))
 
 theorem Nullified.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {v : View}
     (hv : Nullified f S v) : Nullified f S' v :=
@@ -76,6 +76,17 @@ theorem Block.Ancestor.trans {a b c : Block n Tx} (hab : Block.Ancestor a b)
   induction hbc with
   | refl => exact hab
   | parent q v tr p _ ih => exact Block.Ancestor.parent q v tr p ih
+
+omit [DecidableEq Tx] in
+/-- view が 1 以上のブロックは genesis でない。 -/
+theorem Block.ne_gen_of_one_le {b : Block n Tx} (h : 1 ≤ b.view.val) : b ≠ .gen := by
+  intro hg; subst hg; simp [Block.view] at h
+
+omit [DecidableEq Tx] in
+/-- view が 1 以上のブロックへの票は、genesis への票でない。 -/
+theorem Msg.vote_ne_gen_vote {q : Fin n} {b : Block n Tx} (h : 1 ≤ b.view.val) :
+    Msg.vote q b ≠ Msg.vote q .gen := by
+  intro h'; injection h' with _ hb; subst hb; simp [Block.view] at h
 
 omit [DecidableEq Tx] in
 /-- genesis はすべてのブロックの祖先。 -/

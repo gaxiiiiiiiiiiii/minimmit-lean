@@ -38,9 +38,9 @@ theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
 theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {m : Msg n Tx}
     (hm : m ∈ (Algo.st5 f Δ lead q ((State.run s₀ instrs t).procs q)).S) {w : Fin n}
-    (hw : m.signer = some w) : Sends instrs w m := by
+    (hw : m.signer = some w) (hg : m ≠ .vote w .gen) : Sends instrs w m := by
   rcases Algo.mem_S_stage_or_sent f Δ lead q _ hm with hm' | ⟨hs, j, hj⟩
-  · exact sends_of_mem_S hinit hm' hw
+  · exact sends_of_mem_S hinit hm' hw hg
   · rw [hs] at hw
     obtain rfl := Option.some.inj hw
     refine ⟨t, j, ?_⟩
@@ -72,7 +72,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
   have hnoS : ∀ w, Correct s₀ instrs w →
       Msg.vote w b₂ ∉ ((State.run s₀ instrs (Nat.find hex)).procs q).S := by
     intro w hw hmem
-    obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hmem rfl
+    obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hmem rfl (by simpa using hg)
     exact hmin t' ht' w hw j' hj'
   have hact := hh (Nat.find hex) q (hqc _)
   rw [hact] at hj
@@ -94,9 +94,8 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
       Algo.send_climb (localInv_run hinit hh hqc _) hj'
     injection hm with _ hbb
     subst hbb
-    rcases hM1 with hg' | hM1
-    · exact hg hg'
-    obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hM1)
+    obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
+      (lt_of_lt_of_le (by omega) (show 2 * f + 1 ≤ _ from hM1))
     rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt⟩
     · exact hnoS w hwc hw'
     · injection hb'' with _ hbb
@@ -116,13 +115,14 @@ theorem receivesM_of_MNotarised_st2 (hinit : Init s₀) (hh : Honest f Δ lead s
     (hqc : Correct s₀ instrs q) {t : Nat} {b₀ : Block n Tx}
     (h : MNotarised f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S b₀) :
     ReceivesM f instrs b₀ := by
-  rcases h with rfl | h
-  · exact Or.inl rfl
+  by_cases hg : b₀ = .gen
+  · exact Or.inl hg
   · right
     refine h.trans (Finset.card_le_card fun w hw => ?_)
     rw [mem_voters] at hw
     rw [mem_voteSenders]
     exact sends_of_mem_S_st5 hinit hh hqc (Algo.S_st2_subset_st5 f Δ lead q _ hw) rfl
+      (by simpa using hg)
 
 theorem receivesNullification_of_Nullified_st2 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     {q : Fin n} (hqc : Correct s₀ instrs q) {t : Nat} {w : View}
@@ -131,7 +131,7 @@ theorem receivesNullification_of_Nullified_st2 (hinit : Init s₀) (hh : Honest 
   refine h.trans (Finset.card_le_card fun x hx => ?_)
   rw [mem_nullifiers] at hx
   rw [mem_nullifySenders]
-  exact sends_of_mem_S_st5 hinit hh hqc (Algo.S_st2_subset_st5 f Δ lead q _ hx) rfl
+  exact sends_of_mem_S_st5 hinit hh hqc (Algo.S_st2_subset_st5 f Δ lead q _ hx) rfl (by simp)
 
 /-- M-notarisation を受けたブロックの親は M-notarisation を受け、親の view と自分の view の
     間の view は nullification を受ける。 -/
@@ -182,13 +182,13 @@ theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
 /-- 正直者の S にある L-notarisation は、実行上の L-notarisation。 -/
 theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block n Tx}
     (h : LNotarised f ((State.run s₀ instrs t).procs i).S b) : ReceivesL f instrs b := by
-  rcases h with rfl | h
-  · exact Or.inl rfl
+  by_cases hg : b = .gen
+  · exact Or.inl hg
   · right
     refine h.trans (Finset.card_le_card fun w hw => ?_)
     rw [mem_voters] at hw
     rw [mem_voteSenders]
-    exact sends_of_mem_S hinit hw rfl
+    exact sends_of_mem_S hinit hw rfl (by simpa using hg)
 
 /-- Consistency（§2）をブロックの形で: 2 つのプロセッサが L-notarisation を持つ 2 つの
     ブロックは、一方が他方の祖先。 -/

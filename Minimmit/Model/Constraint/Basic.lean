@@ -25,7 +25,7 @@ variable {n : Nat} {Tx : Type}
 /-! ### 初期状態 -/
 
 /-- 初期状態: 全プロセッサが `Processor.init`、byz と pool は空、now は 0。 -/
-structure Init (s₀ : State n Tx) : Prop where
+structure Init [DecidableEq Tx] (s₀ : State n Tx) : Prop where
   procs : ∀ i, s₀.procs i = Processor.init
   byz : s₀.byz = ∅
   pool : s₀.pool = ∅

@@ -1,4 +1,5 @@
 import Mathlib.Data.Finset.Card
+import Mathlib.Data.Fintype.Basic
 
 /-!
 # 遷移系
@@ -120,6 +121,16 @@ instance [DecidableEq Tx] (S : Finset (Msg n Tx)) (b : Block n Tx) :
     Decidable (containsBlock S b) :=
   inferInstanceAs (Decidable (∃ m ∈ S, _))
 
+/-- Table 2 の初期の S: 全プロセッサの genesis への票。genesis と、その M-notarisation・
+    L-notarisation に当たる。 -/
+def genesisS (n : Nat) (Tx : Type) [DecidableEq Tx] : Finset (Msg n Tx) :=
+  Finset.univ.image fun q => Msg.vote q .gen
+
+theorem mem_genesisS [DecidableEq Tx] {m : Msg n Tx} :
+    m ∈ genesisS n Tx ↔ ∃ q, m = .vote q .gen := by
+  simp only [genesisS, Finset.mem_image, Finset.mem_univ, true_and]
+  exact ⟨fun ⟨q, h⟩ => ⟨q, h.symm⟩, fun ⟨q, h⟩ => ⟨q, h.symm⟩⟩
+
 /-- ネットワークに載る単位: message、宛先、送信したスロット。 -/
 structure Packet (n : Nat) (Tx : Type) where
   msg : Msg n Tx
@@ -152,10 +163,11 @@ structure Processor (n : Nat) (Tx : Type) where
 
 namespace Processor
 
-/-- Table 2 の初期値: view 1、T = 0、フラグは false、notarised は none、S は空。 -/
-def init : Processor n Tx :=
+/-- Table 2 の初期値: view 1、T = 0、フラグは false、notarised は none、S は genesis への
+    全員の票。prevS も同じで、初期の S にあるものは転送の対象にならない。 -/
+def init [DecidableEq Tx] : Processor n Tx :=
   { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
-    S := ∅, prevS := ∅ }
+    S := genesisS n Tx, prevS := genesisS n Tx }
 
 /-- 受信: S に m を入れる。到着と、自分の送信の即時受信（§4 冒頭）の両方が
     ここを通る。 -/

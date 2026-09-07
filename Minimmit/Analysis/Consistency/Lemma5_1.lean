@@ -28,6 +28,22 @@ theorem one_le_view_of_sends (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
     (hi : Correct s₀ instrs i) {b : Block n Tx} (hb : Sends instrs i (Msg.vote i b)) :
     1 ≤ b.view.val := by
   obtain ⟨t, j, ht⟩ := hb
-  exact ((localInv_run hinit hh hi (t + 1)).notar b (mem_S_succ_of_send hh hi ht)).1
+  have hL := localInv_run hinit hh hi t
+  rw [hh t i (hi t), Algo.step_eq_stepPair, Algo.stepPair_snd'] at ht
+  rcases List.mem_append.mp ht with ht | ht
+  · obtain ⟨q, hLq, hqv, _⟩ := Algo.vote_emission_core hL ht
+    rw [← hqv]; exact hLq.view_pos
+  · -- 転送: 新しく M-notarised になったブロック。genesis は初期の S で既に M-notarised
+    have hfw := Algo.send_forwardNew_mem_forwardMsgs ht
+    obtain ⟨h1, h2⟩ := Algo.of_mem_forwardMsgs_vote hfw
+    have hg : b ≠ .gen := by
+      rintro rfl
+      rw [Algo.st5_prevS] at h2
+      exact h2 (MNotarised.gen_of h1 (genesisS_subset_prevS_run hinit i t))
+    rcases Algo.mem_S_stage_or_sent f Δ lead i _ (Algo.mem_S_of_mem_forwardMsgs hfw)
+      with hm | ⟨_, j', hs⟩
+    · exact (hL.notar b hg hm).1
+    · obtain ⟨q, hLq, hqv, _⟩ := Algo.vote_emission_core hL hs
+      rw [← hqv]; exact hLq.view_pos
 
 end Minimmit

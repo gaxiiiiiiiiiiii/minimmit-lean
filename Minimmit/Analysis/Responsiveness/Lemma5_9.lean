@@ -137,24 +137,24 @@ theorem leave_view_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       have hmT : Msg.vote r b ∈ ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S :=
         S_subset_run s₀ instrs r (by omega) hm
       have hL := localInv_run hinit hh hr (T₀ + 2 * Δ + 2 * δ)
-      have hnot : ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).notarised = some b := by
-        refine ((hL.notar b hmT).2.resolve_left ?_).2
-        rw [hbv]
-        change ¬ v.val < (viewAt s₀ instrs r (T₀ + 2 * Δ + 2 * δ)).val
-        rw [hvT]; exact lt_irrefl _
       have hg : b ≠ .gen := by
         intro h; subst h
         have : v.val = 0 := by rw [← hbv]; rfl
         omega
+      have hnot : ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).notarised = some b := by
+        refine ((hL.notar b hg hmT).2.resolve_left ?_).2
+        rw [hbv]
+        change ¬ v.val < (viewAt s₀ instrs r (T₀ + 2 * Δ + 2 * δ)).val
+        rw [hvT]; exact lt_irrefl _
       have hnoM : ¬ MNotarised f ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S b := by
         intro hM
         apply hnc r hr (T₀ + 2 * Δ + 2 * δ) (le_refl _)
         rw [← hbv]
-        exact Algo.hasCert_of_mnotarised hg hM
+        exact Algo.hasCert_of_mnotarised hM
       have hvoters :
           (voters ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S b).card ≤ 2 * f := by
         by_contra h
-        exact hnoM (Or.inr (not_le.mp h))
+        exact hnoM (not_le.mp h)
       have hnp :
           NoProgress f ((State.run s₀ instrs (T₀ + 2 * Δ + 2 * δ)).procs r).S v (some b) := by
         have hCsub : correctSet s₀ instrs ⊆

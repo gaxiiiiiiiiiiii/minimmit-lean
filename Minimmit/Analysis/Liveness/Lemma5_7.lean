@@ -45,7 +45,7 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have h2 := hbound r
     omega
   have hlc : Correct s₀ instrs (lead v') := hlv' ▸ hi
-  obtain ⟨e, R⟩ := leader_round hinit hh hs (le_refl Δ) hv'1 hlc hfirst (by omega)
+  obtain ⟨e, R⟩ := leader_round hn hinit hh hs (le_refl Δ) hv'1 hlc hfirst (by omega)
   have hte := first_entry_le_leader_entry R
   -- 取引はブロックの Tr* に入る
   have htr' : tr ∈ (leaderBlockAt f lead s₀ instrs v' e).trStar := by
@@ -59,7 +59,6 @@ theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     fun r hr => all_vote_leaderBlock hinit hh hb hs R hn (mem_correctSet.mp hr)
   obtain ⟨T, hT⟩ := exists_bound hvotes
   refine ⟨T + GST.val + Δ + 1, leaderBlockAt f lead s₀ instrs v' e, ?_, htr'⟩
-  right
   refine (card_correctSet hb).trans (Finset.card_le_card fun r hr => ?_)
   obtain ⟨s, hsT, j', hj'⟩ := hT r hr
   have hrc := mem_correctSet.mp hr

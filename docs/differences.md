@@ -1,0 +1,85 @@
+# 形式化の注記
+
+## 1. 要約
+
+論文 Minimmit（Chou, Lewis-Pye, O'Grady, [arXiv:2508.10862](https://arxiv.org/abs/2508.10862)）の §5 の Lemma 5.1〜5.10 を Lean 4 で機械検査した。対象は、§4 の Algorithm 1 を実行モデルの上で具体的に定義した形式化である。`sorry` はなく、依存公理は Lean の標準の 3 つで、CI がビルドと公理の監査を回す。
+
+論文の証明に誤りは見つからなかった。ただし論文の主張が成り立つのは、論文が明示していないところを補い（3）、いくつかを論文と違う形にした（4）うえでのことである。擬似コードを字義どおりに読むと、証明の時間計算が通らない箇所がある（3.1）。
+
+log と finalise、§6 の最適化は対象外。
+
+## 2. 対象と確かめ方
+
+基準は論文の v7（2026-01-27）。対象は §4 の Algorithm 1 と §5 の 10 補題で、§2 のモデルはそのために必要な範囲で形式化した。
+
+定理が論文のどの主張に当たるかは README の「状態」の表で、論文の概念がどの定義に当たるかは README の「論文との対応」で確かめられる。各定義と定理の意味は docstring に、依存公理は `Minimmit/Axioms.lean` にある。差異の理由の詳細は、各項目が挙げるファイルの冒頭 doc の「論文からの差異」にある。定理の仮定 `Init`・`Honest`・`ByzBound`・`PartialSync` が同時に満たせることは Model/Constraint/Witness の `constraints_satisfiable` で示してあり、定理は空虚に真ではない。
+
+## 3. 明示した前提
+
+論文が明示していないところを、こちらで定めたもの。
+
+### 3.1 Algorithm 1 の実行方式（Model/Algo/Basic の `Algo.step` と `climb`）
+
+#### 論文の記述
+
+Algorithm 1 は「At every timeslot t:」の下に 2〜32 行を並べ、各スロットに上から 1 回評価する形で書かれている。一方、§3 の地の文は「Upon entering view v, p_i finds …」「proceeds to view v + 1 immediately upon seeing an M-notarisation」と、条件が成立した時点で処理すると述べている。§5 の証明は地の文に沿っていて、Lemma 5.6 の証明は「p_j が新しい証明書を転送するので全正直者は t + Δ までに view v に入る」「p_i はしたがって t + Δ までに新しいブロックを配る」と述べている。
+
+#### 問題
+
+各行を 1 回ずつ順に評価すると、証明が使う動作が 2 つ起きない。まず提案と転送が遅れる。view に入るのは 16〜21 行で、提案の 5〜7 行より後にある。そのため view に入ったスロットには提案できず、そのスロットで完成した証明書も次のスロットの 2〜3 行まで転送されない。5.6・5.8・5.9 の証明の時間計算は、入った時点で提案し届いた時点で転送することを使うので、書いてあるとおりには通らず 1〜2 スロットずれる。ずれは定数で、O(·) の主張は変わらない。
+
+次に、view の進み方が足りない。16〜17 行の nullification と 19〜21 行の M-notarisation で、1 スロットに進める view は高々 2 つである。GST 前に配送が遅れて証明書が一括で届く正直者は、遅れの分だけ多くのスロットを要する。「t + Δ までに全員が v に入る」は、v と遅れの差に応じて破れる。
+
+#### 対処
+
+行の順を変え、16〜21 行を繰り返す。16〜21 行を現在の view の証明書がある限り繰り返し、次に 5〜14 行と 24〜28 行を評価し、2〜3 行の転送をスロットの最後に置く。これで、view に入ったスロットに提案し、そのスロットで完成した証明書を同じスロットで転送する。地の文の述べる動作と一致し、Commonware の実装仕様がリーダーは view に入った時点で提案し `enter_view` は現在より大きい view へ直接移ると定めていることとも合う。
+
+§6.1 の「view を飛ばす」最適化は同じ穴を塞ぐもので、こちらは飛ばさず 1 view ずつ登る。§6.1 が追加する 2 つの規則は、順に登れば別の規則なしに満たされる。
+
+### 3.2 仮定と文の明示
+
+- Model/Constraint/Basic の `PartialSync` に Δ ≥ 1 を明示した。§2 の「t に送った message は t′ > t に届く」から従う条件だが、配送の期限をスロット境界で判定しているため、Δ = 0 では timer = 2Δ が二度と成り立たず Lemma 5.5 が偽になる。
+- Lemma 5.8〜5.10 の δ は、Lewis-Pye と Roughgarden の Permissionless Consensus 7.5 節の定義に合わせ、「t に送った message は max(GST, t) + δ までに届く」として置いた（`PartialSync δ`）。
+- Lemma 5.8〜5.10 の O(·) は具体的な上界に置き換えた。5.8 の t + 3δ と 5.9 の t + 2Δ + 3δ は論文の証明本文の数字で、5.10 の t + δ + (f_a + 1)(2Δ + 3δ) + 3δ は 5.9 を f_a + 1 view 分と 5.8 の和である。
+
+## 4. 設計判断
+
+論文と同じ対象を、違う表現で定めたもの。
+
+### 4.1 親ブロックの参照（Model/Transition/Basic の `Block`）
+
+論文はブロックの親をハッシュ値で参照している。本形式化では親ブロックそのものを持つ。ハッシュは衝突しないと仮定されているので、どちらの参照でも親は一意に定まる。違いは、ブロックを含む message を受け取れば祖先も手元にあることで、論文が Lemma 5.7 と 5.10 の証明で別に導く「祖先が届く」議論が要らず、5.10 の上界に祖先が届く時間は含まれない。
+
+### 4.2 スロット内の順序（Model/Transition/Basic の `State.step`）
+
+論文はスロット内の事象の順序を定めていない。本形式化では、1 スロットの中で起きること、すなわち各プロセッサの動作、時刻の進行、配送、取引の投入、腐敗を、この順に適用する。順序の固定が挙動を狭めないことは未証明である（5 を見よ）。
+
+### 4.3 署名（Model/Transition/Basic の `Block` と `Msg`）
+
+論文では、ブロック、票、nullify は出した処理系の署名付きである。本形式化では、ブロック、票、nullify が署名者を成分に持ち、取引は環境が出すものと決まっているので署名者を記さない。論文は署名を偽造不能と仮定しているので、署名を持つことと署名者を記すことは同じである。
+
+### 4.4 リーダー関数（Model/Constraint/Basic の `Fair`、Analysis/Responsiveness/Lemma5_10）
+
+論文は lead(v) = p_{(v mod n)+1} で固定している。本形式化では lead を任意の関数とし、論文の証明が輪番を使う 2 箇所を仮定に置いた。Lemma 5.7 は `Fair`、つまりどのプロセッサもどの view 以降にもリーダーになることを、Lemma 5.10 は、どの f_a + 1 個の連続する view にも正直なリーダーがいることを仮定する。論文の輪番は `Fair` を満たし、f_a 人以下の腐敗のもとで 5.10 の条件も満たすので、論文の設定を含む。輪番が `Fair` を満たすことは Model/Constraint/Witness の `roundRobin_fair` で証明した。
+
+### 4.5 補題の文
+
+- Analysis/Liveness/Lemma5_5 の `progression` は、論文の「every correct processor enters every view v」を「view v 以上に達する」として述べる。登り切りでは 1 スロットで v を通り過ぎることがあるが、view は 1 ずつ進むので通過はする。
+- Lemma 5.4 の `consistency` と 5.7 の `liveness` は p_i・p_j の正直さを仮定しない。署名の遡りと配送は腐敗したプロセッサでも成り立つためで、論文の主張を含む。
+
+### 4.6 その他の符号化
+
+- Model/Transition/Basic の `Block.trStar` は Tr* の重複を除去しない。Lemma 5.7 の結論は重複の有無に依らない。
+- 初期状態の S は空とし、Table 2 が初期 S に含める genesis の M/L-notarisation は Model/Certificate/Basic の述語が無条件に認める。述語の値は同じである。
+- Model/Algo/Basic では、「辞書順最小」や「some b」の選択を S の列挙順とする。論文の証明は選択の仕方を使わない。
+- 論文の finalise は、S に L-notarisation があるブロックを log に加える動作である。本形式化では log を持たず、finalise は S に L-notarisation があることで表す。
+
+## 5. 未証明
+
+スロット内の動作の順序を固定していること（4.2）について、tick と tick の間で原始関数がどの順に並んでも同じ状態に至ること、この固定順で表せない挙動が「送ったスロットの中で届く配送」だけであることは、可換性による形式化の外の議論に依っていて未証明。
+
+## 6. 参考
+
+- 論文: Brendan Kobayashi Chou, Andrew Lewis-Pye, Patrick O'Grady, "Minimmit: Fast Finality with Even Faster Blocks", [arXiv:2508.10862](https://arxiv.org/abs/2508.10862)。基準は v7（2026-01-27）、CC BY 4.0。
+- δ の定義: Andrew Lewis-Pye, Tim Roughgarden, "Permissionless Consensus", [arXiv:2304.14701](https://arxiv.org/abs/2304.14701)、7.5 節。
+- 実装の仕様書: Commonware の [minimmit.md](https://github.com/commonwarexyz/monorepo/blob/4ff08da00068d61d50f745be2942d6a45597ed46/pipeline/minimmit/minimmit.md)（monorepo、2026-01-22 時点、Apache-2.0 と MIT）。論文の Algorithm 1 でなく実装の仕様で、「On 発火条件: 処理」の形で書かれている。

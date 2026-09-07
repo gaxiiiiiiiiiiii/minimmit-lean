@@ -41,7 +41,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S)
     (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j → ∃ b : Block n Tx,
-      LNotarised f ((State.run s₀ instrs (t + δ + (fa + 1) * (2 * Δ + 3 * δ) + 3 * δ)).procs j).S b
+      Finalised f ((State.run s₀ instrs (t + δ + (fa + 1) * (2 * Δ + 3 * δ) + 3 * δ)).procs j).S b
       ∧ tr ∈ b.trStar := by
   classical
   have hδ1 := hs.one_le
@@ -120,7 +120,7 @@ theorem optimistic_responsiveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     Nat.mul_le_mul_right _ (by omega)
   intro j hj
   refine ⟨leaderBlockAt f lead s₀ instrs v₁ e, ?_, ?_⟩
-  · exact (leaderBlock_lnotarised_by (j := j) hinit hh hb hs R).mono
+  · exact (leaderBlock_finalised_by (j := j) hinit hh hb hs R).mono
       (S_subset_run s₀ instrs j (by omega))
   · apply mem_trStar_leaderBlock
     apply Algo.S_subset_st1 f (lead v₁) _

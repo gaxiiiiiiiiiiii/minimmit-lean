@@ -54,7 +54,9 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
     ∃ q t, Correct s₀ instrs q
       ∧ (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view = b₂.view
       ∧ ValidProposal f lead (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S
-          (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view b₂ := by
+          (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view b₂
+      ∧ ∀ t' w j', Correct s₀ instrs w → Action.send (Msg.vote w b₂) j' ∈ (instrs t').actions w →
+          t ≤ t' := by
   classical
   have hex :
       ∃ t, ∃ q, Correct s₀ instrs q ∧ ∃ j, Action.send (Msg.vote q b₂) j
@@ -106,7 +108,8 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
   · obtain ⟨b', hm, hbv, _, _, hvp, _⟩ := Algo.send_voteProposal_eq hj'
     injection hm with _ hbb
     subst hbb
-    exact ⟨q, Nat.find hex, hqc, hbv.symm, hvp⟩
+    exact ⟨q, Nat.find hex, hqc, hbv.symm, hvp,
+      fun t' w j' hw h => Nat.find_min' hex ⟨w, hw, j', h⟩⟩
   · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq hj'; cases hm
   · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq hj'; cases hm
 
@@ -140,7 +143,7 @@ theorem receivesM_parent (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hM : ReceivesM f instrs (Block.node q₀ v tr p₀)) :
     ReceivesM f instrs p₀
       ∧ ∀ w : View, p₀.view.val < w.val → w.val < v.val → ReceivesNullification f instrs w := by
-  obtain ⟨q, t, hqc, hview, hvp⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hM
+  obtain ⟨q, t, hqc, hview, hvp, _⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hM
   have hpar : p₀ ∈ (Block.node q₀ v tr p₀).parent := by simp [Block.parent]
   refine ⟨receivesM_of_MNotarised_st2 hinit hh hqc (hvp.parent p₀ hpar), fun w h1 h2 => ?_⟩
   refine receivesNullification_of_Nullified_st2 hinit hh hqc (hvp.gaps p₀ hpar w h1 ?_)
@@ -178,6 +181,17 @@ theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   obtain ⟨_, hgap⟩ := receivesM_parent hinit hh hb hM
   exact not_receivesNullification_of_receivesL hn hinit hh hb hL
     (hgap b.view hlt (lt_of_le_of_ne hge (Ne.symm hne)))
+
+/-- S にある M-notarisation は、実行上の M-notarisation。 -/
+theorem receivesM_of_MNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block n Tx}
+    (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) : ReceivesM f instrs b := by
+  by_cases hg : b = .gen
+  · exact Or.inl hg
+  · right
+    refine h.trans (Finset.card_le_card fun w hw => ?_)
+    rw [mem_voters] at hw
+    rw [mem_voteSenders]
+    exact sends_of_mem_S hinit hw rfl (by simpa using hg)
 
 /-- 正直者の S にある L-notarisation は、実行上の L-notarisation。 -/
 theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block n Tx}

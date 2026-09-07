@@ -86,6 +86,11 @@ theorem LNotarised.gen {f : Nat} {S : Finset (Msg n Tx)} (h : genesisS n Tx ⊆ 
     LNotarised f S .gen := by
   unfold LNotarised; rw [voters_gen_eq_univ h, Finset.card_univ, Fintype.card_fin]; omega
 
+/-- p_i が b を finalise した（§2、Algorithm 1 の 31〜32 行）: S に b の L-notarisation があり、
+    b の全祖先を S が含む。 -/
+def Finalised (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
+  LNotarised f S b ∧ ∀ a, Block.Ancestor a b → containsBlock S a
+
 /-- S が view v の nullification を含む（§4）: 異なる 2f + 1 人の nullify(v)。 -/
 def Nullified (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Prop :=
   2 * f + 1 ≤ (nullifiers S v).card

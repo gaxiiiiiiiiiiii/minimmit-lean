@@ -142,10 +142,11 @@ noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Bl
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen
 
-/-- ProposeChild(b, v) の Tr（§4）: 受信済みで b の祖先に含まれない取引。 -/
+open Classical in
+/-- ProposeChild(b, v) の Tr（§4）: 受信済みの取引のうち、S が含む b の祖先の Tr に無いもの。 -/
 noncomputable def payload (S : Finset (Msg n Tx)) (b : Block n Tx) : List Tx :=
   (S.toList.filterMap fun m => match m with | .tx tr => some tr | _ => none).filter
-    fun tr => decide (tr ∉ b.trStar)
+    fun tr => decide (∀ a, Block.Ancestor a b → containsBlock S a → tr ∉ a.tr)
 
 /-! ### 2〜3 行と §4 の取引転送 -/
 

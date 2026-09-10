@@ -98,6 +98,17 @@ theorem Block.trStar_prefix_of_ancestor {a b : Block n Tx} (h : Block.Ancestor a
   | refl => exact List.prefix_rfl
   | parent q v tr p _ ih => exact ih.trans (List.prefix_append _ _)
 
+/-- b の取引は b の Tr* にある。 -/
+theorem Block.mem_trStar_of_mem_tr {b : Block n Tx} {x : Tx} (h : x ∈ b.tr) : x ∈ b.trStar := by
+  cases b with
+  | gen => simp [Block.tr] at h
+  | node q v tr p => exact Block.mem_trStar_node.mpr (Or.inr h)
+
+/-- 祖先の取引は Tr* にある。 -/
+theorem Block.mem_trStar_of_ancestor {a b : Block n Tx} (h : Block.Ancestor a b) {x : Tx}
+    (hx : x ∈ a.tr) : x ∈ b.trStar :=
+  (Block.trStar_prefix_of_ancestor h).subset (Block.mem_trStar_of_mem_tr hx)
+
 omit [DecidableEq Tx] in
 theorem Block.depth_le_of_ancestor {a b : Block n Tx} (h : Block.Ancestor a b) :
     a.depth ≤ b.depth := by

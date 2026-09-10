@@ -123,7 +123,7 @@ theorem mem_trStar_leaderBlock {f : Nat} {i : Fin n} {p : Processor n Tx} {tr : 
   · right
     simp only [Algo.payload, List.mem_filter, List.mem_filterMap, Finset.mem_toList,
       decide_eq_true_eq]
-    exact ⟨⟨Msg.tx tr, h, rfl⟩, hp⟩
+    exact ⟨⟨Msg.tx tr, h, rfl⟩, fun a ha _ htr => hp (Block.mem_trStar_of_ancestor ha htr)⟩
 
 /-! ### 5.6 の補題 -/
 

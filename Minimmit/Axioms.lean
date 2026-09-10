@@ -8,7 +8,6 @@ import Minimmit.Analysis.Liveness.Lemma5_7
 import Minimmit.Analysis.Responsiveness.Lemma5_8
 import Minimmit.Analysis.Responsiveness.Lemma5_9
 import Minimmit.Analysis.Responsiveness.Lemma5_10
-import Minimmit.Analysis.Log
 import Minimmit.Model.Constraint.Witness
 
 /-!
@@ -39,18 +38,17 @@ Classical.choice, Quot.sound]
 #guard_msgs in #print axioms Minimmit.not_receivesNullification_of_receivesL
 
 -- Lemma 5.4 Consistency
-/--
-info: 'Minimmit.finalised_compatible' depends on axioms: [propext, Classical.choice, Quot.sound]
--/
-#guard_msgs in #print axioms Minimmit.finalised_compatible
 
-/-- info: 'Minimmit.consistency' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+/--
+info: 'Minimmit.consistency' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
 #guard_msgs in #print axioms Minimmit.consistency
-
 /--
-info: 'Minimmit.satisfies_consistency' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: 'Minimmit.receivesL_consistent' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
-#guard_msgs in #print axioms Minimmit.satisfies_consistency
+#guard_msgs in #print axioms Minimmit.receivesL_consistent
+/-- info: 'Minimmit.lnotarised_consistent' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in #print axioms Minimmit.lnotarised_consistent
 
 -- Lemma 5.5 Progression through views
 /-- info: 'Minimmit.progression' depends on axioms: [propext, Classical.choice, Quot.sound] -/
@@ -63,11 +61,11 @@ info: 'Minimmit.correct_leader_finalises' depends on axioms: [propext, Classical
 #guard_msgs in #print axioms Minimmit.correct_leader_finalises
 
 -- Lemma 5.7 Liveness
+
 /-- info: 'Minimmit.liveness' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in #print axioms Minimmit.liveness
-
-/-- info: 'Minimmit.satisfies_liveness' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in #print axioms Minimmit.satisfies_liveness
+/-- info: 'Minimmit.tx_finalised' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in #print axioms Minimmit.tx_finalised
 
 -- Lemma 5.8
 /--

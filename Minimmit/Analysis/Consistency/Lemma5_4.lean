@@ -1,10 +1,12 @@
 import Minimmit.Analysis.Consistency.Lemma5_3
+import Minimmit.Analysis.Log
 
 /-!
 # Lemma 5.4（Consistency）
 
 M-notarisation を受けたブロックの親と祖先も M-notarisation を受けることから、
-L-notarisation を受けた 2 つのブロックは一方が他方の祖先。
+L-notarisation を受けた 2 つのブロックは一方が他方の祖先。log はそのようなブロックの Tr* なので、
+§2 の Consistency が従う。
 -/
 
 namespace Minimmit
@@ -151,7 +153,7 @@ theorem receivesM_ancestor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
 
 /-- Lemma 5.4（Consistency）の本体: L-notarisation を受けた 2 つのブロックは、一方が他方の
     祖先。 -/
-theorem finalised_compatible (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+theorem receivesL_consistent (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {b b' : Block n Tx} (hL : ReceivesL f instrs b) (hL' : ReceivesL f instrs b') :
     b.Ancestor b' ∨ b'.Ancestor b := by
@@ -196,15 +198,32 @@ theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
     rw [mem_voteSenders]
     exact sends_of_mem_S hinit hw rfl (by simpa using hg)
 
-/-- Consistency（§2）をブロックの形で: 2 つのプロセッサが L-notarisation を持つ 2 つの
+/-- `receivesL_consistent` を S の形で: 2 つのプロセッサの S に L-notarisation を持つ 2 つの
     ブロックは、一方が他方の祖先。 -/
-theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+theorem lnotarised_consistent (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {i j : Fin n} {t t' : Nat} {b b' : Block n Tx}
     (hbi : LNotarised f ((State.run s₀ instrs t).procs i).S b)
     (hbj : LNotarised f ((State.run s₀ instrs t').procs j).S b') :
     b.Ancestor b' ∨ b'.Ancestor b :=
-  finalised_compatible hn hinit hh hb (receivesL_of_LNotarised hinit hbi)
+  receivesL_consistent hn hinit hh hb (receivesL_of_LNotarised hinit hbi)
     (receivesL_of_LNotarised hinit hbj)
+
+/-- Lemma 5.4（Consistency）: プロトコルは Consistency を満たす。 -/
+theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
+    (hh : Honest f Δ lead s₀ instrs) (hbz : ByzBound f s₀ instrs) : Consistency f s₀ instrs := by
+  intro i j _ _ t t'
+  unfold log
+  cases hl : (finalisedBlocks f ((State.run s₀ instrs t).procs i).S).argmax Block.depth with
+  | none => exact Or.inl (List.nil_prefix)
+  | some b =>
+    cases hl' : (finalisedBlocks f ((State.run s₀ instrs t').procs j).S).argmax Block.depth with
+    | none => exact Or.inr (List.nil_prefix)
+    | some b' =>
+      have hb := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl))).2
+      have hb' := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl'))).2
+      rcases lnotarised_consistent hn hinit hh hbz hb.1 hb'.1 with h | h
+      · exact Or.inl (Block.trStar_prefix_of_ancestor h)
+      · exact Or.inr (Block.trStar_prefix_of_ancestor h)
 
 end Minimmit

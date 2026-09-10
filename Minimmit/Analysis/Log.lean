@@ -1,18 +1,19 @@
-import Minimmit.Analysis.Liveness.Lemma5_7
+import Minimmit.Model.Certificate.Mono
+import Minimmit.Model.Constraint.Basic
 
 /-!
 # log と §2 の性質
 
 論文の log_i は finalise が書く変数で、その値は S から定まる: finalise したブロックのうち
-最も深いものの Tr*。ここでは log を S の関数として定義し、§2 の Consistency と Liveness を
-論文の文どおりに定義して、ブロックの形の Lemma 5.4・5.7 から導く。
+最も深いものの Tr*。log を S の関数として定義し、§2 の Consistency と Liveness を論文の
+文どおりに定義する。プロトコルがこれらを満たすことは `consistency` と
+`liveness`。
 -/
 
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
-  {instrs : Nat → Instr n Tx}
+variable {f : Nat} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 open Classical in
 /-- S で finalise したブロックの列 -/
@@ -59,37 +60,5 @@ theorem log_eq_of_finalised {S : Finset (Msg n Tx)}
     rcases hchain b b' hb hb' with h | h
     · exact h
     · rw [Block.eq_of_ancestor_of_depth_le h hle]; exact Block.Ancestor.refl _
-
-/-- Lemma 5.4（Consistency）: プロトコルは Consistency を満たす。 -/
-theorem satisfies_consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hbz : ByzBound f s₀ instrs) : Consistency f s₀ instrs := by
-  intro i j _ _ t t'
-  unfold log
-  cases hl : (finalisedBlocks f ((State.run s₀ instrs t).procs i).S).argmax Block.depth with
-  | none => exact Or.inl (List.nil_prefix)
-  | some b =>
-    cases hl' : (finalisedBlocks f ((State.run s₀ instrs t').procs j).S).argmax Block.depth with
-    | none => exact Or.inr (List.nil_prefix)
-    | some b' =>
-      have hb := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl))).2
-      have hb' := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl'))).2
-      rcases consistency hn hinit hh hbz hb.1 hb'.1 with h | h
-      · exact Or.inl (Block.trStar_prefix_of_ancestor h)
-      · exact Or.inr (Block.trStar_prefix_of_ancestor h)
-
-/-- Lemma 5.7（Liveness）: プロトコルは Liveness を満たす。 -/
-theorem satisfies_liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hbz : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ GST s₀ instrs) (hlead : Fair lead) : Liveness f s₀ instrs := by
-  intro i j hi _ t tr htr
-  obtain ⟨t', b, hfin, hmem⟩ := liveness (j := j) hn hinit hh hbz hs hlead hi htr
-  have hvb : b ∈ Algo.votedBlocks ((State.run s₀ instrs t').procs j).S := by
-    obtain ⟨w, hw⟩ := Finset.card_pos.mp (lt_of_lt_of_le (by omega) (show n - f ≤ _ from hfin.1))
-    exact Algo.mem_votedBlocks (mem_voters.mp hw)
-  obtain ⟨b', _, hanc, hlog⟩ := log_eq_of_finalised
-    (fun x y hx hy => consistency hn hinit hh hbz hx.1 hy.1) hfin hvb
-  refine ⟨t', ?_⟩
-  rw [hlog]
-  exact (Block.trStar_prefix_of_ancestor hanc).subset hmem
 
 end Minimmit

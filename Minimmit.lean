@@ -12,6 +12,7 @@ import Minimmit.Model.Algo.Forward
 import Minimmit.Model.Constraint.Basic
 import Minimmit.Model.Constraint.Run
 import Minimmit.Model.Constraint.Witness
+import Minimmit.Analysis.Log
 import Minimmit.Analysis.Consistency.Lemma5_1
 import Minimmit.Analysis.Consistency.Lemma5_2
 import Minimmit.Analysis.Consistency.Lemma5_3
@@ -22,7 +23,6 @@ import Minimmit.Analysis.Liveness.LeaderRound
 import Minimmit.Analysis.Liveness.Lemma5_6
 import Minimmit.Analysis.Liveness.Lemma5_7
 import Minimmit.Analysis.Liveness.Finalise
-import Minimmit.Analysis.Log
 import Minimmit.Analysis.Responsiveness.Lemma5_8
 import Minimmit.Analysis.Responsiveness.Lemma5_9
 import Minimmit.Analysis.Responsiveness.Lemma5_10

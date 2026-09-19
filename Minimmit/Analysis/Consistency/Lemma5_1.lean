@@ -12,10 +12,10 @@ variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat 
 /-- Lemma 5.1（One vote per view）: 正直者は各 view で高々 1 つのブロックに投票する。 -/
 theorem one_vote_per_view (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
-    {b b' : Block n Tx} (hb : Sends instrs i (.vote i b)) (hb' : Sends instrs i (.vote i b'))
+    {b b' : Block n Tx} (hb : Sends s₀ instrs i (.vote i b)) (hb' : Sends s₀ instrs i (.vote i b'))
     (hview : b.view = b'.view) : b = b' := by
-  obtain ⟨t, j, ht⟩ := hb
-  obtain ⟨t', j', ht'⟩ := hb'
+  obtain ⟨t, j, ht⟩ := hb.instructed hinit
+  obtain ⟨t', j', ht'⟩ := hb'.instructed hinit
   have h₁ := mem_S_succ_of_send hh hi ht
   have h₂ := mem_S_succ_of_send hh hi ht'
   have hle₁ : t + 1 ≤ max (t + 1) (t' + 1) := le_max_left _ _
@@ -25,9 +25,9 @@ theorem one_vote_per_view (hinit : Init s₀)
 
 /-- 正直者が投票するブロックの view は 1 以上。 -/
 theorem one_le_view_of_sends (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {b : Block n Tx} (hb : Sends instrs i (Msg.vote i b)) :
+    (hi : Correct s₀ instrs i) {b : Block n Tx} (hb : Sends s₀ instrs i (Msg.vote i b)) :
     1 ≤ b.view.val := by
-  obtain ⟨t, j, ht⟩ := hb
+  obtain ⟨t, j, ht⟩ := hb.instructed hinit
   have hL := localInv_run hinit hh hi t
   rw [hh t i (hi t), Algo.step_eq_stepPair, Algo.stepPair_snd'] at ht
   rcases List.mem_append.mp ht with ht | ht

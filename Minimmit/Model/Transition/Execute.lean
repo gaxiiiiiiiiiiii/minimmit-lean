@@ -454,9 +454,22 @@ theorem execute_pool_subset (s : State n Tx) (i : Fin n) (a : Action n Tx) :
     · exact Finset.Subset.refl _
   | progress => exact Finset.Subset.refl _
 
+theorem pool_subset_foldl_execute (s : State n Tx) (i : Fin n) (acts : List (Action n Tx)) :
+    s.pool ⊆ (acts.foldl (fun s a => s.execute i a) s).pool := by
+  induction acts generalizing s with
+  | nil => exact Finset.Subset.refl _
+  | cons a acts ih => exact (execute_pool_subset s i a).trans (ih _)
+
+theorem pool_subset_foldl_act (s : State n Tx) (instr : Instr n Tx) (l : List (Fin n)) :
+    s.pool ⊆
+      (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
+  induction l generalizing s with
+  | nil => exact Finset.Subset.refl _
+  | cons k l ih => exact (pool_subset_foldl_execute s k _).trans (ih _)
+
 theorem mem_pool_execute {s : State n Tx} {i : Fin n} {a : Action n Tx} {x : Packet n Tx}
     (hx : x ∈ (s.execute i a).pool) :
-    x ∈ s.pool ∨ ∃ m j, a = Action.send m j ∧ x = ⟨m, j, s.now⟩
+    x ∈ s.pool ∨ ∃ m j, a = Action.send m j ∧ x = ⟨i, m, j, s.now⟩
       ∧ (s.procs i).canSend i m := by
   cases a with
   | send m j =>
@@ -477,7 +490,7 @@ theorem foldl_execute_now (s : State n Tx) (i : Fin n) (acts : List (Action n Tx
 
 theorem mem_pool_foldl_execute {s : State n Tx} {i : Fin n} {acts : List (Action n Tx)}
     {x : Packet n Tx} (hx : x ∈ (acts.foldl (fun s a => s.execute i a) s).pool) :
-    x ∈ s.pool ∨ ∃ m j, Action.send m j ∈ acts ∧ x = ⟨m, j, s.now⟩
+    x ∈ s.pool ∨ ∃ m j, Action.send m j ∈ acts ∧ x = ⟨i, m, j, s.now⟩
       ∧ ((s.procs i).executeAll i acts).canSend i m := by
   induction acts generalizing s with
   | nil => exact Or.inl hx
@@ -506,7 +519,7 @@ theorem act_now (s : State n Tx) (instr : Instr n Tx) : (s.act instr).now = s.no
 theorem mem_pool_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin n)}
     (hl : l.Nodup) {x : Packet n Tx}
     (hx : x ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool) :
-    x ∈ s.pool ∨ ∃ k ∈ l, ∃ m j, Action.send m j ∈ instr.actions k ∧ x = ⟨m, j, s.now⟩
+    x ∈ s.pool ∨ ∃ k ∈ l, ∃ m j, Action.send m j ∈ instr.actions k ∧ x = ⟨k, m, j, s.now⟩
       ∧ ((s.procs k).executeAll k (instr.actions k)).canSend k m := by
   induction l generalizing s with
   | nil => exact Or.inl hx
@@ -525,11 +538,138 @@ theorem mem_pool_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin 
 
 theorem mem_pool_act {s : State n Tx} {instr : Instr n Tx} {x : Packet n Tx}
     (hx : x ∈ (s.act instr).pool) :
-    x ∈ s.pool ∨ ∃ k m j, Action.send m j ∈ instr.actions k ∧ x = ⟨m, j, s.now⟩
+    x ∈ s.pool ∨ ∃ k m j, Action.send m j ∈ instr.actions k ∧ x = ⟨k, m, j, s.now⟩
       ∧ ((s.act instr).procs k).canSend k m := by
   rcases mem_pool_foldl_act (List.nodup_finRange n) hx with hx | ⟨k, _, m, j, hm, hxe, hg⟩
   · exact Or.inl hx
   · exact Or.inr ⟨k, m, j, hm, hxe, by rwa [act_procs]⟩
+
+/-! ### 動作の後の S と pool -/
+
+/-- i の動作の後に S にある message は、前からあったか、i が自分宛に送ってその packet が
+    pool に載ったもの。 -/
+theorem mem_S_foldl_execute_self {s : State n Tx} {i : Fin n} {acts : List (Action n Tx)}
+    {m : Msg n Tx} (hm : m ∈ ((acts.foldl (fun s a => s.execute i a) s).procs i).S) :
+    m ∈ (s.procs i).S
+      ∨ (⟨i, m, i, s.now⟩ : Packet n Tx) ∈ (acts.foldl (fun s a => s.execute i a) s).pool := by
+  induction acts generalizing s with
+  | nil => exact Or.inl hm
+  | cons a acts ih =>
+    rw [List.foldl_cons] at hm ⊢
+    rcases ih hm with h | h
+    · cases a with
+      | send m' j =>
+        simp only [execute, send] at h
+        split_ifs at h with hg
+        · simp only [transmit_procs, update_procs_self, Processor.send_S] at h
+          split_ifs at h with hj
+          · subst hj
+            rcases Finset.mem_insert.mp h with rfl | h
+            · refine Or.inr (pool_subset_foldl_execute _ j acts ?_)
+              simp only [execute, send, if_pos hg, transmit, update_pool]
+              exact Finset.mem_insert_self _ _
+            · exact Or.inl h
+          · exact Or.inl h
+        · exact Or.inl h
+      | progress =>
+        simp only [execute, progress, update_procs_self] at h
+        exact Or.inl h
+    · rw [execute_now] at h; exact Or.inr h
+
+theorem mem_S_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin n)} (hl : l.Nodup)
+    {k : Fin n} {m : Msg n Tx}
+    (hm : m ∈ ((l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).procs
+      k).S) :
+    m ∈ (s.procs k).S ∨ (⟨k, m, k, s.now⟩ : Packet n Tx)
+      ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
+  induction l generalizing s with
+  | nil => exact Or.inl hm
+  | cons i l ih =>
+    rw [List.nodup_cons] at hl
+    rw [List.foldl_cons] at hm ⊢
+    rcases ih hl.2 hm with h | h
+    · by_cases hk : k = i
+      · subst hk
+        rcases mem_S_foldl_execute_self h with h | h
+        · exact Or.inl h
+        · exact Or.inr (pool_subset_foldl_act _ instr l h)
+      · rw [foldl_execute_procs_ne _ hk] at h; exact Or.inl h
+    · rw [foldl_execute_now] at h; exact Or.inr h
+
+/-- 動作の後に p_k の S にある message は、前からあったか、k が自分宛に送ってその packet が
+    pool に載ったもの。 -/
+theorem mem_S_act {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {m : Msg n Tx}
+    (hm : m ∈ ((s.act instr).procs k).S) :
+    m ∈ (s.procs k).S ∨ (⟨k, m, k, s.now⟩ : Packet n Tx) ∈ (s.act instr).pool :=
+  mem_S_foldl_act (List.nodup_finRange n) hm
+
+/-- i の動作の後の S が含むブロックは、前から含まれていたか、i の署名付きで、i が送った message
+    の成分としてその packet が pool に載ったもの。 -/
+theorem containsBlock_foldl_execute {s : State n Tx} {i : Fin n} {acts : List (Action n Tx)}
+    {b : Block n Tx}
+    (hb : containsBlock ((acts.foldl (fun s a => s.execute i a) s).procs i).S b) :
+    containsBlock (s.procs i).S b
+      ∨ (b.signer = some i ∧ ∃ m j, m.block = some b
+          ∧ (⟨i, m, j, s.now⟩ : Packet n Tx) ∈ (acts.foldl (fun s a => s.execute i a) s).pool) := by
+  induction acts generalizing s with
+  | nil => exact Or.inl hb
+  | cons a acts ih =>
+    rw [List.foldl_cons] at hb ⊢
+    rcases ih hb with h | ⟨hs, m, j, hmb, hx⟩
+    · cases a with
+      | send m' j' =>
+        obtain ⟨m, hm, hmb⟩ := h
+        simp only [execute, send] at hm
+        split_ifs at hm with hg
+        · simp only [transmit_procs, update_procs_self, Processor.send_S] at hm
+          split_ifs at hm with hj
+          · rcases Finset.mem_insert.mp hm with rfl | hm
+            · have hok : b.signer = some i ∨ containsBlock (s.procs i).S b := by
+                have := hg.2; rwa [hmb] at this
+              rcases hok with hs | hc
+              · refine Or.inr ⟨hs, m, j', hmb, pool_subset_foldl_execute _ i acts ?_⟩
+                simp only [execute, send, if_pos hg, transmit, update_pool]
+                exact Finset.mem_insert_self _ _
+              · exact Or.inl hc
+            · exact Or.inl ⟨m, hm, hmb⟩
+          · exact Or.inl ⟨m, hm, hmb⟩
+        · exact Or.inl ⟨m, hm, hmb⟩
+      | progress =>
+        obtain ⟨m, hm, hmb⟩ := h
+        simp only [execute, progress, update_procs_self] at hm
+        exact Or.inl ⟨m, hm, hmb⟩
+    · rw [execute_now] at hx; exact Or.inr ⟨hs, m, j, hmb, hx⟩
+
+theorem containsBlock_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin n)}
+    (hl : l.Nodup) {k : Fin n} {b : Block n Tx}
+    (hb : containsBlock
+      ((l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).procs k).S b) :
+    containsBlock (s.procs k).S b
+      ∨ (b.signer = some k ∧ ∃ m j, m.block = some b ∧ (⟨k, m, j, s.now⟩ : Packet n Tx)
+          ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s)
+            s).pool) := by
+  induction l generalizing s with
+  | nil => exact Or.inl hb
+  | cons i l ih =>
+    rw [List.nodup_cons] at hl
+    rw [List.foldl_cons] at hb ⊢
+    rcases ih hl.2 hb with h | ⟨hs, m, j, hmb, hx⟩
+    · by_cases hk : k = i
+      · subst hk
+        rcases containsBlock_foldl_execute h with h | ⟨hs, m, j, hmb, hx⟩
+        · exact Or.inl h
+        · exact Or.inr ⟨hs, m, j, hmb, pool_subset_foldl_act _ instr l hx⟩
+      · rw [foldl_execute_procs_ne _ hk] at h; exact Or.inl h
+    · rw [foldl_execute_now] at hx; exact Or.inr ⟨hs, m, j, hmb, hx⟩
+
+/-- 動作の後の p_k の S が含むブロックは、前から含まれていたか、k の署名付きで、k が送った
+    message の成分としてその packet が pool に載ったもの。 -/
+theorem containsBlock_act {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {b : Block n Tx}
+    (hb : containsBlock ((s.act instr).procs k).S b) :
+    containsBlock (s.procs k).S b
+      ∨ (b.signer = some k ∧ ∃ m j, m.block = some b
+          ∧ (⟨k, m, j, s.now⟩ : Packet n Tx) ∈ (s.act instr).pool) :=
+  containsBlock_foldl_act (List.nodup_finRange n) hb
 
 /-! ### 配送・取引・腐敗と pool -/
 
@@ -692,6 +832,10 @@ theorem step_procs (s : State n Tx) (instr : Instr n Tx) (i : Fin n) :
 theorem step_pool (s : State n Tx) (instr : Instr n Tx) :
     (s.step instr).pool = (s.act instr).pool := by
   rw [step_eq, foldl_corrupt_pool, foldl_submit_pool, foldl_deliver_pool, tick_pool]
+
+theorem pool_subset_step (s : State n Tx) (instr : Instr n Tx) :
+    s.pool ⊆ (s.step instr).pool := by
+  rw [step_pool]; exact pool_subset_foldl_act s instr _
 
 @[simp] theorem deliver_now (s : State n Tx) (x : Packet n Tx) : (s.deliver x).now = s.now := by
   simp only [deliver]; split_ifs <;> rfl

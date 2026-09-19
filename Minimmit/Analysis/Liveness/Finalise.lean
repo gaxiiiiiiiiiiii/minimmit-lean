@@ -45,12 +45,12 @@ theorem ancestor_vote_before (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
     obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
       (lt_of_lt_of_le (by omega) (show 2 * f + 1 ≤ _ from hM))
     rw [mem_voters] at hw
-    obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit hw rfl (by simp)
+    obtain ⟨s', hs', j, hj⟩ := instructed_of_mem_S hinit hw rfl (by simp)
     rcases ha.eq_or_parent with rfl | ⟨p', hp', hap⟩
     · exact ⟨w, s', hwc, hs', j, hj⟩
     · simp only [Block.parent, Option.mem_def, Option.some.injEq] at hp'
       subst hp'
-      have hRM : ReceivesM f instrs (.node q v tr p) := receivesM_of_MNotarised hinit hM
+      have hRM : ReceivesM f s₀ instrs (.node q v tr p) := receivesM_of_MNotarised hinit hM
       obtain ⟨q', t₀, hq'c, _, hvp, hmin⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hRM
       have ht₀ : t₀ ≤ s' := hmin s' w j hwc hj
       have hMp : MNotarised f ((State.run s₀ instrs (t₀ + 1)).procs q').S p :=

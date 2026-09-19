@@ -142,26 +142,31 @@ end
 /-! ### 実行上の証明書（§5.1）
 誰かの S でなく、実行の中で誰が何を送ったかで言う。 -/
 
+variable [DecidableEq Tx]
+
 open Classical in
 /-- b への自分の票を送ったプロセッサ -/
-noncomputable def voteSenders (instrs : Nat → Instr n Tx) (b : Block n Tx) : Finset (Fin n) :=
-  Finset.univ.filter fun q => Sends instrs q (.vote q b)
+noncomputable def voteSenders (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (b : Block n Tx) :
+    Finset (Fin n) :=
+  Finset.univ.filter fun q => Sends s₀ instrs q (.vote q b)
 
 open Classical in
 /-- nullify(v) を送ったプロセッサ -/
-noncomputable def nullifySenders (instrs : Nat → Instr n Tx) (v : View) : Finset (Fin n) :=
-  Finset.univ.filter fun q => Sends instrs q (.nullify q v)
+noncomputable def nullifySenders (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (v : View) :
+    Finset (Fin n) :=
+  Finset.univ.filter fun q => Sends s₀ instrs q (.nullify q v)
 
 /-- b が M-notarisation を受ける（§5.1）: b = genesis か、2f + 1 人以上が b に投票した。 -/
-def ReceivesM (f : Nat) (instrs : Nat → Instr n Tx) (b : Block n Tx) : Prop :=
-  b = .gen ∨ 2 * f + 1 ≤ (voteSenders instrs b).card
+def ReceivesM (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (b : Block n Tx) : Prop :=
+  b = .gen ∨ 2 * f + 1 ≤ (voteSenders s₀ instrs b).card
 
 /-- b が L-notarisation を受ける（§5.1）: b = genesis か、n − f 人以上が b に投票した。 -/
-def ReceivesL (f : Nat) (instrs : Nat → Instr n Tx) (b : Block n Tx) : Prop :=
-  b = .gen ∨ n - f ≤ (voteSenders instrs b).card
+def ReceivesL (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (b : Block n Tx) : Prop :=
+  b = .gen ∨ n - f ≤ (voteSenders s₀ instrs b).card
 
 /-- view v が nullification を受ける（§5.1）: 2f + 1 人以上が nullify(v) を送った。 -/
-def ReceivesNullification (f : Nat) (instrs : Nat → Instr n Tx) (v : View) : Prop :=
-  2 * f + 1 ≤ (nullifySenders instrs v).card
+def ReceivesNullification (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (v : View) :
+    Prop :=
+  2 * f + 1 ≤ (nullifySenders s₀ instrs v).card
 
 end Minimmit

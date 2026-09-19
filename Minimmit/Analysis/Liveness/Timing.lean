@@ -108,36 +108,6 @@ theorem timerAt_add (i : Fin n) (t k : Nat)
       exact lt_irrefl _ h2
     · rw [← Nat.add_assoc, h1, hk]; omega
 
-/-! ### now と pool -/
-
-theorem run_now (hinit : Init s₀) (t : Nat) : (State.run s₀ instrs t).now = ⟨t⟩ := by
-  induction t with
-  | zero => exact hinit.now
-  | succ t ih => rw [State.run, State.step_now, ih]
-
-theorem State.pool_subset_foldl_execute (s : State n Tx) (i : Fin n) (acts : List (Action n Tx)) :
-    s.pool ⊆ (acts.foldl (fun s a => s.execute i a) s).pool := by
-  induction acts generalizing s with
-  | nil => exact Finset.Subset.refl _
-  | cons a acts ih => exact (State.execute_pool_subset s i a).trans (ih _)
-
-theorem State.pool_subset_foldl_act (s : State n Tx) (instr : Instr n Tx) (l : List (Fin n)) :
-    s.pool ⊆
-      (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
-  induction l generalizing s with
-  | nil => exact Finset.Subset.refl _
-  | cons k l ih => exact (State.pool_subset_foldl_execute s k _).trans (ih _)
-
-theorem State.pool_subset_step (s : State n Tx) (instr : Instr n Tx) :
-    s.pool ⊆ (s.step instr).pool := by
-  rw [State.step_pool]; exact State.pool_subset_foldl_act s instr _
-
-theorem pool_subset_run {t t' : Nat} (h : t ≤ t') :
-    (State.run s₀ instrs t).pool ⊆ (State.run s₀ instrs t').pool := by
-  induction h with
-  | refl => exact Finset.Subset.refl _
-  | step _ ih => exact ih.trans (State.pool_subset_step _ _)
-
 /-- 遅延の上界を緩めても部分同期は成り立つ。 -/
 theorem PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ GST s₀ instrs) (hδ : δ ≤ Δ) :
     PartialSync Δ GST s₀ instrs where
@@ -145,60 +115,6 @@ theorem PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ GST s₀ instrs) (h�
   one_le := le_trans hs.one_le hδ
 
 /-! ### 正直者の送信は届く -/
-
-theorem State.mem_pool_foldl_execute_of_send (s : State n Tx) (i : Fin n)
-    {acts : List (Action n Tx)}
-    {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ acts)
-    (hg : Processor.GuardOK i (s.procs i) acts) :
-    (⟨m, j, s.now⟩ : Packet n Tx) ∈ (acts.foldl (fun s a => s.execute i a) s).pool := by
-  induction acts generalizing s with
-  | nil => simp at h
-  | cons a acts ih =>
-    rw [List.foldl_cons]
-    rcases List.mem_cons.mp h with rfl | h
-    · apply State.pool_subset_foldl_execute
-      have hc := hg.1 m j rfl
-      simp only [State.execute, State.send, if_pos hc, State.transmit, State.update_pool,
-        State.update_now]
-      exact Finset.mem_insert_self _ _
-    · have := ih (s.execute i a) h (by rw [State.execute_procs_self]; exact hg.2)
-      rwa [State.execute_now] at this
-
-theorem State.mem_pool_foldl_act_of_send (s : State n Tx) (instr : Instr n Tx) {l : List (Fin n)}
-    (hl : l.Nodup) {i : Fin n} (hi : i ∈ l) {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ instr.actions i)
-    (hg : Processor.GuardOK i (s.procs i) (instr.actions i)) :
-    (⟨m, j, s.now⟩ : Packet n Tx)
-      ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
-  induction l generalizing s with
-  | nil => simp at hi
-  | cons k l ih =>
-    rw [List.nodup_cons] at hl
-    rw [List.foldl_cons]
-    rcases List.mem_cons.mp hi with rfl | hi
-    · exact State.pool_subset_foldl_act _ instr l (State.mem_pool_foldl_execute_of_send s i h hg)
-    · have hne : i ≠ k := fun h' => hl.1 (h' ▸ hi)
-      have := ih ((instr.actions k).foldl (fun s a => s.execute k a) s) hl.2 hi (by
-        rw [State.foldl_execute_procs_ne _ hne]; exact hg)
-      rwa [State.foldl_execute_now] at this
-
-theorem State.mem_pool_step_of_send (s : State n Tx) (instr : Instr n Tx) {i : Fin n} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ instr.actions i)
-    (hg : Processor.GuardOK i (s.procs i) (instr.actions i)) :
-    (⟨m, j, s.now⟩ : Packet n Tx) ∈ (s.step instr).pool := by
-  rw [State.step_pool]
-  exact State.mem_pool_foldl_act_of_send s instr (List.nodup_finRange n) (List.mem_finRange i) h hg
-
-/-- 正直者 p_i がスロット t に j へ送った message の packet は、t + 1 以降の pool にある。 -/
-theorem mem_pool_run_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ (instrs t).actions i) {t' : Nat} (ht : t + 1 ≤ t') :
-    (⟨m, j, ⟨t⟩⟩ : Packet n Tx) ∈ (State.run s₀ instrs t').pool := by
-  have hg : Processor.GuardOK i ((State.run s₀ instrs t).procs i) ((instrs t).actions i) := by
-    rw [hh t i (hi t)]; exact Algo.guardOK_step f Δ lead i _
-  have := State.mem_pool_step_of_send (State.run s₀ instrs t) (instrs t) h hg
-  rw [run_now hinit] at this
-  exact pool_subset_run ht this
 
 /-- 正直者 p_i がスロット t に j へ送った message は、t + 1 以降で期限 max(GST, t) + δ に
     達したスロットの p_j の S にある。 -/
@@ -208,7 +124,7 @@ theorem delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (h : Action.send m j ∈ (instrs t).actions i) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max GST.val t + δ ≤ T) : m ∈ ((State.run s₀ instrs T).procs j).S := by
   have hx := mem_pool_run_of_send hinit hh hi h hT₁
-  have := hs.timely T ⟨m, j, ⟨t⟩⟩ hx
+  have := hs.timely T ⟨i, m, j, ⟨t⟩⟩ hx
   rw [run_now hinit] at this
   exact this hT₂
 

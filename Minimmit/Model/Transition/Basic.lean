@@ -120,8 +120,10 @@ theorem mem_genesisS [DecidableEq Tx] {m : Msg n Tx} :
   simp only [genesisS, Finset.mem_image, Finset.mem_univ, true_and]
   exact ⟨fun ⟨q, h⟩ => ⟨q, h.symm⟩, fun ⟨q, h⟩ => ⟨q, h.symm⟩⟩
 
-/-- ネットワークに載る単位: message、宛先、送信したスロット。 -/
+/-- ネットワークに載る単位: 送信元、message、宛先、送信したスロット。§2 の authenticated channel は
+    受信者が送信元を知る通信路なので、packet は送信元を持つ。 -/
 structure Packet (n : Nat) (Tx : Type) where
+  src : Fin n
   msg : Msg n Tx
   dst : Fin n
   sentAt : Time
@@ -234,11 +236,11 @@ def transmit [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
 
 /-- p_i が m を j へ送る。`Processor.canSend` を満たすときだけ送り、そうでなければ何もしない。
     §2 の、署名は偽造できないという仮定に当たる。局所状態には `Processor.send` の効果、
-    ネットワークには now 付きの packet。 -/
+    ネットワークには送信元 i と now 付きの packet。 -/
 def send [DecidableEq Tx] (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n) :
     State n Tx :=
   if (s.procs i).canSend i m then
-    (s.update i (·.send i m j)).transmit ⟨m, j, s.now⟩
+    (s.update i (·.send i m j)).transmit ⟨i, m, j, s.now⟩
   else s
 
 /-- p_i が次の view へ進む。 -/
@@ -282,11 +284,6 @@ structure Instr (n : Nat) (Tx : Type) where
   submits : List (Fin n × Tx)
   corrupts : List (Fin n)
 
-/-- p_i が m を送る（§5.1 の "sends"）: 指示の列のどこかに、誰か宛に m を送る動作がある。
-    ガードを通らない動作も含み、ネットワークに載ったかどうかは `State.send` の効果で決まる。 -/
-def Sends (instrs : Nat → Instr n Tx) (i : Fin n) (m : Msg n Tx) : Prop :=
-  ∃ t j, Action.send m j ∈ (instrs t).actions i
-
 /-! ## スロット遷移と実行 -/
 
 namespace State
@@ -315,5 +312,11 @@ def run [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat
   | t + 1 => (run s₀ instrs t).step (instrs t)
 
 end State
+
+/-- p_i が m を送る（§5.1 の "sends"）: i を送信元とする m の packet が、いつかのスロットの
+    pool にある。 -/
+def Sends [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n)
+    (m : Msg n Tx) : Prop :=
+  ∃ t, ∃ x ∈ (State.run s₀ instrs t).pool, x.src = i ∧ x.msg = m
 
 end Minimmit

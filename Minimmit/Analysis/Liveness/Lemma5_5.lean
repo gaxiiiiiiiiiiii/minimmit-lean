@@ -67,7 +67,7 @@ theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     m ∈ ((State.run s₀ instrs T).procs i).S := by
   by_cases hg : m = .vote j .gen
   · subst hg; exact genesisS_subset_run hinit i T (mem_genesisS.mpr ⟨j, rfl⟩)
-  obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm hsig hg
+  obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hm hsig hg
   have hact := hh t' j (hj t')
   have hsend : Action.send m i ∈ (instrs t').actions j := by
     rw [hact] at hj' ⊢

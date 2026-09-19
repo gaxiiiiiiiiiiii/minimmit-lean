@@ -56,7 +56,7 @@ theorem tx_finalised (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   -- 全正直者の票が j に届く
   have hvotes : ∀ r ∈ correctSet s₀ instrs, ∃ s, ∃ j',
       Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v' e)) j' ∈ (instrs s).actions r :=
-    fun r hr => all_vote_leaderBlock hinit hh hb hs R hn (mem_correctSet.mp hr)
+    fun r hr => (all_vote_leaderBlock hinit hh hb hs R hn (mem_correctSet.mp hr)).instructed hinit
   obtain ⟨T, hT⟩ := exists_bound hvotes
   have hLN : LNotarised f ((State.run s₀ instrs (T + GST.val + Δ + 1)).procs j).S
       (leaderBlockAt f lead s₀ instrs v' e) := by

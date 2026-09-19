@@ -174,7 +174,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
         with hm | ⟨_, j', hs'⟩
-      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl (by simpa using hg)
+      · obtain ⟨s', hs', j'', hj''⟩ := instructed_of_mem_S hinit hm rfl (by simpa using hg)
         exact absurd (ih s' hs' r hr b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
       · exact ⟨j', hs'⟩
   have hsend : Action.send (Msg.vote r b) j' ∈ (instrs s).actions r := by
@@ -190,7 +190,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
     obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
       (lt_of_lt_of_le (by omega) (show 2 * f + 1 ≤ _ from hM))
     rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt'⟩
-    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl (by simpa using hg)
+    · obtain ⟨s', hs', j'', hj''⟩ := instructed_of_mem_S hinit hw' rfl (by simpa using hg)
       exact absurd (ih s' hs' w hwc b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
     · injection hb'' with _ hbb
       subst hbb
@@ -238,7 +238,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
         with hm | ⟨_, j', hs'⟩
-      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl nofun
+      · obtain ⟨s', hs', j'', hj''⟩ := instructed_of_mem_S hinit hm rfl nofun
         exact absurd (ih s' hs' r hr j'' hj'') (not_le.mpr (lt_trans hs' hlt))
       · exact ⟨j', hs'⟩
   simp only [Algo.innerActs, List.mem_append] at hj'
@@ -276,7 +276,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     have hcv : c₀.view = v := (hL4.notar_view c₀ hc₀).trans hv4.symm
     rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hvote)
       with hm' | ⟨_, j'', hs''⟩
-    · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+    · obtain ⟨s', hs', j₃, hj₃⟩ := instructed_of_mem_S hinit hm' rfl
         (Msg.vote_ne_gen_vote (by rw [hcv]; omega))
       exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' r hr c₀ hcv j₃ hj₃)
         (not_le.mpr (lt_trans hs' hlt))
@@ -297,7 +297,7 @@ theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   · have hcard := card_le_of_byz hb (nullifiers ((State.run s₀ instrs e).procs (lead v)).S v)
       fun q hq => exists_byz_of_not_correct fun hqc => ?_
     · unfold Nullified at hN; omega
-    · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_nullifiers.mp hq) rfl (by simp)
+    · obtain ⟨s', hs', j, hj⟩ := instructed_of_mem_S hinit (mem_nullifiers.mp hq) rfl (by simp)
       exact absurd (nullify_slot_ge hinit hh hb hs hδ hv hfirst hlc he hemin s' q hqc j hj)
         (not_le.mpr hs')
   · obtain ⟨b', hb'⟩ := List.exists_mem_of_ne_nil _ hM
@@ -309,7 +309,7 @@ theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     have hcard := card_le_of_byz hb (voters ((State.run s₀ instrs e).procs (lead v)).S b')
       fun q hq => exists_byz_of_not_correct fun hqc => ?_
     · unfold MNotarised at hM'; omega
-    · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (mem_voters.mp hq) rfl
+    · obtain ⟨s', hs', j, hj⟩ := instructed_of_mem_S hinit (mem_voters.mp hq) rfl
         (by simpa using hg)
       exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' q hqc b' hbv j hj) (not_le.mpr hs')
 
@@ -519,7 +519,7 @@ theorem vote_unique_leaderBlock :
       obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
         (lt_of_lt_of_le (by omega) (show 2 * f + 1 ≤ _ from hM))
       rcases hnew _ (mem_voters.mp hw) with hw' | ⟨b'', hb'', hlt'⟩
-      · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hw' rfl (by simpa using hg)
+      · obtain ⟨s', hs', j'', hj''⟩ := instructed_of_mem_S hinit hw' rfl (by simpa using hg)
         exact ih s' hs' w hwc b hbv j'' hj''
       · injection hb'' with _ hbb
         subst hbb
@@ -543,7 +543,7 @@ theorem vote_unique_leaderBlock :
   · exact hinner j hj
   · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
       with hm | ⟨_, j', hs'⟩
-    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl (by simpa using hg)
+    · obtain ⟨s', hs', j'', hj''⟩ := instructed_of_mem_S hinit hm rfl (by simpa using hg)
       exact ih s' hs' r hr b hbv j'' hj''
     · exact hinner j' hs'
 
@@ -650,7 +650,7 @@ theorem no_nullify_v :
       have hc₀eq : c₀ = leaderBlockAt f lead s₀ instrs v e := by
         rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hvote)
           with hm' | ⟨_, j'', hs''⟩
-        · obtain ⟨s', _, j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+        · obtain ⟨s', _, j₃, hj₃⟩ := instructed_of_mem_S hinit hm' rfl
             (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
           exact vote_unique_leaderBlock hinit hh hb hs R s' r hr c₀ hcv j₃ hj₃
         · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
@@ -664,7 +664,7 @@ theorem no_nullify_v :
         by_cases hwr : w = r
         · subst hwr
           rcases Algo.mem_S_st4_nullify hwn with hm' | hs''
-          · obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl nofun
+          · obtain ⟨s', hs', j₃, hj₃⟩ := instructed_of_mem_S hinit hm' rfl nofun
             exact ih s' hs' w hwc j₃ hj₃
           · exact no_timeout_nullify hinit hh hb hs R s w hwc w hs''
         · have hm' : Msg.nullify w v ∈ ((State.run s₀ instrs s).procs r).S := by
@@ -673,13 +673,13 @@ theorem no_nullify_v :
             · exact hm'
             · simp only [Msg.signer, Option.some.injEq] at hsig
               exact absurd hsig hwr
-          obtain ⟨s', hs', j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl nofun
+          obtain ⟨s', hs', j₃, hj₃⟩ := instructed_of_mem_S hinit hm' rfl nofun
           exact ih s' hs' w hwc j₃ hj₃
       · -- 正直者 w の、lead(v) のブロック以外への票はない
         have hb''eq : b'' = leaderBlockAt f lead s₀ instrs v e := by
           rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.S_st4_subset_st5 f Δ lead r _ hwv)
             with hm' | ⟨hsig, j'', hs''⟩
-          · obtain ⟨s', _, j₃, hj₃⟩ := sendsBefore_of_mem_S hinit hm' rfl
+          · obtain ⟨s', _, j₃, hj₃⟩ := instructed_of_mem_S hinit hm' rfl
               (Msg.vote_ne_gen_vote (by rw [hb''v]; exact R.hv))
             exact vote_unique_leaderBlock hinit hh hb hs R s' w hwc b'' hb''v j₃ hj₃
           · simp only [Msg.signer, Option.some.injEq] at hsig
@@ -694,7 +694,7 @@ theorem no_nullify_v :
   · exact hinner j hj
   · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
       with hm | ⟨_, j', hs'⟩
-    · obtain ⟨s', hs', j'', hj''⟩ := sendsBefore_of_mem_S hinit hm rfl nofun
+    · obtain ⟨s', hs', j'', hj''⟩ := instructed_of_mem_S hinit hm rfl nofun
       exact ih s' hs' r hr j'' hj''
     · exact hinner j' hs'
 
@@ -716,7 +716,7 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
       fun w hw => exists_byz_of_not_correct fun hwc => ?_
     · unfold Nullified at hN; omega
     · rcases hnew _ (mem_nullifiers.mp hw) with hm | ⟨_, hm, _⟩
-      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm rfl nofun
+      · obtain ⟨s', _, j, hj⟩ := instructed_of_mem_S hinit hm rfl nofun
         exact no_nullify_v hinit hh hb hs R s' w hwc j hj
       · cases hm
   have hM : Algo.mNotarisedAt f q.S q.view ≠ [] := by
@@ -737,10 +737,10 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
       rw [← this]; exact hsend'
     · have hmem := hLq.null_mem hnl
       rw [hqv] at hmem
-      obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc hmem) rfl nofun
+      obtain ⟨s', _, j, hj⟩ := instructed_of_mem_S hinit (hqsucc hmem) rfl nofun
       exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
   · have hcv := (hLq.notar_view c hnot).trans hqv
-    obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit (hqsucc (hLq.notar_mem c hnot)) rfl
+    obtain ⟨s', hs', j, hj⟩ := instructed_of_mem_S hinit (hqsucc (hLq.notar_mem c hnot)) rfl
       (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
     have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
     refine ⟨s', Nat.lt_succ_iff.mp hs', j, ?_⟩
@@ -825,7 +825,7 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
       obtain ⟨c, hc⟩ := Option.ne_none_iff_exists'.mp hnot
       have hcv : c.view = v := (hL1.notar_view c hc).trans hst1v
       rcases Algo.mem_S_st1 (hL1.notar_mem c hc) with hm1 | ⟨b', hb', _, j, hj⟩
-      · obtain ⟨s', hs', j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl
+      · obtain ⟨s', hs', j, hj⟩ := instructed_of_mem_S hinit hm1 rfl
           (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
         have := vote_unique_leaderBlock hinit hh hb hs R s' r hr c hcv j hj
         refine ⟨s', hs'.le, j, ?_⟩
@@ -840,7 +840,7 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
       have hmem := hL1.null_mem hnl
       rw [hst1v] at hmem
       rcases Algo.mem_S_st1 hmem with hm1 | ⟨_, hb', _⟩
-      · obtain ⟨s', _, j, hj⟩ := sendsBefore_of_mem_S hinit hm1 rfl nofun
+      · obtain ⟨s', _, j, hj⟩ := instructed_of_mem_S hinit hm1 rfl nofun
         exact absurd hj (no_nullify_v hinit hh hb hs R s' r hr j)
       · cases hb'
 
@@ -863,11 +863,11 @@ theorem vote_by {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 *
 
 /-- 全正直者が lead(v) のブロックに投票する。 -/
 theorem all_vote_leaderBlock (hn : 5 * f + 1 ≤ n) {r : Fin n} (hr : Correct s₀ instrs r) :
-    Sends instrs r (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) := by
+    Sends s₀ instrs r (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) := by
   obtain ⟨T, hT⟩ := reaches_view hn hinit hh hb (hs.mono R.hδ) hr ⟨v.val + 1⟩
   obtain ⟨s, _, hs1, hs2⟩ := exists_leave_slot hinit R.hv (Nat.lt_of_succ_le hT)
   obtain ⟨s', _, j, hj⟩ := vote_at_pass hinit hh hb hs R hr hs1 hs2
-  exact ⟨s', j, hj⟩
+  exact sends_of_send hinit hh hr hj
 
 end CorrectLeader
 

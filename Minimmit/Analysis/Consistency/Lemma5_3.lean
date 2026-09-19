@@ -14,18 +14,19 @@ variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat 
     受けない。 -/
 theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    {b : Block n Tx} (hL : ReceivesL f instrs b) : ¬ ReceivesNullification f instrs b.view := by
+    {b : Block n Tx} (hL : ReceivesL f s₀ instrs b) :
+    ¬ ReceivesNullification f s₀ instrs b.view := by
   intro hN
   classical
   rcases hL with rfl | hL
   · -- genesis: view 0 の nullify を正直者は送らない
-    have hlt : f < (nullifySenders instrs Block.gen.view).card := lt_of_lt_of_le (by omega) hN
+    have hlt : f < (nullifySenders s₀ instrs Block.gen.view).card := lt_of_lt_of_le (by omega) hN
     obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
-    obtain ⟨t, j, ht⟩ := mem_nullifySenders.mp hq
+    obtain ⟨t, j, ht⟩ := (mem_nullifySenders.mp hq).instructed hinit
     have h1 := ((localInv_run hinit hh hqc (t + 1)).null_view _ (mem_S_succ_of_send hh hqc ht)).1
     simp [Block.view] at h1
-  set P := voteSenders instrs b with hP
-  set N := nullifySenders instrs b.view with hNdef
+  set P := voteSenders s₀ instrs b with hP
+  set N := nullifySenders s₀ instrs b.view with hNdef
   have hN' : 2 * f + 1 ≤ N.card := hN
   have hinter := card_inter_add_n_ge P N
   -- C: P ∩ N の正直者。空でない
@@ -49,7 +50,7 @@ theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : I
   obtain ⟨hq₀PN, hq₀c⟩ := Finset.mem_filter.mp hq₀C
   obtain ⟨hq₀P, hq₀N⟩ := Finset.mem_inter.mp hq₀PN
   have hexq₀ : ∃ t, ∃ j, Action.send (Msg.nullify q₀ b.view) j ∈ (instrs t).actions q₀ :=
-    mem_nullifySenders.mp hq₀N
+    (mem_nullifySenders.mp hq₀N).instructed hinit
   obtain ⟨j₀, hj₀⟩ := hT_spec q₀ hexq₀
   have hj₀' := hj₀
   have hact := hh (T q₀) q₀ (hq₀c (T q₀))
@@ -59,16 +60,16 @@ theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : I
   -- 最初の nullify なので、その前の S に自分の nullify は無い
   have hno : Msg.nullify q₀ b.view ∉ ((State.run s₀ instrs (T q₀)).procs q₀).S := by
     intro hmem
-    obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hmem rfl nofun
+    obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hmem rfl nofun
     have := hT_min q₀ hexq₀ t' ⟨j', hj'⟩
     omega
   -- b への票: 最初に送るスロット t₁
   have hexv : ∃ t, ∃ j, Action.send (Msg.vote q₀ b) j ∈ (instrs t).actions q₀ :=
-    mem_voteSenders.mp hq₀P
+    (mem_voteSenders.mp hq₀P).instructed hinit
   obtain ⟨j₁, hj₁⟩ := Nat.find_spec hexv
   have hvote_no : Msg.vote q₀ b ∉ ((State.run s₀ instrs (Nat.find hexv)).procs q₀).S := by
     intro hmem
-    obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hmem rfl
+    obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hmem rfl
       (Msg.vote_ne_gen_vote (one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P)))
     exact absurd (Nat.find_min' hexv ⟨j', hj'⟩) (not_le.mpr ht')
   have hbvote : Msg.vote q₀ b ∈ ((State.run s₀ instrs (T q₀)).procs q₀).S
@@ -115,9 +116,10 @@ theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : I
             cases this
           · rcases Algo.mem_S_stage_or f Δ lead q₀ _ (Algo.S_st4_subset_st5 f Δ lead q₀ _ hm)
               with hm' | hs
-            · obtain ⟨t', ht', j', hj'⟩ := sendsBefore_of_mem_S hinit hm' rfl nofun
+            · obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hm' rfl nofun
               have hwC : w ∈ C := Finset.mem_filter.mpr
-                ⟨Finset.mem_inter.mpr ⟨hwP, mem_nullifySenders.mpr ⟨t', j', hj'⟩⟩, hwc⟩
+                ⟨Finset.mem_inter.mpr
+                  ⟨hwP, mem_nullifySenders.mpr (sends_of_send hinit hh hwc hj')⟩, hwc⟩
               have h1 := hmin w hwC
               have h2 := hT_min w ⟨t', j', hj'⟩ t' ⟨j', hj'⟩
               omega

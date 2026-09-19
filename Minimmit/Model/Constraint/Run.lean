@@ -18,21 +18,61 @@ namespace Minimmit
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f : Nat} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
+/-! ### pool -/
+
+theorem pool_subset_run {t t' : Nat} (h : t ≤ t') :
+    (State.run s₀ instrs t).pool ⊆ (State.run s₀ instrs t').pool := by
+  induction h with
+  | refl => exact Finset.Subset.refl _
+  | step _ ih => exact ih.trans (State.pool_subset_step _ _)
+
+theorem run_now (hinit : Init s₀) (t : Nat) : (State.run s₀ instrs t).now = ⟨t⟩ := by
+  induction t with
+  | zero => exact hinit.now
+  | succ t ih => rw [State.run, State.step_now, ih]
+
+/-- pool にある packet は、その送信元がそれより前のスロットに、その宛先へ送るよう指示されたもの。 -/
+theorem instructed_of_mem_pool (hinit : Init s₀) {t : Nat} {x : Packet n Tx}
+    (hx : x ∈ (State.run s₀ instrs t).pool) :
+    ∃ t' < t, Action.send x.msg x.dst ∈ (instrs t').actions x.src := by
+  induction t with
+  | zero => rw [State.run, hinit.pool] at hx; simp at hx
+  | succ t ih =>
+    rw [State.run, State.step_pool] at hx
+    rcases State.mem_pool_act hx with hx | ⟨k, m, j, hm, rfl, _⟩
+    · obtain ⟨t', ht', h⟩ := ih hx
+      exact ⟨t', Nat.lt_succ_of_lt ht', h⟩
+    · exact ⟨t, Nat.lt_succ_self t, hm⟩
+
 /-! ### 送信の時刻 -/
 
-/-- p_q がスロット t より前に m を送る。 -/
-def SendsBefore (instrs : Nat → Instr n Tx) (q : Fin n) (m : Msg n Tx) (t : Nat) : Prop :=
-  ∃ t' < t, ∃ j, Action.send m j ∈ (instrs t').actions q
+/-- p_q がスロット t より前に m を送る: q を送信元とする m の packet がスロット t の pool にある。 -/
+def SendsBefore (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (q : Fin n) (m : Msg n Tx)
+    (t : Nat) : Prop :=
+  ∃ x ∈ (State.run s₀ instrs t).pool, x.src = q ∧ x.msg = m
 
-omit [DecidableEq Tx] in
-theorem SendsBefore.sends {q : Fin n} {m : Msg n Tx} {t : Nat} (h : SendsBefore instrs q m t) :
-    Sends instrs q m :=
-  let ⟨t', _, j, hj⟩ := h; ⟨t', j, hj⟩
+theorem SendsBefore.sends {q : Fin n} {m : Msg n Tx} {t : Nat} (h : SendsBefore s₀ instrs q m t) :
+    Sends s₀ instrs q m :=
+  ⟨t, h⟩
 
-omit [DecidableEq Tx] in
-theorem SendsBefore.mono {q : Fin n} {m : Msg n Tx} {t t' : Nat} (h : SendsBefore instrs q m t)
-    (htt : t ≤ t') : SendsBefore instrs q m t' :=
-  let ⟨t₀, ht₀, j, hj⟩ := h; ⟨t₀, lt_of_lt_of_le ht₀ htt, j, hj⟩
+theorem SendsBefore.mono {q : Fin n} {m : Msg n Tx} {t t' : Nat} (h : SendsBefore s₀ instrs q m t)
+    (htt : t ≤ t') : SendsBefore s₀ instrs q m t' :=
+  let ⟨x, hx, hxm⟩ := h; ⟨x, pool_subset_run htt hx, hxm⟩
+
+/-- t より前に送ったなら、t より前のスロットに送るよう指示された。 -/
+theorem SendsBefore.instructed {q : Fin n} {m : Msg n Tx} {t : Nat}
+    (h : SendsBefore s₀ instrs q m t) (hinit : Init s₀) :
+    ∃ t' < t, ∃ j, Action.send m j ∈ (instrs t').actions q := by
+  obtain ⟨x, hx, rfl, rfl⟩ := h
+  obtain ⟨t', ht', h⟩ := instructed_of_mem_pool hinit hx
+  exact ⟨t', ht', x.dst, h⟩
+
+/-- 送ったなら、どこかのスロットに送るよう指示された。 -/
+theorem Sends.instructed {q : Fin n} {m : Msg n Tx} (h : Sends s₀ instrs q m) (hinit : Init s₀) :
+    ∃ t j, Action.send m j ∈ (instrs t).actions q := by
+  obtain ⟨t, h⟩ := h
+  obtain ⟨t', _, j, hj⟩ := SendsBefore.instructed h hinit
+  exact ⟨t', j, hj⟩
 
 /-! ### 署名の偽造不能の帰結 -/
 
@@ -40,9 +80,9 @@ theorem SendsBefore.mono {q : Fin n} {m : Msg n Tx} {t t' : Nat} (h : SendsBefor
     でなければ、q が t より前に送った。 -/
 theorem sendsBefore_of_mem (hinit : Init s₀) (t : Nat) :
     (∀ k (m : Msg n Tx) q, m ∈ ((State.run s₀ instrs t).procs k).S → m.signer = some q →
-      m ∈ genesisS n Tx ∨ SendsBefore instrs q m t)
+      m ∈ genesisS n Tx ∨ SendsBefore s₀ instrs q m t)
     ∧ (∀ x ∈ (State.run s₀ instrs t).pool, ∀ q, x.msg.signer = some q →
-      x.msg ∈ genesisS n Tx ∨ SendsBefore instrs q x.msg t) := by
+      x.msg ∈ genesisS n Tx ∨ SendsBefore s₀ instrs q x.msg t) := by
   induction t with
   | zero =>
     refine ⟨fun k m q hm _ => ?_, fun x hx _ _ => ?_⟩
@@ -51,31 +91,33 @@ theorem sendsBefore_of_mem (hinit : Init s₀) (t : Nat) :
   | succ t ih =>
     obtain ⟨ihS, ihP⟩ := ih
     have hrun : State.run s₀ instrs (t + 1) = (State.run s₀ instrs t).step (instrs t) := rfl
+    have hpool : (State.run s₀ instrs (t + 1)).pool
+        = ((State.run s₀ instrs t).act (instrs t)).pool := State.step_pool _ _
     -- 動作の後の S
     have hactS : ∀ k (m : Msg n Tx) q,
         m ∈ (((State.run s₀ instrs t).act (instrs t)).procs k).S → m.signer = some q →
-        m ∈ genesisS n Tx ∨ SendsBefore instrs q m (t + 1) := by
+        m ∈ genesisS n Tx ∨ SendsBefore s₀ instrs q m (t + 1) := by
       intro k m q hm hq
-      rw [State.act_procs] at hm
       by_cases hk : k = q
       · subst hk
-        rcases Processor.mem_S_executeAll k _ _ hm with hm | ⟨j, hj⟩
+        rcases State.mem_S_act hm with hm | hx
         · exact (ihS k m k hm hq).imp_right (·.mono (Nat.le_succ t))
-        · exact Or.inr ⟨t, Nat.lt_succ_self t, j, hj⟩
-      · have hm' := Processor.mem_S_executeAll_of_signer_ne k _ _ hm
+        · exact Or.inr ⟨_, by rw [hpool]; exact hx, rfl, rfl⟩
+      · rw [State.act_procs] at hm
+        have hm' := Processor.mem_S_executeAll_of_signer_ne k _ _ hm
           (by rw [hq]; exact fun h => hk (Option.some.inj h).symm)
         exact (ihS k m q hm' hq).imp_right (·.mono (Nat.le_succ t))
     -- 動作の後の pool
     have hactP : ∀ x ∈ ((State.run s₀ instrs t).act (instrs t)).pool, ∀ q,
-        x.msg.signer = some q → x.msg ∈ genesisS n Tx ∨ SendsBefore instrs q x.msg (t + 1) := by
+        x.msg.signer = some q → x.msg ∈ genesisS n Tx ∨ SendsBefore s₀ instrs q x.msg (t + 1) := by
       intro x hx q hq
-      rcases State.mem_pool_act hx with hx | ⟨k, m, j, hm, rfl, hg⟩
-      · exact (ihP x hx q hq).imp_right (·.mono (Nat.le_succ t))
+      rcases State.mem_pool_act hx with hx' | ⟨k, m, j, hm, rfl, hg⟩
+      · exact (ihP x hx' q hq).imp_right (·.mono (Nat.le_succ t))
       · simp only at hq ⊢
-        rcases hg with hg | hg
+        rcases hg.1 with hg | hg
         · rw [hq] at hg
           obtain rfl := Option.some.inj hg
-          exact Or.inr ⟨t, Nat.lt_succ_self t, j, hm⟩
+          exact Or.inr ⟨_, by rw [hpool]; exact hx, rfl, rfl⟩
         · exact hactS k m q hg hq
     refine ⟨fun k m q hm hq => ?_, fun x hx q hq => ?_⟩
     · rw [hrun] at hm
@@ -90,7 +132,7 @@ theorem sendsBefore_of_mem (hinit : Init s₀) (t : Nat) :
     送った。 -/
 theorem sendsBefore_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} {q : Fin n}
     (hm : m ∈ ((State.run s₀ instrs t).procs k).S) (hq : m.signer = some q)
-    (hg : m ≠ .vote q .gen) : SendsBefore instrs q m t := by
+    (hg : m ≠ .vote q .gen) : SendsBefore s₀ instrs q m t := by
   rcases (sendsBefore_of_mem hinit t).1 k m q hm hq with hg' | hs
   · obtain ⟨q', rfl⟩ := mem_genesisS.mp hg'
     simp only [Msg.signer, Option.some.injEq] at hq
@@ -99,25 +141,40 @@ theorem sendsBefore_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg 
 
 theorem sends_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} {q : Fin n}
     (hm : m ∈ ((State.run s₀ instrs t).procs k).S) (hq : m.signer = some q)
-    (hg : m ≠ .vote q .gen) : Sends instrs q m :=
+    (hg : m ≠ .vote q .gen) : Sends s₀ instrs q m :=
   (sendsBefore_of_mem_S hinit hm hq hg).sends
 
-/-- p_q がスロット t より前に、b を成分に持つ message を送る。 -/
-def SendsBlockBefore (instrs : Nat → Instr n Tx) (q : Fin n) (b : Block n Tx) (t : Nat) : Prop :=
-  ∃ t' < t, ∃ m j, m.block = some b ∧ Action.send m j ∈ (instrs t').actions q
+/-- `sendsBefore_of_mem_S` を指示の形で: q は t より前のスロットに m を送るよう指示された。 -/
+theorem instructed_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} {q : Fin n}
+    (hm : m ∈ ((State.run s₀ instrs t).procs k).S) (hq : m.signer = some q)
+    (hg : m ≠ .vote q .gen) : ∃ t' < t, ∃ j, Action.send m j ∈ (instrs t').actions q :=
+  (sendsBefore_of_mem_S hinit hm hq hg).instructed hinit
 
-omit [DecidableEq Tx] in
+/-- p_q がスロット t より前に、b を成分に持つ message を送る: q を送信元とし b を成分に持つ
+    packet がスロット t の pool にある。 -/
+def SendsBlockBefore (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (q : Fin n) (b : Block n Tx)
+    (t : Nat) : Prop :=
+  ∃ x ∈ (State.run s₀ instrs t).pool, x.src = q ∧ x.msg.block = some b
+
 theorem SendsBlockBefore.mono {q : Fin n} {b : Block n Tx} {t t' : Nat}
-    (h : SendsBlockBefore instrs q b t) (htt : t ≤ t') : SendsBlockBefore instrs q b t' :=
-  let ⟨t₀, ht₀, m, j, hm, hj⟩ := h; ⟨t₀, lt_of_lt_of_le ht₀ htt, m, j, hm, hj⟩
+    (h : SendsBlockBefore s₀ instrs q b t) (htt : t ≤ t') : SendsBlockBefore s₀ instrs q b t' :=
+  let ⟨x, hx, hxb⟩ := h; ⟨x, pool_subset_run htt hx, hxb⟩
+
+/-- t より前に送ったなら、t より前のスロットに送るよう指示された。 -/
+theorem SendsBlockBefore.instructed {q : Fin n} {b : Block n Tx} {t : Nat}
+    (h : SendsBlockBefore s₀ instrs q b t) (hinit : Init s₀) :
+    ∃ t' < t, ∃ m j, m.block = some b ∧ Action.send m j ∈ (instrs t').actions q := by
+  obtain ⟨x, hx, rfl, hb⟩ := h
+  obtain ⟨t', ht', h⟩ := instructed_of_mem_pool hinit hx
+  exact ⟨t', ht', x.msg, x.dst, hb, h⟩
 
 /-- スロット t の S か pool が含む、q の署名付きのブロックは、q が t より前に送った message の
     成分。 -/
 theorem sendsBlockBefore_of_containsBlock (hinit : Init s₀) (t : Nat) :
     (∀ k (b : Block n Tx) q, containsBlock ((State.run s₀ instrs t).procs k).S b →
-      b.signer = some q → SendsBlockBefore instrs q b t)
+      b.signer = some q → SendsBlockBefore s₀ instrs q b t)
     ∧ (∀ x ∈ (State.run s₀ instrs t).pool, ∀ (b : Block n Tx) q, x.msg.block = some b →
-      b.signer = some q → SendsBlockBefore instrs q b t) := by
+      b.signer = some q → SendsBlockBefore s₀ instrs q b t) := by
   induction t with
   | zero =>
     refine ⟨fun k b q hb hq => ?_, fun x hx _ _ _ _ => ?_⟩
@@ -131,23 +188,24 @@ theorem sendsBlockBefore_of_containsBlock (hinit : Init s₀) (t : Nat) :
   | succ t ih =>
     obtain ⟨ihS, ihP⟩ := ih
     have hrun : State.run s₀ instrs (t + 1) = (State.run s₀ instrs t).step (instrs t) := rfl
+    have hpool : (State.run s₀ instrs (t + 1)).pool
+        = ((State.run s₀ instrs t).act (instrs t)).pool := State.step_pool _ _
     -- 動作の後の S
     have hactS : ∀ k (b : Block n Tx) q,
         containsBlock (((State.run s₀ instrs t).act (instrs t)).procs k).S b →
-        b.signer = some q → SendsBlockBefore instrs q b (t + 1) := by
+        b.signer = some q → SendsBlockBefore s₀ instrs q b (t + 1) := by
       intro k b q hb hq
-      rw [State.act_procs] at hb
-      rcases Processor.containsBlock_executeAll k _ _ hb with hb | ⟨hk, m, j, hmb, hj⟩
+      rcases State.containsBlock_act hb with hb | ⟨hk, m, j, hmb, hx⟩
       · exact (ihS k b q hb hq).mono (Nat.le_succ t)
       · rw [hq] at hk
         obtain rfl := Option.some.inj hk
-        exact ⟨t, Nat.lt_succ_self t, m, j, hmb, hj⟩
+        exact ⟨_, by rw [hpool]; exact hx, rfl, hmb⟩
     -- 動作の後の pool
     have hactP : ∀ x ∈ ((State.run s₀ instrs t).act (instrs t)).pool, ∀ (b : Block n Tx) q,
-        x.msg.block = some b → b.signer = some q → SendsBlockBefore instrs q b (t + 1) := by
+        x.msg.block = some b → b.signer = some q → SendsBlockBefore s₀ instrs q b (t + 1) := by
       intro x hx b q hb hq
-      rcases State.mem_pool_act hx with hx | ⟨k, m, j, hm, rfl, hg⟩
-      · exact (ihP x hx b q hb hq).mono (Nat.le_succ t)
+      rcases State.mem_pool_act hx with hx' | ⟨k, m, j, hm, rfl, hg⟩
+      · exact (ihP x hx' b q hb hq).mono (Nat.le_succ t)
       · simp only at hb
         have hok : b.signer = some k
             ∨ containsBlock (((State.run s₀ instrs t).act (instrs t)).procs k).S b := by
@@ -155,7 +213,7 @@ theorem sendsBlockBefore_of_containsBlock (hinit : Init s₀) (t : Nat) :
         rcases hok with hk | hc
         · rw [hq] at hk
           obtain rfl := Option.some.inj hk
-          exact ⟨t, Nat.lt_succ_self t, m, j, hb, hm⟩
+          exact ⟨_, by rw [hpool]; exact hx, rfl, hb⟩
         · exact hactS k b q hc hq
     refine ⟨fun k b q hb hq => ?_, fun x hx b q hb hq => ?_⟩
     · obtain ⟨m, hm, hmb⟩ := hb
@@ -169,8 +227,15 @@ theorem sendsBlockBefore_of_containsBlock (hinit : Init s₀) (t : Nat) :
 
 theorem sendsBlockBefore_of_containsBlock_S (hinit : Init s₀) {t : Nat} {k : Fin n}
     {b : Block n Tx} {q : Fin n} (hb : containsBlock ((State.run s₀ instrs t).procs k).S b)
-    (hq : b.signer = some q) : SendsBlockBefore instrs q b t :=
+    (hq : b.signer = some q) : SendsBlockBefore s₀ instrs q b t :=
   (sendsBlockBefore_of_containsBlock hinit t).1 k b q hb hq
+
+/-- `sendsBlockBefore_of_containsBlock_S` を指示の形で。 -/
+theorem instructedBlock_of_containsBlock_S (hinit : Init s₀) {t : Nat} {k : Fin n}
+    {b : Block n Tx} {q : Fin n} (hb : containsBlock ((State.run s₀ instrs t).procs k).S b)
+    (hq : b.signer = some q) :
+    ∃ t' < t, ∃ m j, m.block = some b ∧ Action.send m j ∈ (instrs t').actions q :=
+  (sendsBlockBefore_of_containsBlock_S hinit hb hq).instructed hinit
 
 /-! ### 腐敗 -/
 
@@ -267,7 +332,7 @@ theorem own_mem_act_of_mem_succ (hinit : Init s₀) (hh : Honest f Δ lead s₀ 
     rw [State.act_procs]
     exact Processor.S_subset_executeAll i _ _
       (genesisS_subset_run hinit i t (mem_genesisS.mpr ⟨i, rfl⟩))
-  obtain ⟨t', ht', j, hj⟩ := sendsBefore_of_mem_S hinit h hm hg
+  obtain ⟨t', ht', j, hj⟩ := instructed_of_mem_S hinit h hm hg
   rcases Nat.lt_succ_iff_lt_or_eq.mp ht' with ht' | rfl
   · have hmem := mem_S_succ_of_send hh hi hj
     have hsub := S_subset_run s₀ instrs i (Nat.succ_le_of_lt ht')
@@ -291,7 +356,7 @@ theorem own_containsBlock_act_of_succ (hinit : Init s₀) (hh : Honest f Δ lead
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} (hb : b.signer = some i)
     (h : containsBlock ((State.run s₀ instrs (t + 1)).procs i).S b) :
     containsBlock (((State.run s₀ instrs t).act (instrs t)).procs i).S b := by
-  obtain ⟨t', ht', m, j, hmb, hj⟩ := sendsBlockBefore_of_containsBlock_S hinit h hb
+  obtain ⟨t', ht', m, j, hmb, hj⟩ := instructedBlock_of_containsBlock_S hinit h hb
   refine ⟨m, ?_, hmb⟩
   rcases Nat.lt_succ_iff_lt_or_eq.mp ht' with ht' | rfl
   · have hmem := mem_S_succ_of_send hh hi hj
@@ -309,7 +374,7 @@ theorem own_containsBlock_of_containsBlock (hinit : Init s₀) (hh : Honest f Δ
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {k : Fin n} {b : Block n Tx}
     (hb : b.signer = some i) (h : containsBlock ((State.run s₀ instrs t).procs k).S b) :
     containsBlock ((State.run s₀ instrs t).procs i).S b := by
-  obtain ⟨t', ht', m, j, hmb, hj⟩ := sendsBlockBefore_of_containsBlock_S hinit h hb
+  obtain ⟨t', ht', m, j, hmb, hj⟩ := instructedBlock_of_containsBlock_S hinit h hb
   exact ⟨m, S_subset_run s₀ instrs i (Nat.succ_le_of_lt ht') (mem_S_succ_of_send hh hi hj), hmb⟩
 
 theorem localInv_init (hinit : Init s₀) (i : Fin n) : Algo.LocalInv f i (s₀.procs i) := by
@@ -420,14 +485,80 @@ theorem own_block_eq_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
   exact own_block_unique hinit hh hi hb (containsBlock_succ_of_send hh hi h' rfl) hs
     (by rw [hb']; rfl) hv
 
-omit [DecidableEq Tx] in
+/-! ### 正直者の送信は pool に載る -/
+
+theorem State.mem_pool_foldl_execute_of_send (s : State n Tx) (i : Fin n)
+    {acts : List (Action n Tx)}
+    {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ acts)
+    (hg : Processor.GuardOK i (s.procs i) acts) :
+    (⟨i, m, j, s.now⟩ : Packet n Tx) ∈ (acts.foldl (fun s a => s.execute i a) s).pool := by
+  induction acts generalizing s with
+  | nil => simp at h
+  | cons a acts ih =>
+    rw [List.foldl_cons]
+    rcases List.mem_cons.mp h with rfl | h
+    · apply State.pool_subset_foldl_execute
+      have hc := hg.1 m j rfl
+      simp only [State.execute, State.send, if_pos hc, State.transmit, State.update_pool,
+        State.update_now]
+      exact Finset.mem_insert_self _ _
+    · have := ih (s.execute i a) h (by rw [State.execute_procs_self]; exact hg.2)
+      rwa [State.execute_now] at this
+
+theorem State.mem_pool_foldl_act_of_send (s : State n Tx) (instr : Instr n Tx) {l : List (Fin n)}
+    (hl : l.Nodup) {i : Fin n} (hi : i ∈ l) {m : Msg n Tx} {j : Fin n}
+    (h : Action.send m j ∈ instr.actions i)
+    (hg : Processor.GuardOK i (s.procs i) (instr.actions i)) :
+    (⟨i, m, j, s.now⟩ : Packet n Tx)
+      ∈ (l.foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s).pool := by
+  induction l generalizing s with
+  | nil => simp at hi
+  | cons k l ih =>
+    rw [List.nodup_cons] at hl
+    rw [List.foldl_cons]
+    rcases List.mem_cons.mp hi with rfl | hi
+    · exact State.pool_subset_foldl_act _ instr l (State.mem_pool_foldl_execute_of_send s i h hg)
+    · have hne : i ≠ k := fun h' => hl.1 (h' ▸ hi)
+      have := ih ((instr.actions k).foldl (fun s a => s.execute k a) s) hl.2 hi (by
+        rw [State.foldl_execute_procs_ne _ hne]; exact hg)
+      rwa [State.foldl_execute_now] at this
+
+theorem State.mem_pool_step_of_send (s : State n Tx) (instr : Instr n Tx) {i : Fin n} {m : Msg n Tx}
+    {j : Fin n} (h : Action.send m j ∈ instr.actions i)
+    (hg : Processor.GuardOK i (s.procs i) (instr.actions i)) :
+    (⟨i, m, j, s.now⟩ : Packet n Tx) ∈ (s.step instr).pool := by
+  rw [State.step_pool]
+  exact State.mem_pool_foldl_act_of_send s instr (List.nodup_finRange n) (List.mem_finRange i) h hg
+
+/-- 正直者 p_i がスロット t に j へ送った message の packet は、t + 1 以降の pool にある。 -/
+theorem mem_pool_run_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
+    (h : Action.send m j ∈ (instrs t).actions i) {t' : Nat} (ht : t + 1 ≤ t') :
+    (⟨i, m, j, ⟨t⟩⟩ : Packet n Tx) ∈ (State.run s₀ instrs t').pool := by
+  have hg : Processor.GuardOK i ((State.run s₀ instrs t).procs i) ((instrs t).actions i) := by
+    rw [hh t i (hi t)]; exact Algo.guardOK_step f Δ lead i _
+  have := State.mem_pool_step_of_send (State.run s₀ instrs t) (instrs t) h hg
+  rw [run_now hinit] at this
+  exact pool_subset_run ht this
+
+/-- 正直者がスロット t に送るよう指示された message は、t + 1 より前に送った。 -/
+theorem sendsBefore_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
+    (h : Action.send m j ∈ (instrs t).actions i) : SendsBefore s₀ instrs i m (t + 1) :=
+  ⟨_, mem_pool_run_of_send hinit hh hi h (le_refl _), rfl, rfl⟩
+
+/-- 正直者が送るよう指示された message は、送った。 -/
+theorem sends_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+    (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
+    (h : Action.send m j ∈ (instrs t).actions i) : Sends s₀ instrs i m :=
+  (sendsBefore_of_send hinit hh hi h).sends
+
 theorem mem_voteSenders {q : Fin n} {b : Block n Tx} :
-    q ∈ voteSenders instrs b ↔ Sends instrs q (Msg.vote q b) := by
+    q ∈ voteSenders s₀ instrs b ↔ Sends s₀ instrs q (Msg.vote q b) := by
   simp [voteSenders]
 
-omit [DecidableEq Tx] in
 theorem mem_nullifySenders {q : Fin n} {v : View} :
-    q ∈ nullifySenders instrs v ↔ Sends instrs q (Msg.nullify q v) := by
+    q ∈ nullifySenders s₀ instrs v ↔ Sends s₀ instrs q (Msg.nullify q v) := by
   simp [nullifySenders]
 
 end Minimmit

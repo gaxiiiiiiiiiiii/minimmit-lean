@@ -158,12 +158,21 @@ theorem tx_finalised_by (hprot : IsMinimmit f Δ lead GST s₀ instrs)
 
 /-- Lemma 5.10（Optimistic responsiveness）: Minimmit は optimistically responsive。定数は 8。 -/
 theorem optimistic_responsiveness : OptimisticallyResponsive := by
+  classical
   refine ⟨8, ?_⟩
-  intro n Tx _ f Δ δ fa GST lead s₀ instrs hprot hδ hs hlead i hi t tr htr hfirst hgst j hj
-  obtain ⟨b, hb, hmem⟩ := tx_finalised_by hprot hδ hs hlead hi htr hfirst hgst j hj
-  refine ⟨b, hb.mono (S_subset_run s₀ instrs j ?_), hmem⟩
-  rw [Nat.mul_add fa (2 * Δ) (3 * δ), Nat.mul_left_comm fa 2 Δ, Nat.mul_left_comm fa 3 δ]
-  have h1 : fa * δ ≤ fa * Δ := Nat.mul_le_mul_left fa hδ
-  omega
+  intro n Tx _ f Δ δ fa GST lead s₀ instrs hprot hδ hs hlead t tr hrecv hgst
+  obtain ⟨⟨i, hi, htr⟩, hfirst⟩ := hrecv
+  -- 期限までに全員が finalise している
+  have hB : FinalisedByAll f s₀ instrs tr (t + 8 * (fa * Δ + δ)) := by
+    intro j hj
+    obtain ⟨b, hb, hmem⟩ := tx_finalised_by hprot hδ hs hlead hi htr hfirst hgst j hj
+    refine ⟨b, hb.mono (S_subset_run s₀ instrs j ?_), hmem⟩
+    rw [Nat.mul_add fa (2 * Δ) (3 * δ), Nat.mul_left_comm fa 2 Δ, Nat.mul_left_comm fa 3 δ]
+    have h1 : fa * δ ≤ fa * Δ := Nat.mul_le_mul_left fa hδ
+    omega
+  -- 初めて全員が finalise している ℓ をとる
+  have hex : ∃ ℓ, FinalisedByAll f s₀ instrs tr (t + ℓ) := ⟨_, hB⟩
+  refine ⟨Nat.find hex, Nat.find_min' hex hB, t, ⟨⟨i, hi, htr⟩, hfirst⟩, Nat.find_spec hex,
+    fun ℓ' hℓ' => Nat.find_min hex hℓ'⟩
 
 end Minimmit

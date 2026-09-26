@@ -14,8 +14,8 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
   {instrs : Nat → Instr n Tx}
 
-/-- p_i がスロット t に view v にいる（§5 の "enters view v"）: スロット t の冒頭の view は v 以下で、
-    スロット t + 1 の冒頭の view は v 以上。view は 1 回の前進で 1 しか増えないので、その間に
+/-- p_i がスロット t に view v にいる（§5 の "enters view v"）: スロット t の view は v 以下で、
+    スロット t + 1 の view は v 以上。view は 1 回の前進で 1 しか増えないので、その間に
     view = v の時点がある。 -/
 def Enters (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (v : View) (t : Nat) :
     Prop :=
@@ -93,7 +93,7 @@ theorem enters_of_reach (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val) {i : F
     exact (not_le.mp hmin).le
 
 open Classical in
-/-- view v 以上に達する正直者がいるなら、最初にそうなるスロットが v への最初の入場。 -/
+/-- view v 以上に達する正直者がいるなら、最初にそうなるスロットが、正直者が最初に v に入るスロット。 -/
 theorem firstEntry_of_reach (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val)
     (hreach : ∃ s, ∃ r, Correct s₀ instrs r ∧ v.val ≤ (viewAt s₀ instrs r (s + 1)).val) :
     FirstEntry s₀ instrs v (Nat.find hreach) := by
@@ -109,7 +109,7 @@ theorem firstEntry_of_reach (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val)
     by_contra hlt
     exact hmin ⟨r, hr, (not_le.mp hlt).le⟩
 
-/-- 最初の入場より前に、v 以上に達している正直者はいない。 -/
+/-- 正直者が最初に v に入るスロットより前に、v 以上に達している正直者はいない。 -/
 theorem FirstEntry.first_ge (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val) {t : Nat}
     (h : FirstEntry s₀ instrs v t) (i : Fin n) (t' : Nat) (hi : Correct s₀ instrs i)
     (hle : v.val ≤ (viewAt s₀ instrs i (t' + 1)).val) : t ≤ t' := by
@@ -340,11 +340,11 @@ theorem reaches_view (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   progression_aux hn hinit hh hb hs v.val i hi
 
 /-- Lemma 5.5（Progression through views）: 正直者はすべての view v ≥ 1 に入る。 -/
-theorem progression (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ GST s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i) {v : View}
+theorem progression (hprot : IsMinimmit f Δ lead GST s₀ instrs)
+    {i : Fin n} (hi : Correct s₀ instrs i) {v : View}
     (hv : 1 ≤ v.val) : ∃ t, Enters s₀ instrs i v t := by
   classical
+  have ⟨hn, hinit, hh, hb, hs, _⟩ := hprot
   have hreach : ∃ s, v.val ≤ (viewAt s₀ instrs i (s + 1)).val := by
     obtain ⟨s, hs'⟩ := reaches_view hn hinit hh hb hs hi v
     exact ⟨s, hs'.trans (viewAt_le_succ i s)⟩

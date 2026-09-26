@@ -57,18 +57,18 @@ theorem leaderBlock_finalised_by (hinit : Init s₀)
 
 /-- Lemma 5.8: lead(v) が正直で、最初の正直者が t ≥ GST に view v に入るなら、正直者は
     全員 t + 3δ までに view v のブロックを finalise し、view v を離れる。 -/
-theorem correct_leader_finalises_fast (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+theorem correct_leader_finalises_fast (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {v : View} (hv : 1 ≤ v.val)
     (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j →
       (∃ b : Block n Tx, b.view = v ∧ Finalised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
       ∧ v.val < (viewAt s₀ instrs j (t + 3 * δ + 1)).val := by
+  have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
   intro j hj
   have hδ1 := hs.one_le
-  obtain ⟨e, R⟩ := leader_round hn hinit hh hs hδ hv hi hfirst hgst
-  have hbLv := leaderBlockAt_view hinit hh hb hs R
+  obtain ⟨e, R⟩ := leader_round hn hinit hh hb hs hδ hv hi hfirst hgst
+  have hbLv := leaderBlockAt_view hinit hh R
   have hLN := leaderBlock_lnotarised_by (j := j) hinit hh hb hs R
   refine ⟨⟨leaderBlockAt f lead s₀ instrs v e, hbLv,
     leaderBlock_finalised_by (j := j) hinit hh hb hs R⟩, ?_⟩

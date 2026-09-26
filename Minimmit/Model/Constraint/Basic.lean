@@ -67,4 +67,17 @@ def Honest [DecidableEq Tx] (f Δ : Nat) (lead : View → Fin n) (s₀ : State n
   ∀ t i, i ∉ (State.run s₀ instrs t).byz →
     (instrs t).actions i = Algo.step f Δ lead i ((State.run s₀ instrs t).procs i)
 
+/-! ### Minimmit -/
+
+/-- s₀ と instrs が Minimmit の実行であること: 5f + 1 ≤ n のもとで、初期状態から始まり、
+    正直者が Algorithm 1 に従い、腐敗が f 人以下で、部分同期で、リーダーが公平。 -/
+structure IsMinimmit [DecidableEq Tx] (f Δ : Nat) (lead : View → Fin n) (GST : Time)
+    (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop where
+  resilience : 5 * f + 1 ≤ n
+  init : Init s₀
+  honest : Honest f Δ lead s₀ instrs
+  byz : ByzBound f s₀ instrs
+  sync : PartialSync Δ GST s₀ instrs
+  fair : Fair lead
+
 end Minimmit

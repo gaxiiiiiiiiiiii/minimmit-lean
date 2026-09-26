@@ -14,11 +14,11 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
   {instrs : Nat → Instr n Tx}
 
-/-- スロット t の冒頭の p_i の view -/
+/-- スロット t の p_i の view -/
 def viewAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : View :=
   ((State.run s₀ instrs t).procs i).view
 
-/-- スロット t の冒頭の p_i の timer -/
+/-- スロット t の p_i の timer -/
 def timerAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : Nat :=
   ((State.run s₀ instrs t).procs i).timer
 
@@ -313,7 +313,7 @@ theorem viewAt_eq_of_lt_timer (hinit : Init s₀) (i : Fin n) (t : Nat) :
 
 /-! ### 正直者の反応 -/
 
-/-- 次のスロットの冒頭の view は、16〜21 行を評価した後の view。 -/
+/-- 次のスロットの view は、16〜21 行を評価した後の view。 -/
 theorem viewAt_succ_eq (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     (t : Nat) :
     viewAt s₀ instrs i (t + 1) = (Algo.st1 f i ((State.run s₀ instrs t).procs i)).view := by
@@ -369,7 +369,7 @@ theorem Algo.view_le_st5 (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : P
     p.view.val ≤ (Algo.st5 f Δ lead i p).view.val := by
   rw [Algo.st5_view]; exact Algo.view_le_st1 f i p
 
-/-- 正直者が view v を越えて進んだなら、スロット冒頭の S に view v の nullification か
+/-- 正直者が view v を越えて進んだなら、そのスロットの S に view v の nullification か
     view v のブロックの M-notarisation がある。 -/
 theorem leave_view_cert (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {v : View} (h1 : (viewAt s₀ instrs i t).val ≤ v.val)

@@ -18,13 +18,12 @@ variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx
 
 /-- Lemma 5.7（Liveness）の本体: 正直者 p_i が受け取った取引は、あるスロットで任意の p_j が
     finalise したブロックの Tr* に入る。 -/
-theorem tx_finalised (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ GST s₀ instrs) (hlead : Fair lead)
+theorem tx_finalised (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {tr : Tx} (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S) :
     ∃ t' b, Finalised f ((State.run s₀ instrs t').procs j).S b ∧ tr ∈ b.trStar := by
   classical
+  have ⟨hn, hinit, hh, hb, hs, hlead⟩ := hprot
   have hΔ := hs.one_le
   -- max(GST, t) より後に始まる view v' で lead v' = i
   obtain ⟨v', hv'V, hlv'⟩ := hlead i
@@ -45,7 +44,7 @@ theorem tx_finalised (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have h2 := hbound r
     omega
   have hlc : Correct s₀ instrs (lead v') := hlv' ▸ hi
-  obtain ⟨e, R⟩ := leader_round hn hinit hh hs (le_refl Δ) hv'1 hlc hfirst (by omega)
+  obtain ⟨e, R⟩ := leader_round hn hinit hh hb hs (le_refl Δ) hv'1 hlc hfirst (by omega)
   have hte := first_entry_le_leader_entry hinit R
   -- 取引はブロックの Tr* に入る
   have htr' : tr ∈ (leaderBlockAt f lead s₀ instrs v' e).trStar := by
@@ -83,16 +82,15 @@ theorem tx_finalised (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     exact ancestors_delivered hinit hh hb hs hMp (by omega) (by omega) a hap
 
 /-- Lemma 5.7（Liveness）: プロトコルは Liveness を満たす。 -/
-theorem liveness (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hbz : ByzBound f s₀ instrs)
-    (hs : PartialSync Δ GST s₀ instrs) (hlead : Fair lead) : Liveness f s₀ instrs := by
+theorem liveness (hprot : IsMinimmit f Δ lead GST s₀ instrs) : Liveness f s₀ instrs := by
   intro i j hi _ t tr htr
-  obtain ⟨t', b, hfin, hmem⟩ := tx_finalised (j := j) hn hinit hh hbz hs hlead hi htr
+  have hn := hprot.resilience
+  obtain ⟨t', b, hfin, hmem⟩ := tx_finalised (j := j) hprot hi htr
   have hvb : b ∈ Algo.votedBlocks ((State.run s₀ instrs t').procs j).S := by
     obtain ⟨w, hw⟩ := Finset.card_pos.mp (lt_of_lt_of_le (by omega) (show n - f ≤ _ from hfin.1))
     exact Algo.mem_votedBlocks (mem_voters.mp hw)
   obtain ⟨b', _, hanc, hlog⟩ := log_eq_of_finalised
-    (fun x y hx hy => lnotarised_consistent hn hinit hh hbz hx.1 hy.1) hfin hvb
+    (fun x y hx hy => lnotarised_consistent hprot hx.1 hy.1) hfin hvb
   refine ⟨t', ?_⟩
   rw [hlog]
   exact (Block.trStar_prefix_of_ancestor hanc).subset hmem

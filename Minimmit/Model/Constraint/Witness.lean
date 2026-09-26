@@ -6,7 +6,7 @@ import Minimmit.Model.Transition.Execute
 # 制約の充足可能性
 
 `Init`・`Honest`・`ByzBound`・`PartialSync` を同時に満たす実行の例。腐敗がなく、全員が
-`Algo.step` に従い、送った packet がそのスロットのうちに届く実行を、スロットの冒頭の状態から
+`Algo.step` に従い、送った packet がそのスロットのうちに届く実行を、スロットの状態から
 そのスロットの指示を作る再帰で定義する。§5 の補題の仮定が矛盾しないことを
 `constraints_satisfiable` として示す。あわせて、論文の輪番のリーダー関数が `Fair` を満たすことを
 `roundRobin_fair` として、Lemma 5.10 のリーダーの仮定を満たすことを `roundRobin_correct_leader`
@@ -23,7 +23,7 @@ namespace Witness
 def init : State n Tx :=
   { procs := fun _ => Processor.init, byz := ∅, pool := ∅, now := ⟨0⟩ }
 
-/-- 状態 s を冒頭とするスロットの指示: 全員の動作は `Algo.step` の出力、配送は動作の後の pool
+/-- 状態 s のスロットの指示: 全員の動作は `Algo.step` の出力、配送は動作の後の pool
     にある packet 全部、取引の投入と腐敗はなし。 -/
 noncomputable def instrOf (f Δ : Nat) (lead : View → Fin n) (s : State n Tx) : Instr n Tx :=
   let acts : Instr n Tx :=
@@ -43,7 +43,7 @@ noncomputable def instrOf (f Δ : Nat) (lead : View → Fin n) (s : State n Tx) 
 theorem instrOf_deliveries (f Δ : Nat) (lead : View → Fin n) (s : State n Tx) :
     (instrOf f Δ lead s).deliveries = (s.act (instrOf f Δ lead s)).pool.toList := rfl
 
-/-- スロット t の冒頭の状態と、そのスロットの指示の対 -/
+/-- スロット t の状態と、そのスロットの指示の対 -/
 noncomputable def trace (f Δ : Nat) (lead : View → Fin n) : Nat → State n Tx × Instr n Tx
   | 0 => (init, instrOf f Δ lead init)
   | t + 1 =>
@@ -102,7 +102,7 @@ theorem mem_S_foldl_deliver_of_mem (s : State n Tx) (xs : List (Packet n Tx)) {x
       exact Finset.mem_insert_self _ _
     · exact ih _ hx (by rwa [State.deliver_pool])
 
-/-- 各スロットの冒頭で、pool にある packet の message は宛先の S にある。 -/
+/-- 各スロットで、pool にある packet の message は宛先の S にある。 -/
 theorem pool_delivered (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     ∀ x ∈ (trace (Tx := Tx) f Δ lead t).1.pool, x.msg ∈ ((trace f Δ lead t).1.procs x.dst).S := by
   intro x hx
@@ -126,14 +126,14 @@ theorem partialSync (f Δ : Nat) (lead : View → Fin n) (hΔ : 1 ≤ Δ) :
 
 end Witness
 
-/-- `Init`・`Honest`・`ByzBound`・`PartialSync` は同時に満たせる: Δ ≥ 1 なら、どの f・lead についても
-    4 つを満たす初期状態と指示の列がある。 -/
-theorem constraints_satisfiable (f Δ : Nat) (hΔ : 1 ≤ Δ) (lead : View → Fin n) :
-    ∃ (s₀ : State n Tx) (instrs : Nat → Instr n Tx),
-      Init s₀ ∧ Honest f Δ lead s₀ instrs ∧ ByzBound f s₀ instrs
-        ∧ ∃ GST, PartialSync Δ GST s₀ instrs :=
-  ⟨Witness.init, Witness.instrs f Δ lead, Witness.init_spec, Witness.honest f Δ lead,
-    Witness.byzBound f Δ lead, ⟨⟨0⟩, Witness.partialSync f Δ lead hΔ⟩⟩
+/-- `IsMinimmit` は満たせる: 5f + 1 ≤ n と Δ ≥ 1 のもと、公平な lead について、Minimmit の
+    実行である初期状態と指示の列と GST がある。 -/
+theorem isMinimmit_satisfiable (f Δ : Nat) (hn : 5 * f + 1 ≤ n) (hΔ : 1 ≤ Δ)
+    (lead : View → Fin n) (hfair : Fair lead) :
+    ∃ (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (GST : Time),
+      IsMinimmit f Δ lead GST s₀ instrs :=
+  ⟨Witness.init, Witness.instrs f Δ lead, ⟨0⟩, hn, Witness.init_spec, Witness.honest f Δ lead,
+    Witness.byzBound f Δ lead, Witness.partialSync f Δ lead hΔ, hfair⟩
 
 /-! ### 輪番のリーダー -/
 

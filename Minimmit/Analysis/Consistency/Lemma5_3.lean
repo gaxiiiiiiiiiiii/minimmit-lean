@@ -8,14 +8,15 @@ import Mathlib.Data.Finset.Max
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ : Nat} {GST : Time} {lead : View → Fin n}
+variable {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.3（§3 の (X2)）: b が L-notarisation を受けるなら、b の view は nullification を
     受けない。 -/
-theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {b : Block n Tx} (hL : ReceivesL f s₀ instrs b) :
     ¬ ReceivesNullification f s₀ instrs b.view := by
+  have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
   intro hN
   classical
   rcases hL with rfl | hL
@@ -133,7 +134,7 @@ theorem not_receivesNullification_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : I
               with hm' | hs
             · have hs'' := sends_of_mem_S hinit hm' rfl (Msg.vote_ne_gen_vote
                 (by rw [hbv]; exact one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P)))
-              have := one_vote_per_view hinit hh hwc (mem_voteSenders.mp hwP) hs'' hbv.symm
+              have := one_vote_per_view hprot hwc (mem_voteSenders.mp hwP) hs'' hbv.symm
               exact hne (congrArg some this.symm)
             · simp only [Msg.signer, Option.some.injEq] at hs
               exact hwq hs

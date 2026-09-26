@@ -12,7 +12,8 @@ L-notarisation を受けた 2 つのブロックは一方が他方の祖先。lo
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ : Nat} {GST : Time} {lead : View → Fin n}
+variable {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 theorem receivesM_of_receivesL (hn : 5 * f + 1 ≤ n) {b : Block n Tx}
     (hL : ReceivesL f s₀ instrs b) : ReceivesM f s₀ instrs b :=
@@ -152,10 +153,10 @@ theorem receivesM_ancestor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
 
 /-- Lemma 5.4（Consistency）の本体: L-notarisation を受けた 2 つのブロックは、一方が他方の
     祖先。 -/
-theorem receivesL_consistent (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+theorem receivesL_consistent (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {b b' : Block n Tx} (hL : ReceivesL f s₀ instrs b) (hL' : ReceivesL f s₀ instrs b') :
     b.Ancestor b' ∨ b'.Ancestor b := by
+  have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
   by_contra hcon
   simp only [not_or] at hcon
   wlog hle : b.view.val ≤ b'.view.val generalizing b b' with H
@@ -169,10 +170,10 @@ theorem receivesL_consistent (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   have hne : v.val ≠ b.view.val := by
     intro heq
     have hv : (Block.node q v tr p₀).view = b.view := View.val_injective heq
-    have := receivesM_unique_of_receivesL hn hinit hh hb hL hv hM
+    have := receivesM_unique_of_receivesL hprot hL hv hM
     exact hna (this ▸ Block.Ancestor.refl _)
   obtain ⟨_, hgap⟩ := receivesM_parent hinit hh hb hM
-  exact not_receivesNullification_of_receivesL hn hinit hh hb hL
+  exact not_receivesNullification_of_receivesL hprot hL
     (hgap b.view hlt (lt_of_le_of_ne hge (Ne.symm hne)))
 
 /-- S にある M-notarisation は、実行上の M-notarisation。 -/
@@ -199,20 +200,18 @@ theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
 
 /-- `receivesL_consistent` を S の形で: 2 つのプロセッサの S に L-notarisation を持つ 2 つの
     ブロックは、一方が他方の祖先。 -/
-theorem lnotarised_consistent (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+theorem lnotarised_consistent (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {i j : Fin n} {t t' : Nat} {b b' : Block n Tx}
     (hbi : LNotarised f ((State.run s₀ instrs t).procs i).S b)
     (hbj : LNotarised f ((State.run s₀ instrs t').procs j).S b') :
     b.Ancestor b' ∨ b'.Ancestor b :=
-  receivesL_consistent hn hinit hh hb (receivesL_of_LNotarised hinit hbi)
-    (receivesL_of_LNotarised hinit hbj)
+  receivesL_consistent hprot (receivesL_of_LNotarised hprot.init hbi)
+    (receivesL_of_LNotarised hprot.init hbj)
 
 /-- Lemma 5.4（Consistency）: プロトコルは Consistency を満たす。 -/
-theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hbz : ByzBound f s₀ instrs) : Consistency f s₀ instrs := by
+theorem consistency (hprot : IsMinimmit f Δ lead GST s₀ instrs) : Consistency f s₀ instrs := by
   intro i j _ _ t t'
-  unfold log
+  unfold Compatible log
   cases hl : (finalisedBlocks f ((State.run s₀ instrs t).procs i).S).argmax Block.depth with
   | none => exact Or.inl (List.nil_prefix)
   | some b =>
@@ -221,7 +220,7 @@ theorem consistency (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     | some b' =>
       have hb := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl))).2
       have hb' := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl'))).2
-      rcases lnotarised_consistent hn hinit hh hbz hb.1 hb'.1 with h | h
+      rcases lnotarised_consistent hprot hb.1 hb'.1 with h | h
       · exact Or.inl (Block.trStar_prefix_of_ancestor h)
       · exact Or.inr (Block.trStar_prefix_of_ancestor h)
 

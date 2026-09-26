@@ -85,11 +85,11 @@ Quot.sound]
 -/
 #guard_msgs in #print axioms Minimmit.optimistic_responsiveness
 
--- 制約の充足可能性
+-- IsMinimmit の充足可能性
 /--
-info: 'Minimmit.constraints_satisfiable' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: 'Minimmit.isMinimmit_satisfiable' depends on axioms: [propext, Classical.choice, Quot.sound]
 -/
-#guard_msgs in #print axioms Minimmit.constraints_satisfiable
+#guard_msgs in #print axioms Minimmit.isMinimmit_satisfiable
 
 /-- info: 'Minimmit.roundRobin_fair' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in #print axioms Minimmit.roundRobin_fair

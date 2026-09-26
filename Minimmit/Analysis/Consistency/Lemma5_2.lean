@@ -7,14 +7,15 @@ import Minimmit.Analysis.Consistency.Lemma5_1
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ : Nat} {GST : Time} {lead : View → Fin n}
+variable {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.2（§3 の (X1)）: b が L-notarisation を受けるなら、同じ view の他のブロックは
     M-notarisation を受けない。 -/
-theorem receivesM_unique_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
+theorem receivesM_unique_of_receivesL (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {b b' : Block n Tx} (hL : ReceivesL f s₀ instrs b) (hview : b'.view = b.view)
     (hM : ReceivesM f s₀ instrs b') : b' = b := by
+  have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
   rcases hM with rfl | hM
   · rcases hL with rfl | hL
     · rfl
@@ -35,7 +36,7 @@ theorem receivesM_unique_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       have hlt : f < (voteSenders s₀ instrs b ∩ voteSenders s₀ instrs b').card := by omega
       obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
       rw [Finset.mem_inter] at hq
-      exact (one_vote_per_view hinit hh hqc (mem_voteSenders.mp hq.1) (mem_voteSenders.mp hq.2)
+      exact (one_vote_per_view hprot hqc (mem_voteSenders.mp hq.1) (mem_voteSenders.mp hq.2)
         hview.symm).symm
 
 end Minimmit

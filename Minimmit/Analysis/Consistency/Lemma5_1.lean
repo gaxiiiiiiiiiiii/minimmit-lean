@@ -7,13 +7,15 @@ import Minimmit.Model.Constraint.Run
 namespace Minimmit
 
 variable {n : Nat} {Tx : Type} [DecidableEq Tx]
-variable {f Δ : Nat} {lead : View → Fin n} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
+variable {f Δ : Nat} {GST : Time} {lead : View → Fin n}
+variable {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 /-- Lemma 5.1（One vote per view）: 正直者は各 view で高々 1 つのブロックに投票する。 -/
-theorem one_vote_per_view (hinit : Init s₀)
-    (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
+theorem one_vote_per_view (hprot : IsMinimmit f Δ lead GST s₀ instrs)
+    {i : Fin n} (hi : Correct s₀ instrs i)
     {b b' : Block n Tx} (hb : Sends s₀ instrs i (.vote i b)) (hb' : Sends s₀ instrs i (.vote i b'))
     (hview : b.view = b'.view) : b = b' := by
+  have ⟨_, hinit, hh, _, _, _⟩ := hprot
   obtain ⟨t, j, ht⟩ := hb.instructed hinit
   obtain ⟨t', j', ht'⟩ := hb'.instructed hinit
   have h₁ := mem_S_succ_of_send hh hi ht

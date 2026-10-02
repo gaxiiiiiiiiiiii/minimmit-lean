@@ -61,11 +61,12 @@ Minimmit
 │   │   ├── Send.lean           各段の S の中身、各段が送る message とその条件、票と nullify の出所
 │   │   └── Forward.lean        転送と反応の補題、SelectParent と valid proposal
 │   └── Constraint
-│       ├── Basic.lean          Init、PartialSync、Correct、ByzBound、Fair、Honest
+│       ├── Basic.lean          Init、PartialSync、Correct、ByzBound、Fair、Honest、IsMinimmit
 │       ├── Run.lean            署名の遡り（S にあれば署名者が前に送った）、腐敗の数え上げ、不変量の実行への持ち上げ
-│       └── Witness.lean        Init・Honest・ByzBound・PartialSync を同時に満たす実行の例、輪番の lead が Fair と 5.10 のリーダーの仮定を満たすこと
+│       └── Witness.lean        IsMinimmit を満たす実行の例、輪番の lead が Fair と 5.10 のリーダーの仮定を満たすこと
 └── Analysis
-    ├── Log.lean                log と、§2 の Consistency・Liveness の定義
+    ├── Log.lean                log と、§2 の compatible・Consistency・Liveness の定義
+    ├── Latency.lean            §5.3 の optimistic responsiveness の定義
     ├── Consistency
     │   ├── Lemma5_1.lean
     │   ├── Lemma5_2.lean

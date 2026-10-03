@@ -8,19 +8,6 @@ BFT コンセンサスプロトコル Minimmit（Chou et al., [arXiv:2508.10862]
 
 Lemma 5.1〜5.10 はすべて証明済み。`sorry` はなく、各定理が依存する公理は `propext`・`Classical.choice`・`Quot.sound` のみ。`Minimmit/Axioms.lean` が主定理ごとにこれを `#guard_msgs` で固定し、GitHub Actions の CI が push ごとにビルドと、ライブラリ全体の公理の監査を回す。
 
-| 論文 | 定理 | ファイル |
-|---|---|---|
-| Lemma 5.1 One vote per view | `one_vote_per_view` | Analysis/Consistency/Lemma5_1 |
-| Lemma 5.2 (X1) | `receivesM_unique_of_receivesL` | Analysis/Consistency/Lemma5_2 |
-| Lemma 5.3 (X2) | `not_receivesNullification_of_receivesL` | Analysis/Consistency/Lemma5_3 |
-| Lemma 5.4 Consistency | `consistency`, `lnotarised_consistent`, `receivesL_consistent` | Analysis/Consistency/Lemma5_4 |
-| Lemma 5.5 Progression through views | `progression` | Analysis/Liveness/Lemma5_5 |
-| Lemma 5.6 Correct leaders finalise blocks | `correct_leader_finalises` | Analysis/Liveness/Lemma5_6 |
-| Lemma 5.7 Liveness | `liveness`, `tx_finalised` | Analysis/Liveness/Lemma5_7 |
-| Lemma 5.8 | `correct_leader_finalises_fast` | Analysis/Responsiveness/Lemma5_8 |
-| Lemma 5.9 | `leave_view` | Analysis/Responsiveness/Lemma5_9 |
-| Lemma 5.10 Optimistic responsiveness | `optimistic_responsiveness` | Analysis/Responsiveness/Lemma5_10 |
-
 論文の記述との対応と、論文と違う形にした点は [CORRESPONDENCE.md](CORRESPONDENCE.md) にまとめてある。
 
 ## ビルド

@@ -55,7 +55,8 @@ theorem card_correctSet (hb : ByzBound f s₀ instrs) : n - f ≤ (correctSet s�
   rw [Finset.card_univ, Fintype.card_fin] at h1
   omega
 
-/-- 正直者 p_j が t + 1 の S に持つ自分の署名付きメッセージは、p_i に期限までに届く。 -/
+/-- 正直者 p_j がスロット s + 1 の S に持つ自分の署名付きメッセージは、s + 1 以降で期限
+    max(GST, s) + δ に達したスロットの p_i の S にある。 -/
 theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs)
     {i j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}
@@ -76,7 +77,7 @@ theorem viewAt_zero (hinit : Init s₀) (j : Fin n) : (viewAt s₀ instrs j 0).v
   unfold viewAt; rw [State.stateAt, hinit.procs j]; rfl
 
 open Classical in
-/-- view v 以上に達する正直者は、最初にそうなるスロットに v にいる。 -/
+/-- view v 以上に達するプロセッサは、最初にそうなるスロットで v に達する（`Enters`）。 -/
 theorem enters_of_reach (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val) {i : Fin n}
     (hreach : ∃ s, v.val ≤ (viewAt s₀ instrs i (s + 1)).val) :
     Enters s₀ instrs i v (Nat.find hreach) := by
@@ -153,8 +154,8 @@ theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     rw [hbv] at this
     exact absurd (hstuck _) (not_le.mpr this)
 
-/-- view k に止まる正直者は、timer が 2Δ に達したスロット s で、view k のブロックに投票済みか
-    nullify(k) を送っている。 -/
+/-- view k に止まる正直者は、あるスロット s で view k にいて、s + 1 の S に view k のブロックへの
+    自分の票か自分の nullify(k) を持つ。 -/
 theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync Δ GST s₀ instrs)
     {j : Fin n} (hj : Correct s₀ instrs j) {k : Nat} (hreach : ∃ t, k ≤ (viewAt s₀ instrs j t).val)

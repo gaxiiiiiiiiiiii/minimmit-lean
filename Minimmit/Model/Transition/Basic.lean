@@ -210,7 +210,7 @@ structure State (n : Nat) (Tx : Type) where
 
 namespace State
 
-/-- procs i だけを f で置き換える。 -/
+/-- procs i を f (procs i) に置き換える。 -/
 def update (s : State n Tx) (i : Fin n) (f : Processor n Tx → Processor n Tx) :
     State n Tx :=
   { s with procs := Function.update s.procs i (f (s.procs i)) }
@@ -251,7 +251,7 @@ def tick (s : State n Tx) : State n Tx :=
 end State
 
 /-! ## 指示
-1 スロット分の遷移の構成。`Instr` の成分は `State.step` が順に適用する: actions の各動作が
+1 スロット分の遷移の構成で、プロトコルの外から与えられる。`Instr` の成分は `State.step` が順に適用する: actions の各動作が
 `execute`、deliveries が `deliver`、submits が `submit`、corrupts が `corrupt`。 -/
 
 /-- p_i が自分から起こす動作: m を j へ送る、または次の view へ進む。 -/

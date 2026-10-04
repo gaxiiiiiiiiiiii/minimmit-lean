@@ -97,7 +97,7 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
         rw [hqnl] at this
         cases this
   obtain ⟨h6, hv6, hnl6, hvote6, hnp⟩ := Algo.nullify_after_vote hp hbvote hj₀ hno
-  -- 証拠の署名者 W を数える
+  -- proof of no progress の署名者 W を数える
   set W := noProgressWitnesses (Algo.st4 f Δ lead q₀ ((State.stateAt s₀ instrs (T q₀)).procs q₀)).S
     b.view (some b) with hW
   have hWcard : 2 * f + 1 ≤ W.card := hnp

@@ -4,7 +4,7 @@ import Minimmit.Model.Constraint.Basic
 /-!
 # log と §2 の性質
 
-log を S の関数として定義し、§2 の compatible・Consistency・Liveness を論文の文どおりに定義する。
+log を S の関数として定義し、§2 の compatible・Consistency・Liveness を定義する。
 -/
 
 namespace Minimmit
@@ -42,8 +42,8 @@ theorem mem_finalisedBlocks {S : Finset (Msg n Tx)} {b : Block n Tx} :
     b ∈ finalisedBlocks f S ↔ b ∈ Algo.votedBlocks S ∧ Finalised f S b := by
   simp [finalisedBlocks]
 
-/-- finalise したブロックのどの 2 つも一方が他方の祖先なら、log はそのどれよりも深い finalise した
-    ブロックの Tr*。 -/
+/-- finalise したブロックのどの 2 つも一方が他方の祖先なら、投票された finalise したブロック b
+    について、b を祖先に持つ finalise したブロック b′ があり、log は b′ の Tr*。 -/
 theorem log_eq_of_finalised {S : Finset (Msg n Tx)}
     (hchain : ∀ b b', Finalised f S b → Finalised f S b' →
       Block.Ancestor b b' ∨ Block.Ancestor b' b)

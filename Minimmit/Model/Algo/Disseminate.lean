@@ -73,7 +73,7 @@ theorem mem_S_disseminate_fst (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
     · exact S_subset_foldl_send i m l _ (mem_S_send_self i p m)
     · exact ih _ hj
 
-/-- ガードを通るメッセージの disseminate は、動作の畳み込みと局所状態が一致する。 -/
+/-- `canSend` を満たすメッセージの disseminate は、動作の畳み込みと局所状態が一致する。 -/
 theorem executeAll_disseminate {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (h : p.canSend i m) :
     p.executeAll i (disseminate i p m).2 = (disseminate i p m).1 := by
@@ -90,7 +90,7 @@ theorem executeAll_disseminate {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
       if_pos h]
     exact ih _ (Processor.canSend_mono (Processor.S_subset_send i p m j) h)
 
-/-- ガードを通るメッセージの disseminate の各 send は、その時点のガードを通る。 -/
+/-- `canSend` を満たすメッセージの disseminate の各 send は、その時点の`canSend` を満たす。 -/
 theorem guardOK_disseminate {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} (h : p.canSend i m) :
     Processor.GuardOK i p (disseminate i p m).2 := by
   rw [disseminate_snd]

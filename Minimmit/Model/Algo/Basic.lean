@@ -6,8 +6,9 @@ import Mathlib.Data.Finset.Sort
 /-!
 # Algorithm 1
 
-局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。各部分を関数に
-切り出したものは Algo/Stage にある。
+局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その補助関数。`Algo.step` は
+疑似コードの各部分（16〜21 行、5〜7 行、9〜11 行、13〜14 行、24〜28 行、2〜3 行）を順に評価する。
+各部分を関数に切り出したものは Algo/Stage にある。
 -/
 
 namespace Minimmit
@@ -16,7 +17,7 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 
 namespace Algo
 
-/-! ## 部品 -/
+/-! ## 補助関数 -/
 
 /-! ### 送信
 動作の列を組み立てながら、`Processor.send` で局所状態にも同じ効果を与える。 -/
@@ -50,8 +51,7 @@ noncomputable def nullifyViews (S : Finset (Msg n Tx)) : List View :=
 noncomputable def votedBlocks (S : Finset (Msg n Tx)) : List (Block n Tx) :=
   (S.toList.filterMap fun m => match m with | .vote _ b => some b | _ => none).dedup
 
-/-- S が含む、lead(v) の署名付きの view v のブロックを重複なく列挙する。valid proposal の
-    条件 (i) は、これがちょうど 1 つであること。 -/
+/-- S が含む、lead(v) の署名付きの view v のブロックを重複なく列挙する。 -/
 noncomputable def proposals (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View) :
     List (Block n Tx) :=
   (S.toList.filterMap fun m => match m.block with
@@ -89,8 +89,8 @@ theorem containsBlock_of_mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v :
   simp only [mNotarisedAt, List.mem_filter] at h
   exact containsBlock_of_mem_votedBlocks h.1
 
-/-! ## 各部分の部品
-`Algo.step` の評価順に並べる。13〜14 行と 24〜28 行は部品を持たず、`Algo.step` に直接書く。 -/
+/-! ## 各部分の補助関数
+`Algo.step` の評価順に並べる。13〜14 行と 24〜28 行は補助関数を持たず、`Algo.step` に直接書く。 -/
 
 /-! ### 16〜21 行 -/
 
@@ -106,8 +106,8 @@ noncomputable instance (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Decidable 
   inferInstanceAs (Decidable (_ ∨ _))
 
 /-- 16〜21 行を 1 回評価する。現在の view の nullification があれば進む（16〜17 行）。
-    なければ、現在の view のブロックの M-notarisation があれば、未投票なら投票してから進む
-    （19〜21 行）。複数あれば `mNotarisedAt` の順で先のブロックに投票する。 -/
+    なければ、現在の view のブロックの M-notarisation があれば、未投票で nullify も送っていなければ
+    投票してから進む（19〜21 行）。複数あれば `mNotarisedAt` の順で先のブロックに投票する。 -/
 noncomputable def advanceOnce (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   if Nullified f p.S p.view then (p.progress, [Action.progress])
@@ -141,7 +141,7 @@ noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Bl
     fun b => b.view.val).getD .gen
 
 open Classical in
-/-- ProposeChild(b, v) の Tr（§4）: 受信済みの取引のうち、S が含む b の祖先の Tr に無いもの。 -/
+/-- ProposeChild の Tr（§4）: 受信済みの取引のうち、S が含む b の祖先の Tr に無いもの。 -/
 noncomputable def payload (S : Finset (Msg n Tx)) (b : Block n Tx) : List Tx :=
   (S.toList.filterMap fun m => match m with | .tx tr => some tr | _ => none).filter
     fun tr => decide (∀ a, Block.Ancestor a b → containsBlock S a → tr ∉ a.tr)
@@ -159,7 +159,7 @@ def leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin
   (((voters S b).sort (· ≤ ·)).take (2 * f + 1)).toFinset
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
-    取引（§4 本文）。new とは、S にあって prevS にないこと。証明書は、署名者の番号が小さい順に
+    取引（§4 本文）。new（§4）とは、S にあって prevS にないこと。証明書は、署名者の番号が小さい順に
     2f + 1 人分のメッセージを送る。 -/
 noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=

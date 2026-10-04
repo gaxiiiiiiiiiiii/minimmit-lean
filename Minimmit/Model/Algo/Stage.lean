@@ -197,7 +197,7 @@ theorem executeAll_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pr
     executeAll_voteProposal, executeAll_nullifyTimeout, executeAll_climb,
     executeAll_nullifyNoProgress]
 
-/-! ### 各部分の send は、その時点の局所状態のガードを通る -/
+/-! ### 各部分の send は、その時点の局所状態の`canSend` を満たす -/
 
 theorem guardOK_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor.GuardOK i p (forwardNew f i p).2 := by
@@ -270,7 +270,7 @@ theorem guardOK_nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
   · exact guardOK_disseminate Processor.canSend_nullify
   · trivial
 
-/-- `Algo.step` の各 send は、その時点の局所状態のガードを通る。 -/
+/-- `Algo.step` の各 send は、その時点の局所状態の`canSend` を満たす。 -/
 theorem guardOK_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     Processor.GuardOK i p (Algo.step f Δ lead i p) := by
   rw [step_eq_stepPair]
@@ -285,7 +285,7 @@ theorem guardOK_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Proce
   · exact guardOK_nullifyNoProgress f i _
   · exact guardOK_forwardNew f i _
 
-/-! ### 各部分で送るメッセージは、その部分の後の S にある -/
+/-! ### 各部分で S は減らない -/
 
 theorem S_subset_disseminateAll_fst (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
     p.S ⊆ (disseminateAll i p ms).1.S := by
@@ -464,13 +464,13 @@ theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · exact mem_S_of_send_forwardNew h
 
 
-/-! ### 部分ごとの入力状態と、送信の出所 -/
+/-! ### 部分ごとの入力状態と動作の列の分解 -/
 
 section Stages
 
 variable (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
 
-/-- 各部分の入力となる局所状態: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
+/-- 各部分の後の局所状態で、次の部分の入力: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
     st4 は 13〜14 行の後、st5 は 24〜28 行の後。最後に 2〜3 行が続く。 -/
 noncomputable def st1 : Processor n Tx := (climb f i (maxView p.S + 1) p).1
 noncomputable def st2 : Processor n Tx := (propose f lead i (st1 f i p)).1

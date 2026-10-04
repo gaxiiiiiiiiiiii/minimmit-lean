@@ -6,7 +6,7 @@ import Mathlib.Data.Fintype.Card
 # 証明書
 
 §4 の用語（M/L-notarisation・nullification・valid proposal・proof of no progress）を
-メッセージの集合 S 上の述語として定義し、§5.1 の「b が M-notarisation を受ける」などを
+メッセージの集合 S 上の述語として定義し（M/L-notarisation と nullification を証明書と呼ぶ）、§5.1 の「b が M-notarisation を受ける」などを
 実行上の述語として定義する。
 -/
 
@@ -139,7 +139,7 @@ def NoProgress (f : Nat) (S : Finset (Msg n Tx)) (v : View)
 end
 
 /-! ### 実行上の証明書（§5.1）
-誰かの S でなく、実行の中で誰が何を送ったかで言う。 -/
+S にではなく、実行の中で誰が何を送ったかについて定義する。 -/
 
 variable [DecidableEq Tx]
 

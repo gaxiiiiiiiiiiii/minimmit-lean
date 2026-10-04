@@ -89,7 +89,7 @@ theorem SGrows.receive (p : Processor n Tx) (m : Msg n Tx) : p.SGrows (p.receive
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, Finset.subset_insert _ _⟩
 
 /-- 動作 a の局所効果: `State.execute` が procs i に与える効果。send には `State.send` と同じ
-    ガードが付く。 -/
+    条件 `canSend` が付く。 -/
 def execute (i : Fin n) (p : Processor n Tx) : Action n Tx → Processor n Tx
   | .send m j => if p.canSend i m then p.send i m j else p
   | .progress => p.progress
@@ -129,9 +129,9 @@ theorem S_subset_executeAll (i : Fin n) (p : Processor n Tx) (acts : List (Actio
   | nil => exact Finset.Subset.refl _
   | cons a acts ih => exact (S_subset_execute i p a).trans (ih _)
 
-/-! ### 動作の列のガード -/
+/-! ### 動作の列の各 send の条件 -/
 
-/-- 動作の列の各 send が、その時点の局所状態のガードを通る。 -/
+/-- 動作の列の各 send が、その時点の局所状態で `canSend` を満たす。 -/
 def GuardOK (i : Fin n) : Processor n Tx → List (Action n Tx) → Prop
   | _, [] => True
   | p, a :: acts => (∀ m j, a = .send m j → p.canSend i m) ∧ GuardOK i (p.execute i a) acts

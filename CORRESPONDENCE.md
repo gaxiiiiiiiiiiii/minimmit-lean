@@ -867,7 +867,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 #### ■ 正直さ
 
-正直なプロセッサへの指示に課す条件。その動作が Algorithm 1 と一致することを要求する。
+正直なプロセッサの動作が Algorithm 1 と一致することを、指示に課す。
 
 - **実装**
 
@@ -906,8 +906,6 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 #### ■ 部分同期
 
-部分同期は、Lewis-Pye と Roughgarden の Permissionless Consensus 3.1 節の定義に従う。原文と内容は変わらない。
-
 - **原文**
 
   > a message sent at time t must arrive at time t′ > t with t′ ≤ max{GST, t} + Δ. While Δ is known, the value of GST is unknown to the protocol.
@@ -930,7 +928,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
     one_le : 1 ≤ Δ
   ```
 
-  - 原文では t′ > t が課されるが、受信は送った次のスロット以降にしか入らず、要求せずとも成り立つので、`Timely` には書かない。
+  - 原文の t′ > t は `Timely` に書かない。受信は送った次のスロット以降にしか入らないので、要求せずとも成り立つ。
   - Δ ≥ 1 は原文に明示されていないが、t′ > t と t′ ≤ t + Δ が両立するには要るので、暗に仮定されていると読める。`PartialSync` ではそれを `one_le` として明示した。
 
 #### ■ リーダー
@@ -945,7 +943,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 - **実装**
 
-  `Fair` は、どのプロセッサもいつかリーダーになること。
+  `Fair` は、どのプロセッサも、どの view 以降にもリーダーになる view を持つこと。
 
   ```lean
   def Fair (lead : View → Fin n) : Prop :=

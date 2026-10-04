@@ -3,8 +3,8 @@ import Minimmit.Model.Algo.Stage
 /-!
 # 正直者の局所状態の不変量
 
-Lemma 5.1・5.3 の核 `LocalInv`（S にある自分の票・nullify と view・notarised・nullified の関係）と、
-提案についての `PropInv`。各段で保たれることを示す。
+正直者の局所状態の不変量 `LocalInv`（S にある自分の票・nullify と view・notarised・nullified の関係）と、
+提案についての `PropInv`。各部分で保たれることを示す。
 -/
 
 namespace Minimmit
@@ -14,9 +14,9 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 namespace Algo
 
 /-! ### 正直者の局所状態の不変量
-Lemma 5.1・5.3 の核。S にある自分の票・nullify と、view・notarised・nullified の関係。 -/
+S にある自分の票・nullify と、view・notarised・nullified の関係。 -/
 
-/-- 全員へ送る途中でも保たれる部分 -/
+/-- `LocalInv` のうち、全員へ送る途中でも保たれる条件 -/
 structure PreInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop where
   /-- view は 1 以上。 -/
   view_pos : 1 ≤ p.view.val
@@ -34,7 +34,7 @@ structure PreInv (f : Nat) (i : Fin n) (p : Processor n Tx) : Prop where
   /-- 自分の現在の view の nullify が S にあれば nullified。 -/
   null_flag : Msg.nullify i p.view ∈ p.S → p.nullified = true
   /-- 自分の nullify(w) と、view w のブロック c への自分の票が両方 S にあるなら、
-      S は view w で c 以外への進捗のなさの証拠を含む（24〜28 行で送った）。 -/
+      `NoProgress f S w (some c)`。 -/
   null_vote : ∀ w c, Msg.nullify i w ∈ p.S → Msg.vote i c ∈ p.S → c.view = w →
     NoProgress f p.S w (some c)
 
@@ -188,8 +188,8 @@ theorem send_vote (h : PreInv f i p) {b : Block n Tx} (hb : b.view = p.view)
       exact absurd hw' hnn
     · exact (h.null_vote w c hw' hc hcw).mono (Processor.S_subset_send i p _ j)
 
-/-- notarised が none か、notarised のブロック以外への進捗のなさの証拠があれば、現在の
-    view の nullify を送っても保たれる。 -/
+/-- notarised が none か、notarised のブロックについての proof of no progress が S にあれば、
+    現在の view の nullify を送っても保たれる。 -/
 theorem send_nullify (h : PreInv f i p)
     (hH : p.notarised = none ∨ ∃ c₀, p.notarised = some c₀ ∧ NoProgress f p.S p.view (some c₀))
     (j : Fin n) : PreInv f i (p.send i (Msg.nullify i p.view) j) := by
@@ -409,7 +409,7 @@ theorem disseminateAll_of_mem (h : LocalInv f i p) {ms : List (Msg n Tx)} (hm : 
     exact ih (h.disseminate_of_mem (hm m (List.mem_cons_self ..))) fun m' hm' =>
       S_subset_disseminate_fst i p m (hm m' (List.mem_cons_of_mem _ hm'))
 
-/-! #### 各段 -/
+/-! #### 各部分 -/
 
 theorem forwardNew (h : LocalInv f i p) : LocalInv f i (forwardNew f i p).1 := by
   rw [forwardNew_eq]

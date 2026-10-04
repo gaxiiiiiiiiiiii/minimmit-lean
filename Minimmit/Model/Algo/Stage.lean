@@ -1,10 +1,10 @@
 import Minimmit.Model.Algo.Disseminate
 
 /-!
-# Algorithm 1 の段ごとの分解
+# Algorithm 1 の部分ごとの分解
 
-`Algo.step` を段（16〜21 行、5〜7 行、9〜11 行、13〜14 行、24〜28 行、2〜3 行）に分け、
-各段の入力状態 st1〜st5、動作列の畳み込み、各段の S と view。
+`Algo.step` を部分（16〜21 行、5〜7 行、9〜11 行、13〜14 行、24〜28 行、2〜3 行）に分け、
+各部分の入力状態 st1〜st5、動作列の畳み込み、各部分の S と view。
 -/
 
 namespace Minimmit
@@ -13,8 +13,8 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 
 namespace Algo
 
-/-! ### 段ごとの分解
-`Algo.step` の各段を名前付きの関数にする。本体は `Algo.step` と同じ。 -/
+/-! ### 部分ごとの分解
+`Algo.step` の各部分を名前付きの関数にする。本体は `Algo.step` と同じ。 -/
 
 /-- 2〜3 行で送るメッセージの列 -/
 noncomputable def forwardMsgs (f : Nat) (p : Processor n Tx) : List (Msg n Tx) :=
@@ -119,7 +119,7 @@ noncomputable def stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p :
 theorem step_eq_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     Algo.step f Δ lead i p = (stepPair f Δ lead i p).2 := rfl
 
-/-! ### 各段で、返す局所状態は返す動作の畳み込み -/
+/-! ### 各部分で、返す局所状態は返す動作の畳み込み -/
 
 theorem executeAll_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     p.executeAll i (forwardNew f i p).2 = (forwardNew f i p).1 := by
@@ -197,7 +197,7 @@ theorem executeAll_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pr
     executeAll_voteProposal, executeAll_nullifyTimeout, executeAll_climb,
     executeAll_nullifyNoProgress]
 
-/-! ### 各段の send は、その時点の局所状態のガードを通る -/
+/-! ### 各部分の send は、その時点の局所状態のガードを通る -/
 
 theorem guardOK_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor.GuardOK i p (forwardNew f i p).2 := by
@@ -285,7 +285,7 @@ theorem guardOK_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Proce
   · exact guardOK_nullifyNoProgress f i _
   · exact guardOK_forwardNew f i _
 
-/-! ### 各段で送るメッセージは、その段の後の S にある -/
+/-! ### 各部分で送るメッセージは、その部分の後の S にある -/
 
 theorem S_subset_disseminateAll_fst (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
     p.S ⊆ (disseminateAll i p ms).1.S := by
@@ -371,7 +371,7 @@ theorem S_subset_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     p.S ⊆ (forwardNew f i p).1.S := by
   rw [forwardNew_eq]; exact S_subset_disseminateAll_fst i p _
 
-/-! #### 送ったメッセージはその段の後の S にある -/
+/-! #### 送ったメッセージはその部分の後の S にある -/
 
 theorem mem_S_of_send_disseminate {i : Fin n} {p : Processor n Tx} {m m' : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (disseminate i p m').2) : m ∈ (disseminate i p m').1.S := by
@@ -464,13 +464,13 @@ theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · exact mem_S_of_send_forwardNew h
 
 
-/-! ### 段ごとの入力状態と、送信の出所 -/
+/-! ### 部分ごとの入力状態と、送信の出所 -/
 
 section Stages
 
 variable (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
 
-/-- 各段の入力となる局所状態: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
+/-- 各部分の入力となる局所状態: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
     st4 は 13〜14 行の後、st5 は 24〜28 行の後。最後に 2〜3 行が続く。 -/
 noncomputable def st1 : Processor n Tx := (climb f i (maxView p.S + 1) p).1
 noncomputable def st2 : Processor n Tx := (propose f lead i (st1 f i p)).1
@@ -497,7 +497,7 @@ theorem stepPair_snd' : (stepPair f Δ lead i p).2 =
 
 end Stages
 
-/-! #### 各段の view・S -/
+/-! #### 各部分の view・S -/
 
 theorem disseminate_view (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
     (disseminate i p m).1.view = p.view := by
@@ -581,7 +581,7 @@ theorem forwardNew_S (f : Nat) (i : Fin n) (p : Processor n Tx) : (forwardNew f 
       rw [ih _ (fun m' hm' => hS ▸ hq m' (List.mem_cons_of_mem _ hm')), hS]
   exact key _ p fun m hm => mem_S_of_mem_forwardMsgs hm
 
-/-- 各段の view、5〜7 行以降は変わらない -/
+/-- 各部分の view、5〜7 行以降は変わらない -/
 theorem st2_view (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (st2 f lead i p).view = (st1 f i p).view := propose_view f lead i _
 

@@ -1,9 +1,9 @@
 import Minimmit.Model.Algo.Climb
 
 /-!
-# 各段の S の中身と送信
+# 各部分の S の中身と送信
 
-各段の後の S にあるメッセージの出所、各段が送るメッセージとそのときの条件、
+各部分の後の S にあるメッセージの出所、各部分が送るメッセージとそのときの条件、
 票と nullify の出所（`vote_emission`・`nullify_after_vote`）。
 -/
 
@@ -28,7 +28,7 @@ theorem propose_nullified (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
   · rfl
 
 
-/-! #### 各段の後の S の中身 -/
+/-! #### 各部分の後の S の中身 -/
 
 theorem mem_S_forwardNew {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (forwardNew f i q).1.S) : m ∈ q.S := by
@@ -130,7 +130,7 @@ theorem mem_S_st4_nullify {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : 
     subst hw
     exact Or.inr hs
 
-/-- 動作を終えた後の S にあるメッセージは、前からあったか、このスロットの転送以外の段で
+/-- 動作を終えた後の S にあるメッセージは、前からあったか、このスロットの転送以外の部分で
     自分が送った自分の署名付きのメッセージ。 -/
 theorem mem_S_stage_or_sent (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
     {m : Msg n Tx} (h : m ∈ (st5 f Δ lead i p).S) :
@@ -152,7 +152,7 @@ theorem mem_S_stage_or (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
     {m : Msg n Tx} (h : m ∈ (st5 f Δ lead i p).S) : m ∈ p.S ∨ m.signer = some i :=
   (mem_S_stage_or_sent f Δ lead i p h).imp_right And.left
 
-/-! #### 各段が送るメッセージとそのときの条件 -/
+/-! #### 各部分が送るメッセージとそのときの条件 -/
 
 theorem send_forwardNew_mem {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (forwardNew f i p).2) : m ∈ p.S := by
@@ -294,8 +294,8 @@ theorem send_advanceOnce_eq {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg 
   · simp at h
   · exact send_advanceM_eq h
 
-/-- 登りで自分の票を出すなら、ある中間状態 q で 19〜21 行が出している。q は投票先の view に
-    いて未投票で、S は登る前の S に、それより前の view のブロックへの自分の票を足したもの。 -/
+/-- `climb` で自分の票を出すなら、ある中間状態 q で 19〜21 行が出している。q は投票先の view に
+    いて未投票で、S は`climb` の前の S に、それより前の view のブロックへの自分の票を足したもの。 -/
 theorem send_climb {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} {m : Msg n Tx}
     {j : Fin n} (hL : LocalInv f i p) (h : Action.send m j ∈ (climb f i fuel p).2) :
     ∃ b q, m = Msg.vote i b ∧ LocalInv f i q ∧ q.view = b.view ∧ MNotarised f q.S b
@@ -436,7 +436,7 @@ theorem localInv_st5 {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proce
     (h : LocalInv f i p) : LocalInv f i (st5 f Δ lead i p) :=
   (localInv_st4 (Δ := Δ) (lead := lead) h).nullifyNoProgress
 
-/-- 転送以外の段で自分の票を出す条件 -/
+/-- 転送以外の部分で自分の票を出す条件 -/
 theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) {b : Block n Tx} {j : Fin n}
     (hv : Action.send (Msg.vote i b) j ∈ innerActs f Δ lead i p) :
@@ -467,7 +467,7 @@ theorem vote_emission_core {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · obtain ⟨hm, _⟩ := send_nullifyTimeout_eq hv; cases hm
   · obtain ⟨hm, _⟩ := send_nullifyNoProgress_eq hv; cases hm
 
-/-- 自分の票の出所: S にあった（転送）か、19〜21 行か 9〜11 行で、その段の入力 q は現在の
+/-- 自分の票の出所: S にあった（転送）か、19〜21 行か 9〜11 行で、その部分の入力 q は現在の
     view が b の view で、notarised = none、nullified = false、S に M-notarisation か
     valid proposal がある。 -/
 theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
@@ -485,7 +485,7 @@ theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proc
     · exact Or.inr (vote_emission_core h hs)
 
 /-- 自分の nullify(b.view) を出し、b への自分の票が S にあるか同じスロットで出すなら、
-    nullify は 24〜28 行で、その段の入力 st4 には b 以外への進捗のなさの証拠がある。 -/
+    nullify は 24〜28 行で、その部分の入力 st4 には b 以外についての proof of no progress がある。 -/
 theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) {b : Block n Tx} {j j' : Fin n}
     (hb : Msg.vote i b ∈ p.S ∨ Action.send (Msg.vote i b) j ∈ Algo.step f Δ lead i p)
@@ -496,7 +496,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
       ∧ NoProgress f (st4 f Δ lead i p).S b.view (some b) := by
   have h3 : LocalInv f i (st3 f lead i p) := localInv_st3 h
   have h4 : LocalInv f i (st4 f Δ lead i p) := localInv_st4 h
-  -- 転送以外の段で票を出す場合の整理
+  -- 転送以外の部分で票を出す場合の整理
   have hcore : ∀ {j : Fin n}, Action.send (Msg.vote i b) j ∈ innerActs f Δ lead i p →
       b.view.val < (st1 f i p).view.val
       ∨ (Msg.vote i b ∈ (st3 f lead i p).S ∧ (st3 f lead i p).notarised = some b) := by
@@ -526,7 +526,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
       · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hb) with hm | ⟨_, _, hs⟩
         · exact Or.inl hm
         · exact Or.inr (hcore hs)
-  -- nullify の出所（転送なら転送以外の段に遡る）
+  -- nullify の出所（転送なら転送以外の部分に遡る）
   obtain ⟨j'', hn'⟩ : ∃ j, Action.send (Msg.nullify i b.view) j ∈ innerActs f Δ lead i p := by
     rw [step_eq_stepPair, stepPair_snd'] at hn
     rcases List.mem_append.mp hn with hn | hn

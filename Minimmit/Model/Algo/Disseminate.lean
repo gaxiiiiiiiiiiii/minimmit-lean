@@ -55,7 +55,7 @@ theorem mem_S_send_self (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
     m ∈ (p.send i m i).S := by
   cases m <;> simp [Processor.send]
 
-/-- 送ったメッセージは自分にも送るので、送った後の S にある。 -/
+/-- 送ったメッセージは、送った後の S にある。 -/
 theorem mem_S_disseminate_fst (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
     m ∈ (disseminate i p m).1.S := by
   rw [disseminate_fst]

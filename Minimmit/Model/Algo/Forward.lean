@@ -3,7 +3,7 @@ import Minimmit.Model.Algo.Send
 /-!
 # 転送と反応、SelectParent の補題
 
-新しい証明書の転送、timer と prevS の推移、13〜14 行と 24〜28 行の発火、
+新しい証明書の転送、timer と prevS の推移、13〜14 行と 24〜28 行が nullify を送る条件、
 SelectParent と valid proposal。
 -/
 
@@ -174,8 +174,7 @@ theorem stepPair_timer (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
 
 /-! #### SelectParent と valid proposal -/
 
-/-- 初期の S を含む S では、2f + 1 ≤ n なら SelectParent の返すブロックは M-notarised。候補が
-    無ければ genesis で、genesis は初期の S の票で M-notarised。 -/
+/-- 初期の S を含む S では、2f + 1 ≤ n なら SelectParent の返すブロックは M-notarised。 -/
 theorem selectParent_mnotarised {f : Nat} (hn : 2 * f + 1 ≤ n) {S : Finset (Msg n Tx)}
     (hS : genesisS n Tx ⊆ S) (v : View) : MNotarised f S (selectParent f S v) := by
   unfold selectParent

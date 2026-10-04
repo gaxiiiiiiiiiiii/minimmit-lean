@@ -6,10 +6,8 @@ import Mathlib.Data.Finset.Sort
 /-!
 # Algorithm 1
 
-局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。`step` の各段は
-Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`advanceM`・
-`nullifyNoProgress` として切り出してあり、`step` との一致は `step_eq_stepPair`。補題は段の
-名前で述べる。`step` が送るメッセージが遷移系の送信ガードを通ることは Timing の `Algo.send_guard`。
+局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。各部分を関数に
+切り出したものは Algo/Stage にある。
 -/
 
 namespace Minimmit
@@ -91,8 +89,8 @@ theorem containsBlock_of_mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v :
   simp only [mNotarisedAt, List.mem_filter] at h
   exact containsBlock_of_mem_votedBlocks h.1
 
-/-! ## 各段の部品
-`step` の評価順に並べる。13〜14 行と 24〜28 行は部品を持たず、`step` に直接書く。 -/
+/-! ## 各部分の部品
+`Algo.step` の評価順に並べる。13〜14 行と 24〜28 行は部品を持たず、`Algo.step` に直接書く。 -/
 
 /-! ### 16〜21 行 -/
 
@@ -136,8 +134,8 @@ noncomputable def climb (f : Nat) (i : Fin n) :
 /-! ### 5〜7 行（SelectParent と ProposeChild） -/
 
 /-- SelectParent(S, v)（§4）: M-notarisation を持つ view v 未満のブロックのうち、view が
-    最大のもの。票のあるブロックに候補が無ければ genesis。genesis は view 0 で、初期の S の
-    票により M-notarisation を持つ。同じ view に複数あれば `votedBlocks` の順で先のもの。 -/
+    最大のもの。票のあるブロックに候補が無ければ genesis。同じ view に複数あれば `votedBlocks`
+    の順で先のもの。 -/
 noncomputable def selectParent (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Block n Tx :=
   (((votedBlocks S).filter fun b => decide (b.view.val < v.val ∧ MNotarised f S b)).argmax
     fun b => b.view.val).getD .gen
@@ -151,7 +149,7 @@ noncomputable def payload (S : Finset (Msg n Tx)) (b : Block n Tx) : List Tx :=
 /-! ### 2〜3 行と §4 の取引転送 -/
 
 /-- S にある nullify(v) の署名者のうち、番号の小さい順に 2f + 1 人。論文の「辞書順最小の
-    nullification」の署名者。`Nullified f S v` ならちょうど 2f + 1 人。 -/
+    nullification」の署名者。 -/
 def leastNullifiers (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
   (((nullifiers S v).sort (· ≤ ·)).take (2 * f + 1)).toFinset
 
@@ -161,11 +159,8 @@ def leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin
   (((voters S b).sort (· ≤ ·)).take (2 * f + 1)).toFinset
 
 /-- 新しく受け取ったものを全員へ送る: nullification（2 行）、M-notarisation（3 行）、
-    取引（§4 本文）。「新しい」とは、S にあって prevS にないこと。スロットの最後に評価する
-    ので、このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
-    その証明書での view 前進は、16〜21 行をスロットの最初に評価するので次のスロット。
-    証明書は、署名者の番号が小さい順に 2f + 1 人分のメッセージを送る。論文の辞書順最小の組に
-    当たる。 -/
+    取引（§4 本文）。new とは、S にあって prevS にないこと。証明書は、署名者の番号が小さい順に
+    2f + 1 人分のメッセージを送る。 -/
 noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
   let nulls := (nullifyViews p.S).filter fun v =>

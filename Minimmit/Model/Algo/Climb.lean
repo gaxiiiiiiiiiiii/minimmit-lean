@@ -1,10 +1,10 @@
 import Minimmit.Model.Algo.LocalInv
 
 /-!
-# 登り（16〜21 行の繰り返し）の補題
+# `climb`（16〜21 行の繰り返し）の補題
 
-通過した view の証明書は登る前の S にある、証明書がある限り登る、燃料 maxView + 1 で止まる、
-登りの後の状態 st1 の性質。
+通過した view の証明書は`climb` の前の S にある、証明書がある限り進む、燃料 maxView + 1 で止まる、
+`climb` の後の状態 st1 の性質。
 -/
 
 namespace Minimmit
@@ -13,7 +13,7 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 
 namespace Algo
 
-/-! #### 登り: 16〜21 行の繰り返し -/
+/-! #### 16〜21 行の繰り返し -/
 
 omit [DecidableEq Tx] in
 theorem mem_nullifyViews {S : Finset (Msg n Tx)} {q : Fin n} {v : View} (h : Msg.nullify q v ∈ S) :
@@ -152,7 +152,7 @@ theorem view_le_climb (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
       omega
     · rw [climb_of_not i hc]
 
-/-- view が変わらなければ、登りは何もしていない。 -/
+/-- view が変わらなければ、`climb` は何もしていない。 -/
 theorem climb_eq_of_view {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx}
     (h : (climb f i fuel p).1.view = p.view) : climb f i fuel p = (p, []) := by
   cases fuel with
@@ -184,7 +184,7 @@ theorem climb_exhaust (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
       · exact Or.inr h
     · rw [climb_of_not i hc]; exact Or.inr hc
 
-/-! #### 各段の後の S にあるメッセージは、前からあったか自分の署名付き -/
+/-! #### 各部分の後の S にあるメッセージは、前からあったか自分の署名付き -/
 
 theorem mem_S_send_or_signer (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
     {m' : Msg n Tx} (h : m' ∈ (p.send i m j).S) : m' ∈ p.S ∨ m' = m := by
@@ -228,8 +228,8 @@ theorem mem_S_advanceOnce {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n 
   · exact Or.inl hm
   · exact mem_S_advanceM hm
 
-/-- 登りの後の S にあるメッセージは、前からあったか、登りで出した自分の票。票の view は
-    登りの後の view より小さい。 -/
+/-- `climb` の後の S にあるメッセージは、前からあったか、`climb` で出した自分の票。票の view は
+    `climb` の後の view より小さい。 -/
 theorem mem_S_climb {f : Nat} {i : Fin n} {fuel : Nat} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (climb f i fuel q).1.S) :
     m ∈ q.S ∨ ∃ b, m = Msg.vote i b ∧ b.view.val < (climb f i fuel q).1.view.val
@@ -272,7 +272,7 @@ theorem maxView_climb (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
       exact (ih _).trans (maxView_advanceOnce f i p)
     · rw [climb_of_not i hc]
 
-/-- 登りで通過した view の証明書は、登る前の S にある。 -/
+/-- `climb` で通過した view の証明書は、`climb` の前の S にある。 -/
 theorem climb_certs (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
     ∀ w : View, p.view.val ≤ w.val → w.val < (climb f i fuel p).1.view.val → HasCert f p.S w := by
   induction fuel generalizing p with
@@ -296,7 +296,7 @@ theorem climb_certs (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
     · rw [climb_of_not i hc] at h2
       exact absurd (lt_of_le_of_lt h1 h2) (lt_irrefl _)
 
-/-- v 未満の各 view の証明書があり、燃料が足りれば、登りは v 以上に達する。 -/
+/-- v 未満の各 view の証明書があり、燃料が足りれば、`climb` は v 以上に達する。 -/
 theorem climb_reaches (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) (v : View)
     (hcerts : ∀ w : View, p.view.val ≤ w.val → w.val < v.val → HasCert f p.S w)
     (hfuel : v.val ≤ p.view.val + fuel) : v.val ≤ (climb f i fuel p).1.view.val := by
@@ -314,7 +314,7 @@ theorem climb_reaches (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) (v
       · omega
     · exact le_trans (not_lt.mp hlt) (view_le_climb f i (fuel + 1) p)
 
-/-- 登りで view w を通過する中間状態 q: q の S は登る前の S に、w 未満の view への自分の票を
+/-- `climb` で view w を通過する中間状態 q: q の S は`climb` の前の S に、w 未満の view への自分の票を
     足したもので、w の証明書を持つ。 -/
 theorem climb_pass {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} (hL : LocalInv f i p)
     {w : View} (h1 : p.view.val ≤ w.val) (h2 : w.val < (climb f i fuel p).1.view.val) :
@@ -375,7 +375,7 @@ theorem advanceOnce_fields {f : Nat} (i : Fin n) {p : Processor n Tx} (hc : HasC
     · exact absurd hl (hc.resolve_left hN)
     · simp only; split_ifs <;> exact ⟨rfl, rfl, rfl, rfl⟩
 
-/-- 登りは何もしないか、timer を 0 にし proposed を false にする。 -/
+/-- `climb` は何もしないか、timer を 0 にし proposed を false にする。 -/
 theorem climb_eq_or (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
     climb f i fuel p = (p, [])
       ∨ ((climb f i fuel p).1.timer = 0 ∧ (climb f i fuel p).1.proposed = false) := by
@@ -398,7 +398,7 @@ theorem st1_eq_or (f : Nat) (i : Fin n) (p : Processor n Tx) :
   · left; show (climb f i (maxView p.S + 1) p).1 = p; rw [h]
   · exact Or.inr h
 
-/-! #### st1: 登りの後の状態 -/
+/-! #### st1: `climb` の後の状態 -/
 
 theorem view_le_st1 (f : Nat) (i : Fin n) (p : Processor n Tx) :
     p.view.val ≤ (st1 f i p).view.val :=
@@ -423,7 +423,7 @@ theorem view_lt_st1_of_hasCert {f : Nat} (i : Fin n) {p : Processor n Tx}
   show p.view.val < (climb f i (maxView p.S) (advanceOnce f i p).1).1.view.val
   omega
 
-/-- v 未満の各 view の証明書があれば、登りは v 以上に達する。 -/
+/-- v 未満の各 view の証明書があれば、`climb` は v 以上に達する。 -/
 theorem st1_reaches {f : Nat} (i : Fin n) {p : Processor n Tx} {v : View}
     (hcerts : ∀ w : View, p.view.val ≤ w.val → w.val < v.val → HasCert f p.S w) :
     v.val ≤ (st1 f i p).view.val := by
@@ -436,7 +436,7 @@ theorem st1_reaches {f : Nat} (i : Fin n) {p : Processor n Tx} {v : View}
     omega
   · omega
 
-/-- 登りの後は、現在の view の証明書がない。 -/
+/-- `climb` の後は、現在の view の証明書がない。 -/
 theorem st1_quiescent (f : Nat) (i : Fin n) (p : Processor n Tx) :
     ¬ HasCert f (st1 f i p).S (st1 f i p).view := by
   rcases climb_exhaust f i (maxView p.S + 1) p with h | h
@@ -447,7 +447,7 @@ theorem st1_quiescent (f : Nat) (i : Fin n) (p : Processor n Tx) :
     omega
   · exact h
 
-/-- 段を進めても S は減らない。 -/
+/-- 部分を進めても S は減らない。 -/
 theorem S_subset_st1 (f : Nat) (i : Fin n) (p : Processor n Tx) : p.S ⊆ (st1 f i p).S :=
   S_subset_climb f i _ p
 

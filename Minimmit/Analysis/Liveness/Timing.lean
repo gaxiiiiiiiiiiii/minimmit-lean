@@ -140,7 +140,7 @@ theorem prevS_stateAt_honest (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi
     (t : Nat) :
     ((State.stateAt s₀ instrs (t + 1)).procs i).prevS
       = (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t).procs i)).S := by
-  rw [prevS_stateAt, hh t i (hi t), Algo.executeAll_step, Algo.stepPair_S]
+  rw [prevS_stateAt, hh t i (hi t), Algo.executeAll_step_S]
 
 theorem prevS_zero (hinit : Init s₀) (i : Fin n) :
     ((State.stateAt s₀ instrs 0).procs i).prevS = ∅ := by
@@ -312,14 +312,16 @@ theorem viewAt_succ_eq (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Cor
     viewAt s₀ instrs i (t + 1) = (Algo.st1 f i ((State.stateAt s₀ instrs t).procs i)).view := by
   unfold viewAt
   rw [run_succ, (State.step_procs _ _ i).view, Processor.tick_view, hh t i (hi t),
-    Algo.executeAll_step, Algo.stepPair_view]
+    Algo.executeAll_step_view]
 
-theorem S_stepPair_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
+/-- 正直者がスロット t の動作を終えた時点の S は、スロット t + 1 の S に含まれる。 -/
+theorem S_executeAll_step_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) (t : Nat) :
-    (Algo.stepPair f Δ lead i ((State.stateAt s₀ instrs t).procs i)).1.S
+    (((State.stateAt s₀ instrs t).procs i).executeAll i
+        (Algo.step f Δ lead i ((State.stateAt s₀ instrs t).procs i))).S
       ⊆ ((State.stateAt s₀ instrs (t + 1)).procs i).S := by
   intro m hm
-  rw [← Algo.executeAll_step, ← hh t i (hi t)] at hm
+  rw [← hh t i (hi t)] at hm
   have h2 := (State.step_procs (State.stateAt s₀ instrs t) (instrs t) i).S
   rw [Processor.tick_S] at h2
   rw [run_succ]; exact h2 hm
@@ -327,8 +329,8 @@ theorem S_stepPair_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
 theorem S_st5_subset_succ (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     (t : Nat) :
     (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t).procs i)).S
-      ⊆ ((State.stateAt s₀ instrs (t + 1)).procs i).S :=
-  (Algo.S_st5_subset_stepPair f Δ lead i _).trans (S_stepPair_subset_succ hh hi t)
+      ⊆ ((State.stateAt s₀ instrs (t + 1)).procs i).S := by
+  rw [← Algo.executeAll_step_S]; exact S_executeAll_step_subset_succ hh hi t
 
 theorem Algo.hasCert_of_mnotarised {f : Nat} {S : Finset (Msg n Tx)} {b : Block n Tx}
     (h : MNotarised f S b) : Algo.HasCert f S b.view := by

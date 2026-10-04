@@ -388,7 +388,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 - `mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) : List (Block n Tx)`  
   S にある M-notarisation を持つ view v のブロックの列
 - `maxView (S : Finset (Msg n Tx)) : Nat`  
-  S にあるメッセージが言及する view の最大
+  S にあるメッセージが言及する view の最大、`climb` の停止性の尺度
 - `leastNullifiers (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n)`  
   nullify(v) の署名者のうち番号順の先頭 2f + 1 人、原文の「lexicographically least」
 - `leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin n)`  
@@ -410,7 +410,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 - **発動条件**
 
-  S に現在の view の証明書がある。
+  S に現在の view の証明書がある。`climb` は 16 行の条件と 19 行の条件を順に判定する。
 
   ```lean
   def HasCert (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Prop :=
@@ -421,46 +421,30 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 - **処理内容**
 
-  `advanceOnce` は 1 回分の前進で、nullification があれば進み、なければ M-notarisation のあるブロックに未投票なら票を入れてから進む。
-
-  ```lean
-  noncomputable def advanceOnce (f : Nat) (i : Fin n) (p : Processor n Tx) :
-      Processor n Tx × List (Action n Tx) :=
-    if Nullified f p.S p.view then (p.progress, [Action.progress])
-    else
-      match mNotarisedAt f p.S p.view with
-      | b :: _ =>
-        let r :=
-          if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
-          else (p, [])
-        (r.1.progress, r.2 ++ [Action.progress])
-      | [] => (p, [])
-  ```
+  16〜17 行は次の view へ進む。19〜21 行は、未投票で nullify も送っていなければ M-notarisation のあるブロックに投票してから、次の view へ進む。進んだら、新しい view で 16 行から繰り返す。
 
   - 19 行の「some b」は `mNotarisedAt` の先頭とする。論文の証明は b の選び方によらない。
 
 - **実装**
 
-  `climb` は、現在の view の証明書がある限り、`advanceOnce` を繰り返す。
-
   ```lean
-  noncomputable def climb (f : Nat) (i : Fin n) :
-      Nat → Processor n Tx → Processor n Tx × List (Action n Tx)
-    | 0, p => (p, [])
-    | fuel + 1, p =>
-      if HasCert f p.S p.view then
-        let r := advanceOnce f i p
-        let r' := climb f i fuel r.1
-        (r'.1, r.2 ++ r'.2)
-      else (p, [])
+  noncomputable def climb (f : Nat) (i : Fin n) (p : Processor n Tx) :
+      Processor n Tx × List (Action n Tx) :=
+    if Nullified f p.S p.view then
+      let r := climb f i p.progress
+      (r.1, Action.progress :: r.2)
+    else if hM : mNotarisedAt f p.S p.view ≠ [] then
+      let b := (mNotarisedAt f p.S p.view).head hM
+      let r :=
+        if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b) else (p, [])
+      let r' := climb f i r.1.progress
+      (r'.1, r.2 ++ Action.progress :: r'.2)
+    else (p, [])
+  termination_by maxView p.S + 1 - p.view.val
   ```
 
   - 原文は 16〜21 行を 1 スロットに 1 回評価するが、`climb` は証明書がある限り繰り返す。
-  - `climb` の fuel は論文にない引数で、Lean の停止性のために繰り返しの上限を与える。`Algo.step` は `maxView` + 1 を渡す。この上限で打ち切られないこと、すなわち `climb` の後に現在の view の証明書が残らないことは、別に証明してある。
-
-- **操作**
-
-  - `advanceM` : `advanceOnce` の 19〜21 行の側、証明で使う
+  - 停止性は、証明書のある view が S にあるメッセージの view を超えないことによる。
 
 #### ■ 提案
 
@@ -798,25 +782,22 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 - **実装**
 
-  各部分の関数を順に適用する。原文の順から、view の前進を先頭に、新しい証明書の転送を最後尾に動かした。
+  各部分の関数を順に適用し、動作の列を連結する。原文の順から、view の前進を先頭に、新しい証明書の転送を最後尾に動かした。
 
   ```lean
-  noncomputable def stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-      Processor n Tx × List (Action n Tx) :=
-    let r₁ := climb f i (maxView p.S + 1) p
+  noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+      List (Action n Tx) :=
+    let r₁ := climb f i p
     let r₂ := propose f lead i r₁.1
     let r₃ := voteProposal f lead i r₂.1
     let r₄ := nullifyTimeout Δ i r₃.1
     let r₅ := nullifyNoProgress f i r₄.1
     let r₆ := forwardNew f i r₅.1
-    (r₆.1, r₁.2 ++ r₂.2 ++ r₃.2 ++ r₄.2 ++ r₅.2 ++ r₆.2)
+    r₁.2 ++ r₂.2 ++ r₃.2 ++ r₄.2 ++ r₅.2 ++ r₆.2
   ```
 
+  - 各部分は、動作の列と、その動作を実行した後の局所状態の組を返す。局所状態は次の部分の入力になる。
   - フラグと view の更新はそれぞれ、`Processor.send` と `Processor.progress` の実行時になされる。
-
-- **操作**
-
-  - `Algo.step` : `stepPair` の動作の列だけを返す形
 
 ### 2.5 Minimmit
 
@@ -1484,30 +1465,6 @@ Minimmit の実行が存在することを示す。
   def canSend [DecidableEq Tx] (p : Processor n Tx) (i : Fin n) (m : Msg n Tx) : Prop :=
     (m.signer = some i ∨ m ∈ p.S) ∧ blockOK p.S i m.block
   ```
-
-### ■ step と stepPair の一致
-
-`step` と `stepPair` の動作の列が一致することを示す。
-
-- **実装**
-
-  ```lean
-  theorem step_eq_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-      Algo.step f Δ lead i p = (stepPair f Δ lead i p).2
-  ```
-
-### ■ view の前進の上限
-
-`climb` の上限が挙動を変えないことを示す。
-
-- **実装**
-
-  ```lean
-  theorem st1_quiescent (f : Nat) (i : Fin n) (p : Processor n Tx) :
-      ¬ HasCert f (st1 f i p).S (st1 f i p).view
-  ```
-
-  - `st1` は、`step` の view の前進を終えた時点の局所状態。上限に達する前に証明書が尽きるので、上限なしで繰り返した場合と同じ状態で止まる。
 
 ## 5. 対応の外
 

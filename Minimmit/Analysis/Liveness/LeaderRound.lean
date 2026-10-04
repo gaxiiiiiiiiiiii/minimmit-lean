@@ -168,7 +168,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
   rw [hact] at hj
   obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.vote r b) j'
       ∈ Algo.innerActs f Δ lead r ((State.stateAt s₀ instrs s).procs r) := by
-    rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+    rw [Algo.step_eq_innerActs] at hj
     rcases List.mem_append.mp hj with hj | hj
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
@@ -177,7 +177,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
         exact absurd (ih s' hs' r hr b hbv j'' hj'') (not_le.mpr (lt_trans hs' hlt))
       · exact ⟨j', hs'⟩
   have hsend : Action.send (Msg.vote r b) j' ∈ (instrs s).actions r := by
-    rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+    rw [hact, Algo.step_eq_innerActs]
     exact List.mem_append_left _ hj'
   simp only [Algo.innerActs, List.mem_append] at hj'
   rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
@@ -232,7 +232,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   rw [hact] at hj
   obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.nullify r v) j'
       ∈ Algo.innerActs f Δ lead r ((State.stateAt s₀ instrs s).procs r) := by
-    rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+    rw [Algo.step_eq_innerActs] at hj
     rcases List.mem_append.mp hj with hj | hj
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
@@ -280,7 +280,7 @@ theorem nullify_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
       exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' r hr c₀ hcv j₃ hj₃)
         (not_le.mpr (lt_trans hs' hlt))
     · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
-        rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+        rw [hact, Algo.step_eq_innerActs]
         exact List.mem_append_left _ hs''
       exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s r hr c₀ hcv j'' hsend) (not_le.mpr hlt)
 
@@ -408,7 +408,7 @@ theorem leader_proposes (j : Fin n) :
     Action.send (Msg.propose (leaderBlockAt f lead s₀ instrs v e)) j
       ∈ (instrs e).actions (lead v) := by
   obtain ⟨hview, hprop⟩ := leader_at_entry_of_no_cert hinit hh E.hlc E.hnc E.hev E.hstart
-  rw [hh e (lead v) (E.hlc e), Algo.step_eq_stepPair, Algo.stepPair_snd']
+  rw [hh e (lead v) (E.hlc e), Algo.step_eq_innerActs]
   apply List.mem_append_left
   simp only [Algo.innerActs, List.mem_append]
   left; left; left; right
@@ -539,7 +539,7 @@ theorem vote_or_flag_at {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT :
       ∧ (Algo.st2 f lead r ((State.stateAt s₀ instrs s).procs r)).notarised = none
       ∧ (Algo.st2 f lead r ((State.stateAt s₀ instrs s).procs r)).nullified = false
   · refine Or.inl ⟨r, ?_⟩
-    rw [hh s r (hr s), Algo.step_eq_stepPair, Algo.stepPair_snd']
+    rw [hh s r (hr s), Algo.step_eq_innerActs]
     apply List.mem_append_left
     simp only [Algo.innerActs, List.mem_append]
     left; left; right
@@ -589,7 +589,7 @@ theorem vote_unique_leaderBlock :
       b = leaderBlockAt f lead s₀ instrs v e := by
     intro j' hj'
     have hsend : Action.send (Msg.vote r b) j' ∈ (instrs s).actions r := by
-      rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+      rw [hact, Algo.step_eq_innerActs]
       exact List.mem_append_left _ hj'
     simp only [Algo.innerActs, List.mem_append] at hj'
     rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
@@ -619,7 +619,7 @@ theorem vote_unique_leaderBlock :
         (by rw [hbv, leaderBlockAt_view hinit hh R])
     · obtain ⟨hm, _⟩ := Algo.send_nullifyTimeout_eq hj'; cases hm
     · obtain ⟨hm, _⟩ := Algo.send_nullifyNoProgress_eq hj'; cases hm
-  rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+  rw [hact, Algo.step_eq_innerActs] at hj
   rcases List.mem_append.mp hj with hj | hj
   · exact hinner j hj
   · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
@@ -735,7 +735,7 @@ theorem no_nullify_v :
             (Msg.vote_ne_gen_vote (by rw [hcv]; exact R.hv))
           exact vote_unique_leaderBlock hinit hh hb R s' r hr c₀ hcv j₃ hj₃
         · have hsend : Action.send (Msg.vote r c₀) j'' ∈ (instrs s).actions r := by
-            rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+            rw [hact, Algo.step_eq_innerActs]
             exact List.mem_append_left _ hs''
           exact vote_unique_leaderBlock hinit hh hb R s r hr c₀ hcv j'' hsend
       rw [← hv4] at hnp
@@ -766,11 +766,11 @@ theorem no_nullify_v :
           · simp only [Msg.signer, Option.some.injEq] at hsig
             subst hsig
             have hsend : Action.send (Msg.vote w b'') j'' ∈ (instrs s).actions w := by
-              rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd']
+              rw [hact, Algo.step_eq_innerActs]
               exact List.mem_append_left _ hs''
             exact vote_unique_leaderBlock hinit hh hb R s w hwc b'' hb''v j'' hsend
         exact hne (by rw [hb''eq, hc₀eq])
-  rw [hact, Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+  rw [hact, Algo.step_eq_innerActs] at hj
   rcases List.mem_append.mp hj with hj | hj
   · exact hinner j hj
   · rcases Algo.mem_S_stage_or_sent f Δ lead r _ (Algo.send_forwardNew_mem hj)
@@ -786,11 +786,12 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
     ∃ s' ≤ s, ∃ j, Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v e)) j
       ∈ (instrs s').actions r := by
   rw [viewAt_succ_eq hh hr s] at hs2
-  obtain ⟨q, hLq, hqv, _, hcert, hnew, hqS, hqsend⟩ :=
+  obtain ⟨q, hLq, hqv, _, hcert, hnew, hqclimb, hqsend⟩ :=
     Algo.climb_pass (localInv_stateAt hinit hh hr s) hs1 hs2
-  have hqsucc : q.S ⊆ ((State.stateAt s₀ instrs (s + 1)).procs r).S :=
-    (Algo.S_subset_advanceOnce f r q).trans
-      (hqS.trans ((Algo.S_st1_subset_st5 f Δ lead r _).trans (S_st5_subset_succ hh hr s)))
+  have hqsucc : q.S ⊆ ((State.stateAt s₀ instrs (s + 1)).procs r).S := by
+    refine (Algo.S_subset_climb f r q).trans ?_
+    rw [hqclimb]
+    exact (Algo.S_st1_subset_st5 f Δ lead r _).trans (S_st5_subset_succ hh hr s)
   have hN : ¬ Nullified f q.S v := by
     intro hN
     have hcard := card_le_of_byz hb (nullifiers q.S v)
@@ -804,13 +805,13 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
     rw [hqv]; exact hcert.resolve_left hN
   rcases hnot : q.notarised with _ | c
   · rcases hnl : q.nullified with _ | _
-    · obtain ⟨b'', hb'', hsend⟩ := Algo.advanceOnce_vote_of r (by rw [hqv]; exact hN) hM hnot hnl
+    · obtain ⟨b'', hb'', hsend⟩ := Algo.climb_vote_of r (by rw [hqv]; exact hN) hM hnot hnl
       have hsend' : Action.send (Msg.vote r b'') r ∈ (instrs s).actions r := by
-        rw [hh s r (hr s), Algo.step_eq_stepPair, Algo.stepPair_snd']
+        rw [hh s r (hr s), Algo.step_eq_innerActs]
         apply List.mem_append_left
         simp only [Algo.innerActs, List.mem_append]
         left; left; left; left
-        exact hqsend _ _ hsend
+        exact hqsend _ hsend
       have hbv := (Algo.mem_mNotarisedAt hb'').1
       rw [hqv] at hbv
       have := vote_unique_leaderBlock hinit hh hb R s r hr b'' hbv r hsend'
@@ -835,11 +836,11 @@ theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT
       ∈ (instrs s').actions r := by
   have hL1 := Algo.localInv_st1 (localInv_stateAt hinit hh hr s)
   have hclimb_send : ∀ m j, Action.send m j
-      ∈ (Algo.climb f r (Algo.maxView ((State.stateAt s₀ instrs s).procs r).S + 1)
+      ∈ (Algo.climb f r
           ((State.stateAt s₀ instrs s).procs r)).2 →
       Action.send m j ∈ (instrs s).actions r := by
     intro m j hm
-    rw [hh s r (hr s), Algo.step_eq_stepPair, Algo.stepPair_snd']
+    rw [hh s r (hr s), Algo.step_eq_innerActs]
     apply List.mem_append_left
     simp only [Algo.innerActs, List.mem_append]
     left; left; left; left

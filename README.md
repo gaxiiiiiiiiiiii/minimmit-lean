@@ -40,11 +40,11 @@ Minimmit
 │   │   ├── Basic.lean          §4 の述語（M/L-notarisation、nullification、valid proposal、proof of no progress）
 │   │   └── Mono.lean           述語の単調性、投票者・nullify 送信者の集合
 │   ├── Algo
-│   │   ├── Basic.lean          Algorithm 1（Algo.step）と部品（SelectParent、ProposeChild、転送、16〜21 行の繰り返し）
+│   │   ├── Basic.lean          Algorithm 1（Algo.step）、各部分の関数（16〜21 行の climb、提案、投票、timeout、proof of no progress、転送）、補助関数
 │   │   ├── Disseminate.lean    全員への送信の補題
-│   │   ├── Stage.lean          Algo.step の部分ごとの分解、各部分の入力状態 st1〜st5、各部分の S と view
+│   │   ├── Stage.lean          各部分の入力状態 st1〜st5 と動作の列の分解、動作の畳み込み、送信のガード、各部分の S と view
 │   │   ├── LocalInv.lean       局所不変量（LocalInv・PropInv）と各部分での保存
-│   │   ├── Climb.lean          `climb`（16〜21 行の繰り返し）の補題
+│   │   ├── Climb.lean          `climb`（16〜21 行）の補題
 │   │   ├── Send.lean           各部分の S の中身、各部分が送るメッセージとその条件、票と nullify の出所
 │   │   └── Forward.lean        転送と反応の補題、SelectParent と valid proposal
 │   └── Constraint

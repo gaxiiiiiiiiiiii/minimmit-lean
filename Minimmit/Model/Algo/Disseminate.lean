@@ -16,31 +16,6 @@ namespace Algo
 
 /-! ### disseminate -/
 
-theorem disseminate_snd (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
-    (disseminate i p m).2 = (List.finRange n).map (Action.send m) := by
-  simp only [disseminate]
-  suffices h : ∀ (l : List (Fin n)) (p : Processor n Tx) (acc : List (Action n Tx)),
-      (l.foldl (fun (pa : Processor n Tx × List (Action n Tx)) j =>
-        (pa.1.send i m j, pa.2 ++ [Action.send m j])) (p, acc)).2 = acc ++ l.map (Action.send m) by
-    simpa using h (List.finRange n) p []
-  intro l
-  induction l with
-  | nil => simp
-  | cons j l ih => intro p acc; simp [ih]
-
-theorem disseminate_fst (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
-    (disseminate i p m).1 = (List.finRange n).foldl (fun p j => p.send i m j) p := by
-  simp only [disseminate]
-  suffices h : ∀ (l : List (Fin n)) (p : Processor n Tx) (acc : List (Action n Tx)),
-      (l.foldl (fun (pa : Processor n Tx × List (Action n Tx)) j =>
-        (pa.1.send i m j, pa.2 ++ [Action.send m j])) (p, acc)).1
-        = l.foldl (fun p j => p.send i m j) p by
-    exact h (List.finRange n) p []
-  intro l
-  induction l with
-  | nil => simp
-  | cons j l ih => intro p acc; simp [ih]
-
 theorem mem_disseminate_snd {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {a : Action n Tx} :
     a ∈ (disseminate i p m).2 ↔ ∃ j, a = Action.send m j := by
   simp [disseminate_snd, List.mem_finRange, eq_comm]

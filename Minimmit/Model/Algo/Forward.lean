@@ -68,7 +68,7 @@ theorem mem_forwardMsgs_tx {f : Nat} {p : Processor n Tx} {tr : Tx} (h : Msg.tx 
 theorem send_mem_step_of_mem_forwardMsgs {f Δ : Nat} {lead : View → Fin n} {i : Fin n}
     {p : Processor n Tx} {m : Msg n Tx} (h : m ∈ forwardMsgs f (st5 f Δ lead i p)) (j : Fin n) :
     Action.send m j ∈ Algo.step f Δ lead i p := by
-  rw [step_eq_stepPair, stepPair_snd']
+  rw [step_eq_innerActs]
   apply List.mem_append_right
   rw [forwardNew_eq]
   exact mem_disseminateAll_snd.mpr ⟨m, h, j, rfl⟩
@@ -158,19 +158,12 @@ theorem _root_.Minimmit.Processor.executeAll_prevS (i : Fin n) (p : Processor n 
 
 theorem st5_prevS (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (st5 f Δ lead i p).prevS = p.prevS := by
-  rw [← forwardNew_prevS f i, ← stepPair_fst, ← executeAll_step, Processor.executeAll_prevS]
+  rw [← forwardNew_prevS f i, ← executeAll_step, Processor.executeAll_prevS]
 
 /-- 5〜11 行は timer を変えない。 -/
 theorem st3_timer (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     (st3 f lead i p).timer = (st1 f i p).timer := by
   simp only [st3, st2]; rw [voteProposal_timer, propose_timer]
-
-/-- 5〜28 行と転送は timer を変えない。 -/
-theorem stepPair_timer (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (stepPair f Δ lead i p).1.timer = (st1 f i p).timer := by
-  rw [stepPair_fst, forwardNew_timer]
-  simp only [st5, st4]
-  rw [nullifyNoProgress_timer, nullifyTimeout_timer, st3_timer]
 
 /-! #### SelectParent と valid proposal -/
 
@@ -268,10 +261,6 @@ theorem nullifyNoProgress_fires {f : Nat} {i : Fin n} {q : Processor n Tx} {c : 
   unfold nullifyNoProgress
   rw [if_pos ⟨hnl, by rw [hnot]; exact Option.some_ne_none c, by rw [hnot]; exact hnp⟩]
   exact mem_S_disseminate_fst i q _
-
-theorem S_st5_subset_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (st5 f Δ lead i p).S ⊆ (stepPair f Δ lead i p).1.S := by
-  rw [stepPair_fst, forwardNew_S]
 
 end Algo
 

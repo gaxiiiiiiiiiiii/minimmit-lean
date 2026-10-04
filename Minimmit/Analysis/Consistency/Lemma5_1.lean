@@ -31,7 +31,7 @@ theorem one_le_view_of_sends (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
     (hg : b ≠ .gen) : 1 ≤ b.view.val := by
   obtain ⟨t, j, ht⟩ := hb.instructed hinit
   have hL := localInv_stateAt hinit hh hi t
-  rw [hh t i (hi t), Algo.step_eq_stepPair, Algo.stepPair_snd'] at ht
+  rw [hh t i (hi t), Algo.step_eq_innerActs] at ht
   rcases List.mem_append.mp ht with ht | ht
   · obtain ⟨q, hLq, hqv, _⟩ := Algo.vote_emission_core hL ht
     rw [← hqv]; exact hLq.view_pos

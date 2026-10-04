@@ -1,10 +1,10 @@
 import Minimmit.Model.Algo.Disseminate
 
 /-!
-# Algorithm 1 の部分ごとの分解
+# Algorithm 1 の各部分の補題
 
-`Algo.step` を部分（16〜21 行、5〜7 行、9〜11 行、13〜14 行、24〜28 行、2〜3 行）に分け、
-各部分の入力状態 st1〜st5、動作列の畳み込み、各部分の S と view。
+各部分の入力状態 st1〜st5 と動作の列の分解、各部分で返す局所状態が動作の列の畳み込みと一致すること、
+各部分の send がその時点の `canSend` を満たすこと、各部分で S が減らないこと、各部分の S と view。
 -/
 
 namespace Minimmit
@@ -13,8 +13,7 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 
 namespace Algo
 
-/-! ### 部分ごとの分解
-`Algo.step` の各部分を名前付きの関数にする。本体は `Algo.step` と同じ。 -/
+/-! ### 2〜3 行で送るメッセージ -/
 
 /-- 2〜3 行で送るメッセージの列 -/
 noncomputable def forwardMsgs (f : Nat) (p : Processor n Tx) : List (Msg n Tx) :=
@@ -56,68 +55,116 @@ theorem mem_S_of_mem_forwardMsgs {f : Nat} {p : Processor n Tx} {m : Msg n Tx}
   · exact (Finset.mem_filter.mp (leastVoters_subset f _ _ hq)).2
   · exact hm
 
-/-- 5〜7 行 -/
-noncomputable def propose (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  if lead p.view = i ∧ p.proposed = false then
-    let parent := selectParent f p.S p.view
-    disseminate i p (.propose (.node i p.view (payload p.S parent) parent))
-  else (p, [])
+/-! ### 部分ごとの入力状態と動作の列の分解 -/
 
-open Classical in
-/-- 9〜11 行 -/
-noncomputable def voteProposal (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  match proposals lead p.S p.view with
-  | [b] =>
-    if ValidProposal f lead p.S p.view b ∧ p.notarised = none ∧ p.nullified = false then
-      disseminate i p (.vote i b)
-    else (p, [])
-  | _ => (p, [])
+section Stages
 
-/-- 13〜14 行 -/
-def nullifyTimeout (Δ : Nat) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  if p.timer = 2 * Δ ∧ p.nullified = false ∧ p.notarised = none then
-    disseminate i p (.nullify i p.view)
-  else (p, [])
+variable (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
 
-/-- 19〜21 行、`advanceOnce` の現在の view の nullification がない側 -/
-noncomputable def advanceM (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  match mNotarisedAt f p.S p.view with
-  | b :: _ =>
-    let r :=
-      if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
-      else (p, [])
-    (r.1.progress, r.2 ++ [Action.progress])
-  | [] => (p, [])
+/-- 各部分の後の局所状態で、次の部分の入力: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
+    st4 は 13〜14 行の後、st5 は 24〜28 行の後。最後に 2〜3 行が続く。 -/
+noncomputable def st1 : Processor n Tx := (climb f i p).1
+noncomputable def st2 : Processor n Tx := (propose f lead i (st1 f i p)).1
+noncomputable def st3 : Processor n Tx := (voteProposal f lead i (st2 f lead i p)).1
+noncomputable def st4 : Processor n Tx := (nullifyTimeout Δ i (st3 f lead i p)).1
+noncomputable def st5 : Processor n Tx := (nullifyNoProgress f i (st4 f Δ lead i p)).1
 
-theorem advanceOnce_eq (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    advanceOnce f i p
-      = if Nullified f p.S p.view then (p.progress, [Action.progress]) else advanceM f i p := rfl
+/-- `Algo.step` の動作の列は、各部分の動作の列の連結。 -/
+theorem step_eq_parts : step f Δ lead i p =
+    (climb f i p).2 ++ (propose f lead i (st1 f i p)).2
+      ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
+      ++ (nullifyNoProgress f i (st4 f Δ lead i p)).2
+      ++ (forwardNew f i (st5 f Δ lead i p)).2 := rfl
 
-open Classical in
-/-- 24〜28 行 -/
-noncomputable def nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  if p.nullified = false ∧ p.notarised ≠ none ∧ NoProgress f p.S p.view p.notarised then
-    disseminate i p (.nullify i p.view)
-  else (p, [])
+/-- 2〜3 行の転送を除いた動作の列 -/
+noncomputable def innerActs : List (Action n Tx) :=
+  (climb f i p).2 ++ (propose f lead i (st1 f i p)).2
+    ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
+    ++ (nullifyNoProgress f i (st4 f Δ lead i p)).2
 
-/-- `Algo.step` と同じ計算で、最後の局所状態も返す。 -/
-noncomputable def stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    Processor n Tx × List (Action n Tx) :=
-  let r₁ := climb f i (maxView p.S + 1) p
-  let r₂ := propose f lead i r₁.1
-  let r₃ := voteProposal f lead i r₂.1
-  let r₄ := nullifyTimeout Δ i r₃.1
-  let r₅ := nullifyNoProgress f i r₄.1
-  let r₆ := forwardNew f i r₅.1
-  (r₆.1, r₁.2 ++ r₂.2 ++ r₃.2 ++ r₄.2 ++ r₅.2 ++ r₆.2)
+theorem step_eq_innerActs : step f Δ lead i p =
+    innerActs f Δ lead i p ++ (forwardNew f i (st5 f Δ lead i p)).2 := rfl
 
-theorem step_eq_stepPair (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    Algo.step f Δ lead i p = (stepPair f Δ lead i p).2 := rfl
+end Stages
+
+/-! ### 19〜21 行の投票
+`climb` の 19〜21 行で、投票するかしないかした直後の局所状態と動作の列。 -/
+
+theorem mem_S_of_send_disseminate {i : Fin n} {p : Processor n Tx} {m m' : Msg n Tx} {j : Fin n}
+    (h : Action.send m j ∈ (disseminate i p m').2) : m ∈ (disseminate i p m').1.S := by
+  obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
+  cases hm
+  exact mem_S_disseminate_fst i p _
+
+theorem ite_vote_view (i : Fin n) (p : Processor n Tx) (b : Block n Tx) :
+    (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1.view = p.view := by
+  split_ifs
+  · exact disseminate_view i p _
+  · rfl
+
+theorem ite_vote_progress_view (i : Fin n) (p : Processor n Tx) (b : Block n Tx) :
+    (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1.progress.view.val = p.view.val + 1 := by
+  show (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1.view.val + 1 = p.view.val + 1
+  rw [ite_vote_view]
+
+theorem S_subset_ite_vote (i : Fin n) (p : Processor n Tx) (b : Block n Tx) :
+    p.S ⊆ (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1.S := by
+  split_ifs
+  · exact S_subset_disseminate_fst i p _
+  · exact Finset.Subset.refl _
+
+theorem mem_S_ite_vote_or {i : Fin n} {p : Processor n Tx} {b : Block n Tx} {m : Msg n Tx}
+    (h : m ∈ (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1.S) :
+    m ∈ p.S ∨ (m = Msg.vote i b ∧ Action.send (Msg.vote i b) i
+      ∈ (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+        else (p, [])).2) := by
+  split_ifs at h ⊢
+  · exact (mem_S_disseminate_or i p _ h).imp_right fun h => ⟨h, mem_disseminate_snd.mpr ⟨i, rfl⟩⟩
+  · exact Or.inl h
+
+theorem send_ite_vote_eq {i : Fin n} {p : Processor n Tx} {b : Block n Tx} {m : Msg n Tx}
+    {j : Fin n}
+    (h : Action.send m j ∈ (if p.notarised = none ∧ p.nullified = false
+      then disseminate i p (.vote i b) else (p, [])).2) :
+    m = Msg.vote i b ∧ p.notarised = none ∧ p.nullified = false := by
+  split_ifs at h with hg
+  · obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
+    cases hm
+    exact ⟨rfl, hg⟩
+  · simp at h
+
+theorem mem_S_of_send_ite_vote {i : Fin n} {p : Processor n Tx} {b : Block n Tx} {m : Msg n Tx}
+    {j : Fin n}
+    (h : Action.send m j ∈ (if p.notarised = none ∧ p.nullified = false
+      then disseminate i p (.vote i b) else (p, [])).2) :
+    m ∈ (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1.S := by
+  split_ifs at h ⊢
+  · exact mem_S_of_send_disseminate h
+  · simp at h
+
+theorem executeAll_ite_vote {i : Fin n} {p : Processor n Tx} {b : Block n Tx}
+    (hb : containsBlock p.S b) :
+    p.executeAll i (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).2
+    = (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1 := by
+  split_ifs
+  · exact executeAll_disseminate (Processor.canSend_vote hb)
+  · rfl
+
+theorem guardOK_ite_vote {i : Fin n} {p : Processor n Tx} {b : Block n Tx}
+    (hb : containsBlock p.S b) :
+    Processor.GuardOK i p (if p.notarised = none ∧ p.nullified = false
+      then disseminate i p (.vote i b) else (p, [])).2 := by
+  split_ifs
+  · exact guardOK_disseminate (Processor.canSend_vote hb)
+  · trivial
 
 /-! ### 各部分で、返す局所状態は返す動作の畳み込み -/
 
@@ -153,34 +200,21 @@ theorem executeAll_nullifyTimeout (Δ : Nat) (i : Fin n) (p : Processor n Tx) :
   · exact executeAll_disseminate Processor.canSend_nullify
   · rfl
 
-theorem executeAll_advanceM (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    p.executeAll i (advanceM f i p).2 = (advanceM f i p).1 := by
-  unfold advanceM
-  rcases hl : mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
-  · rfl
-  · simp only [Processor.executeAll_append]
-    split_ifs
-    · have hb : b ∈ mNotarisedAt f p.S p.view := by rw [hl]; exact List.mem_cons_self ..
-      rw [executeAll_disseminate (Processor.canSend_vote (containsBlock_of_mem_mNotarisedAt hb))]
-      rfl
-    · rfl
-
-theorem executeAll_advanceOnce (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    p.executeAll i (advanceOnce f i p).2 = (advanceOnce f i p).1 := by
-  rw [advanceOnce_eq]
-  split_ifs
-  · rfl
-  · exact executeAll_advanceM f i p
-
-theorem executeAll_climb (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
-    p.executeAll i (climb f i fuel p).2 = (climb f i fuel p).1 := by
-  induction fuel generalizing p with
-  | zero => rfl
-  | succ fuel ih =>
-    simp only [climb]
-    split_ifs
-    · simp only [Processor.executeAll_append, executeAll_advanceOnce, ih]
-    · rfl
+theorem executeAll_climb (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    p.executeAll i (climb f i p).2 = (climb f i p).1 := by
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih
+    rw [climb_of_nullified i hN, Processor.executeAll_cons]
+    exact ih
+  · intro p hN hM ih
+    rw [climb_of_mnotarised i hN hM]
+    dsimp only
+    have hb := containsBlock_of_mem_mNotarisedAt (List.head_mem hM)
+    rw [Processor.executeAll_append, executeAll_ite_vote hb, Processor.executeAll_cons]
+    exact ih
+  · intro p hN hM
+    rw [climb_of_not i fun h => h.elim hN hM]
+    rfl
 
 theorem executeAll_nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
     p.executeAll i (nullifyNoProgress f i p).2 = (nullifyNoProgress f i p).1 := by
@@ -189,15 +223,14 @@ theorem executeAll_nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) 
   · exact executeAll_disseminate Processor.canSend_nullify
   · rfl
 
-/-- `Algo.step` の動作を畳み込んだ局所状態は、`stepPair` が返す局所状態。 -/
+/-- `Algo.step` の動作を畳み込んだ局所状態は、2〜3 行の後の局所状態。 -/
 theorem executeAll_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    p.executeAll i (Algo.step f Δ lead i p) = (stepPair f Δ lead i p).1 := by
-  rw [step_eq_stepPair]
-  simp only [stepPair, Processor.executeAll_append, executeAll_forwardNew, executeAll_propose,
-    executeAll_voteProposal, executeAll_nullifyTimeout, executeAll_climb,
+    p.executeAll i (step f Δ lead i p) = (forwardNew f i (st5 f Δ lead i p)).1 := by
+  simp only [step, st5, st4, st3, st2, st1, Processor.executeAll_append, executeAll_forwardNew,
+    executeAll_propose, executeAll_voteProposal, executeAll_nullifyTimeout, executeAll_climb,
     executeAll_nullifyNoProgress]
 
-/-! ### 各部分の send は、その時点の局所状態の`canSend` を満たす -/
+/-! ### 各部分の send は、その時点の局所状態の `canSend` を満たす -/
 
 theorem guardOK_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor.GuardOK i p (forwardNew f i p).2 := by
@@ -230,38 +263,22 @@ theorem guardOK_nullifyTimeout (Δ : Nat) (i : Fin n) (p : Processor n Tx) :
   · exact guardOK_disseminate Processor.canSend_nullify
   · trivial
 
-theorem guardOK_advanceM (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    Processor.GuardOK i p (advanceM f i p).2 := by
-  unfold advanceM
-  rcases hl : mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
-  · trivial
-  · simp only
-    split_ifs
-    · have hb : b ∈ mNotarisedAt f p.S p.view := by rw [hl]; exact List.mem_cons_self ..
-      have hc := Processor.canSend_vote (p := p) (i := i) (containsBlock_of_mem_mNotarisedAt hb)
-      refine Processor.GuardOK.append (guardOK_disseminate hc) ?_
-      rw [executeAll_disseminate hc]
-      exact Processor.GuardOK.progress_cons trivial
-    · exact Processor.GuardOK.progress_cons trivial
-
-theorem guardOK_advanceOnce (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    Processor.GuardOK i p (advanceOnce f i p).2 := by
-  rw [advanceOnce_eq]
-  split_ifs
-  · exact Processor.GuardOK.progress_cons trivial
-  · exact guardOK_advanceM f i p
-
-theorem guardOK_climb (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
-    Processor.GuardOK i p (climb f i fuel p).2 := by
-  induction fuel generalizing p with
-  | zero => trivial
-  | succ fuel ih =>
-    simp only [climb]
-    split_ifs
-    · refine Processor.GuardOK.append (guardOK_advanceOnce f i p) ?_
-      rw [executeAll_advanceOnce]
-      exact ih _
-    · trivial
+theorem guardOK_climb (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    Processor.GuardOK i p (climb f i p).2 := by
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih
+    rw [climb_of_nullified i hN]
+    exact Processor.GuardOK.progress_cons ih
+  · intro p hN hM ih
+    rw [climb_of_mnotarised i hN hM]
+    dsimp only
+    have hb := containsBlock_of_mem_mNotarisedAt (List.head_mem hM)
+    refine Processor.GuardOK.append (guardOK_ite_vote hb) ?_
+    rw [executeAll_ite_vote hb]
+    exact Processor.GuardOK.progress_cons ih
+  · intro p hN hM
+    rw [climb_of_not i fun h => h.elim hN hM]
+    trivial
 
 theorem guardOK_nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor.GuardOK i p (nullifyNoProgress f i p).2 := by
@@ -270,13 +287,12 @@ theorem guardOK_nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
   · exact guardOK_disseminate Processor.canSend_nullify
   · trivial
 
-/-- `Algo.step` の各 send は、その時点の局所状態の`canSend` を満たす。 -/
+/-- `Algo.step` の各 send は、その時点の局所状態の `canSend` を満たす。 -/
 theorem guardOK_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    Processor.GuardOK i p (Algo.step f Δ lead i p) := by
-  rw [step_eq_stepPair]
-  simp only [stepPair]
+    Processor.GuardOK i p (step f Δ lead i p) := by
+  simp only [step]
   refine Processor.GuardOK.append (Processor.GuardOK.append (Processor.GuardOK.append
-    (Processor.GuardOK.append (Processor.GuardOK.append (guardOK_climb f i _ p) ?_) ?_) ?_) ?_) ?_
+    (Processor.GuardOK.append (Processor.GuardOK.append (guardOK_climb f i p) ?_) ?_) ?_) ?_) ?_
     <;> simp only [Processor.executeAll_append, executeAll_climb, executeAll_propose,
       executeAll_voteProposal, executeAll_nullifyTimeout, executeAll_nullifyNoProgress]
   · exact guardOK_propose f lead i _
@@ -310,11 +326,6 @@ theorem mem_S_of_mem_disseminateAll_snd {i : Fin n} {p : Processor n Tx} {ms : L
       exact S_subset_foldl_send_fst i ms _ (mem_S_disseminate_fst i p _)
     · exact ih h
 
-theorem mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v : View} {b : Block n Tx}
-    (h : b ∈ mNotarisedAt f S v) : b.view = v ∧ MNotarised f S b := by
-  simp only [mNotarisedAt, List.mem_filter, decide_eq_true_eq] at h
-  exact h.2
-
 theorem S_subset_propose (f : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     p.S ⊆ (propose f lead i p).1.S := by
   unfold propose; split_ifs
@@ -337,29 +348,18 @@ theorem S_subset_nullifyTimeout (Δ : Nat) (i : Fin n) (p : Processor n Tx) :
   · exact S_subset_disseminate_fst i p _
   · exact Finset.Subset.refl _
 
-theorem S_subset_advanceM (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    p.S ⊆ (advanceM f i p).1.S := by
-  unfold advanceM
-  rcases mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
-  · exact Finset.Subset.refl _
-  · simp only; split_ifs
-    · exact S_subset_disseminate_fst i p _
-    · exact Finset.Subset.refl _
-
-theorem S_subset_advanceOnce (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    p.S ⊆ (advanceOnce f i p).1.S := by
-  rw [advanceOnce_eq]; split_ifs
-  · exact Finset.Subset.refl _
-  · exact S_subset_advanceM f i p
-
-theorem S_subset_climb (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
-    p.S ⊆ (climb f i fuel p).1.S := by
-  induction fuel generalizing p with
-  | zero => exact Finset.Subset.refl _
-  | succ fuel ih =>
-    simp only [climb]; split_ifs
-    · exact (S_subset_advanceOnce f i p).trans (ih _)
-    · exact Finset.Subset.refl _
+theorem S_subset_climb (f : Nat) (i : Fin n) (p : Processor n Tx) :
+    p.S ⊆ (climb f i p).1.S := by
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih
+    rw [climb_of_nullified i hN]
+    exact ih
+  · intro p hN hM ih
+    rw [climb_of_mnotarised i hN hM]
+    dsimp only
+    exact (S_subset_ite_vote i p _).trans ih
+  · intro p hN hM
+    rw [climb_of_not i fun h => h.elim hN hM]
 
 theorem S_subset_nullifyNoProgress (f : Nat) (i : Fin n) (p : Processor n Tx) :
     p.S ⊆ (nullifyNoProgress f i p).1.S := by
@@ -372,12 +372,6 @@ theorem S_subset_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
   rw [forwardNew_eq]; exact S_subset_disseminateAll_fst i p _
 
 /-! #### 送ったメッセージはその部分の後の S にある -/
-
-theorem mem_S_of_send_disseminate {i : Fin n} {p : Processor n Tx} {m m' : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ (disseminate i p m').2) : m ∈ (disseminate i p m').1.S := by
-  obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
-  cases hm
-  exact mem_S_disseminate_fst i p _
 
 theorem mem_S_of_send_forwardNew {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     {j : Fin n} (h : Action.send m j ∈ (forwardNew f i p).2) : m ∈ (forwardNew f i p).1.S := by
@@ -409,34 +403,24 @@ theorem mem_S_of_send_nullifyTimeout {Δ : Nat} {i : Fin n} {p : Processor n Tx}
   · exact mem_S_of_send_disseminate h
   · simp at h
 
-theorem mem_S_of_send_advanceM {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ (advanceM f i p).2) : m ∈ (advanceM f i p).1.S := by
-  unfold advanceM at h ⊢
-  generalize mNotarisedAt f p.S p.view = l at h ⊢
-  rcases l with _ | ⟨b, l⟩
-  · simp at h
-  · simp only [List.mem_append, List.mem_singleton, reduceCtorEq, or_false] at h
-    simp only
-    split_ifs at h ⊢
-    · exact mem_S_of_send_disseminate h
-    · simp at h
-
-theorem mem_S_of_send_advanceOnce {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ (advanceOnce f i p).2) : m ∈ (advanceOnce f i p).1.S := by
-  rw [advanceOnce_eq] at h ⊢; split_ifs at h ⊢
-  · simp at h
-  · exact mem_S_of_send_advanceM h
-
-theorem mem_S_of_send_climb {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ (climb f i fuel p).2) : m ∈ (climb f i fuel p).1.S := by
-  induction fuel generalizing p with
-  | zero => simp [climb] at h
-  | succ fuel ih =>
-    simp only [climb] at h ⊢; split_ifs at h ⊢
-    · rcases List.mem_append.mp h with h | h
-      · exact S_subset_climb f i fuel _ (mem_S_of_send_advanceOnce h)
-      · exact ih h
-    · simp at h
+theorem mem_S_of_send_climb {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    {j : Fin n} (h : Action.send m j ∈ (climb f i p).2) : m ∈ (climb f i p).1.S := by
+  revert h
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih h
+    rw [climb_of_nullified i hN] at h ⊢
+    simp only [List.mem_cons, reduceCtorEq, false_or] at h
+    exact ih h
+  · intro p hN hM ih h
+    rw [climb_of_mnotarised i hN hM] at h ⊢
+    dsimp only at h ⊢
+    rcases List.mem_append.mp h with h | h
+    · exact S_subset_climb f i _ (mem_S_of_send_ite_vote h)
+    · simp only [List.mem_cons, reduceCtorEq, false_or] at h
+      exact ih h
+  · intro p hN hM h
+    rw [climb_of_not i fun h => h.elim hN hM] at h
+    simp at h
 
 theorem mem_S_of_send_nullifyNoProgress {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     {j : Fin n} (h : Action.send m j ∈ (nullifyNoProgress f i p).2) :
@@ -447,10 +431,10 @@ theorem mem_S_of_send_nullifyNoProgress {f : Nat} {i : Fin n} {p : Processor n T
 
 /-- `Algo.step` が送るメッセージは、その動作をすべて実行した後の S にある。 -/
 theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
-    {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) :
-    m ∈ (stepPair f Δ lead i p).1.S := by
-  rw [step_eq_stepPair] at h
-  simp only [stepPair, List.mem_append] at h ⊢
+    {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ step f Δ lead i p) :
+    m ∈ (p.executeAll i (step f Δ lead i p)).S := by
+  rw [executeAll_step]
+  simp only [step, List.mem_append] at h
   rcases h with (((((h | h) | h) | h) | h) | h)
   · exact S_subset_forwardNew _ _ _ (S_subset_nullifyNoProgress _ _ _ (S_subset_nullifyTimeout _ _ _
       (S_subset_voteProposal _ _ _ _ (S_subset_propose _ _ _ _ (mem_S_of_send_climb h)))))
@@ -463,48 +447,7 @@ theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
   · exact S_subset_forwardNew _ _ _ (mem_S_of_send_nullifyNoProgress h)
   · exact mem_S_of_send_forwardNew h
 
-
-/-! ### 部分ごとの入力状態と動作の列の分解 -/
-
-section Stages
-
-variable (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
-
-/-- 各部分の後の局所状態で、次の部分の入力: st1 は 16〜21 行の後、st2 は 5〜7 行の後、st3 は 9〜11 行の後、
-    st4 は 13〜14 行の後、st5 は 24〜28 行の後。最後に 2〜3 行が続く。 -/
-noncomputable def st1 : Processor n Tx := (climb f i (maxView p.S + 1) p).1
-noncomputable def st2 : Processor n Tx := (propose f lead i (st1 f i p)).1
-noncomputable def st3 : Processor n Tx := (voteProposal f lead i (st2 f lead i p)).1
-noncomputable def st4 : Processor n Tx := (nullifyTimeout Δ i (st3 f lead i p)).1
-noncomputable def st5 : Processor n Tx := (nullifyNoProgress f i (st4 f Δ lead i p)).1
-
-theorem stepPair_snd : (stepPair f Δ lead i p).2 =
-    (climb f i (maxView p.S + 1) p).2 ++ (propose f lead i (st1 f i p)).2
-      ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
-      ++ (nullifyNoProgress f i (st4 f Δ lead i p)).2
-      ++ (forwardNew f i (st5 f Δ lead i p)).2 := rfl
-
-theorem stepPair_fst : (stepPair f Δ lead i p).1 = (forwardNew f i (st5 f Δ lead i p)).1 := rfl
-
-/-- 2〜3 行の転送を除いた動作の列 -/
-noncomputable def innerActs : List (Action n Tx) :=
-  (climb f i (maxView p.S + 1) p).2 ++ (propose f lead i (st1 f i p)).2
-    ++ (voteProposal f lead i (st2 f lead i p)).2 ++ (nullifyTimeout Δ i (st3 f lead i p)).2
-    ++ (nullifyNoProgress f i (st4 f Δ lead i p)).2
-
-theorem stepPair_snd' : (stepPair f Δ lead i p).2 =
-    innerActs f Δ lead i p ++ (forwardNew f i (st5 f Δ lead i p)).2 := rfl
-
-end Stages
-
 /-! #### 各部分の view・S -/
-
-theorem disseminate_view (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
-    (disseminate i p m).1.view = p.view := by
-  rw [disseminate_fst]
-  induction List.finRange n generalizing p with
-  | nil => rfl
-  | cons j l ih => rw [List.foldl_cons, ih, Processor.send_view]
 
 theorem disseminateAll_view (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
     (disseminateAll i p ms).1.view = p.view := by
@@ -544,16 +487,6 @@ theorem nullifyNoProgress_view (f : Nat) (i : Fin n) (p : Processor n Tx) :
   unfold nullifyNoProgress; split_ifs
   · exact disseminate_view i p _
   · rfl
-
-theorem advanceM_view (f : Nat) (i : Fin n) (p : Processor n Tx) :
-    (advanceM f i p).1.view = p.view ∨ (advanceM f i p).1.view.val = p.view.val + 1 := by
-  unfold advanceM
-  rcases mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
-  · exact Or.inl rfl
-  · simp only
-    split_ifs
-    · right; simp [Processor.progress, disseminate_view]
-    · right; simp [Processor.progress]
 
 theorem disseminate_S_of_mem (i : Fin n) (q : Processor n Tx) {m : Msg n Tx} (hm : m ∈ q.S) :
     (disseminate i q m).1.S = q.S := by
@@ -597,24 +530,15 @@ theorem st5_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor
     (st5 f Δ lead i p).view = (st1 f i p).view := by
   simp only [st5]; rw [nullifyNoProgress_view, st4_view]
 
-theorem stepPair_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
-    (stepPair f Δ lead i p).1.view = (st1 f i p).view := by
-  rw [stepPair_fst, forwardNew_view, st5_view]
+/-- `Algo.step` の動作を畳み込んだ局所状態の view は、16〜21 行の後の view。 -/
+theorem executeAll_step_view (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (p.executeAll i (step f Δ lead i p)).view = (st1 f i p).view := by
+  rw [executeAll_step, forwardNew_view, st5_view]
 
-theorem advanceM_eq_of_nil {f : Nat} {i : Fin n} {q : Processor n Tx}
-    (h : mNotarisedAt f q.S q.view = []) : (advanceM f i q).1 = q := by
-  unfold advanceM; rw [h]
-
-theorem advanceM_view_succ_of_ne_nil {f : Nat} {i : Fin n} {q : Processor n Tx}
-    (h : mNotarisedAt f q.S q.view ≠ []) : (advanceM f i q).1.view.val = q.view.val + 1 := by
-  unfold advanceM
-  generalize hl : mNotarisedAt f q.S q.view = l at h ⊢
-  rcases l with _ | ⟨b, l⟩
-  · exact absurd rfl h
-  · simp only
-    split_ifs
-    · simp [Processor.progress, disseminate_view]
-    · simp [Processor.progress]
+/-- `Algo.step` の動作を畳み込んだ局所状態の S は、24〜28 行の後の S。 -/
+theorem executeAll_step_S (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
+    (p.executeAll i (step f Δ lead i p)).S = (st5 f Δ lead i p).S := by
+  rw [executeAll_step, forwardNew_S]
 
 end Algo
 

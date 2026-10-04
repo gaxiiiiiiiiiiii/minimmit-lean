@@ -19,11 +19,11 @@ variable [DecidableEq Tx]
 
 /-! ### notarisation と nullification -/
 
-/-- b への票を S に持つ署名者 -/
+/-- S にある b への票の署名者の集合 -/
 def voters (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.vote q b ∈ S
 
-/-- nullify(v) を S に持つ署名者 -/
+/-- S にある nullify(v) の署名者の集合 -/
 def nullifiers (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n) :=
   Finset.univ.filter fun q => Msg.nullify q v ∈ S
 
@@ -94,7 +94,7 @@ instance (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Decidable (Nullified f S
 
 /-! ### valid proposal -/
 
-/-- S が view v の valid proposal b を含む（§4）。 -/
+/-- S が view v の valid proposal b を含む（§4） -/
 structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)) (v : View)
     (b : Block n Tx) : Prop where
   /-- (i) b は view v のブロック。 -/
@@ -114,9 +114,8 @@ structure ValidProposal (f : Nat) (lead : View → Fin n) (S : Finset (Msg n Tx)
 
 /-! ### proof of no progress -/
 
-/-- q が view v の proof of no progress に寄与する（Algorithm 1 の 24〜27 行）: nullify(v)
-    を送ったか、notarised 以外の view v のブロックに投票した。論文はこの条件に名前を
-    付けておらず、29 行の注釈 "proof of no progress" から名付けた。 -/
+/-- q が view v の proof of no progress に数えられる（Algorithm 1 の 24〜27 行）: q の nullify(v) か、
+    notarised 以外の view v のブロックへの q の票が S にある。 -/
 inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block n Tx))
     (q : Fin n) : Prop where
   /-- (i) nullify(v) が S にある。 -/
@@ -126,12 +125,12 @@ inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Opti
       (h : Msg.vote q b ∈ S) : NoProgressWitness S v notarised q
 
 open Classical in
-/-- view v の proof of no progress に寄与する署名者 -/
+/-- `NoProgressWitness` を満たすプロセッサの集合 -/
 noncomputable def noProgressWitnesses (S : Finset (Msg n Tx)) (v : View)
     (notarised : Option (Block n Tx)) : Finset (Fin n) :=
   Finset.univ.filter (NoProgressWitness S v notarised)
 
-/-- view v の proof of no progress が S にある（Algorithm 1 の 24〜27 行）: 寄与する署名者が
+/-- view v の proof of no progress が S にある（Algorithm 1 の 24〜27 行）: `noProgressWitnesses` が
     2f + 1 人以上。 -/
 def NoProgress (f : Nat) (S : Finset (Msg n Tx)) (v : View)
     (notarised : Option (Block n Tx)) : Prop :=
@@ -145,13 +144,13 @@ end
 variable [DecidableEq Tx]
 
 open Classical in
-/-- b への自分の票を送ったプロセッサ -/
+/-- b への自分の票を `Sends` するプロセッサの集合 -/
 noncomputable def voteSenders (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (b : Block n Tx) :
     Finset (Fin n) :=
   Finset.univ.filter fun q => Sends s₀ instrs q (.vote q b)
 
 open Classical in
-/-- nullify(v) を送ったプロセッサ -/
+/-- 自分の nullify(v) を `Sends` するプロセッサの集合 -/
 noncomputable def nullifySenders (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (v : View) :
     Finset (Fin n) :=
   Finset.univ.filter fun q => Sends s₀ instrs q (.nullify q v)

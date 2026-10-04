@@ -3,7 +3,7 @@ import Minimmit.Model.Certificate.Basic
 /-!
 # 証明書の補題
 
-S 上の述語は S について単調。
+S 上の述語の S についての単調性と、View・Block・Tr* の補題。
 -/
 
 namespace Minimmit
@@ -146,8 +146,7 @@ theorem Block.gen_ancestor (b : Block n Tx) : Block.Ancestor Block.gen b := by
   | node q v tr p ih => exact Block.Ancestor.parent q v tr p ih
 
 omit [DecidableEq Tx] in
-/-- view が v₁ 以上のブロックの祖先の鎖には、view が v₁ 以上で親の view が v₁ 未満の
-    ブロックがある。 -/
+/-- view が v₁ 以上のブロックの祖先には、view が v₁ 以上で親の view が v₁ 未満のものがある。 -/
 theorem Block.exists_crossing {b : Block n Tx} {v₁ : Nat} (h1 : 1 ≤ v₁) (hb : v₁ ≤ b.view.val) :
     ∃ q v tr p, Block.Ancestor (Block.node q v tr p) b ∧ v₁ ≤ v.val ∧ p.view.val < v₁ := by
   induction b with

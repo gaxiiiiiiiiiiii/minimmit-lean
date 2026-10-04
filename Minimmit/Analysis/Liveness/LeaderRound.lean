@@ -52,8 +52,8 @@ theorem hasCert_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     rw [← hbv]
     exact Algo.hasCert_of_mnotarised this
 
-/-- Lemma 5.6 の第 1 段: 最初の正直者が t に view v に入れば、正直者は全員
-    max(t, GST) + δ までに view v に入る。T₀ は t 以上で GST 以上の任意の時刻。 -/
+/-- Lemma 5.6 の最初の補題: 最初の正直者が t に view v に入れば、正直者は全員 max(t, GST) + δ
+    までに view v に入る。T₀ は t 以上で GST 以上の任意の時刻。 -/
 theorem enter_all_anchor (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs) {v : View} {t : Nat} (hfirst : FirstEntry s₀ instrs v t)
     {T₀ : Nat} (ht : t ≤ T₀) (hgst : GST.val ≤ T₀) {q : Fin n} (hq : Correct s₀ instrs q) :
@@ -145,9 +145,7 @@ theorem entry_slot (hinit : Init s₀) {r : Fin n} {v : View} (hv : 1 ≤ v.val)
     left; rw [hs']
     exact not_le.mp (Nat.find_min hreach (by rw [hs']; exact Nat.lt_succ_self s'))
 
-/-- lead(v) が view v に入るスロット e より前に、正直者は view v のブロックに投票しない。
-    e より前に投票するには lead(v) の署名付きの view v のブロックか、それへの正直者の票が
-    要るから。 -/
+/-- lead(v) が view v に入るスロット e より前に、正直者は view v のブロックに投票しない。 -/
 theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     {v : View} (hv : 1 ≤ v.val) (hlc : Correct s₀ instrs (lead v)) {e : Nat}
     (hemin : ∀ s' < e, (viewAt s₀ instrs (lead v) (s' + 1)).val < v.val) :
@@ -182,7 +180,7 @@ theorem vote_slot_ge (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) (hb
     exact List.mem_append_left _ hj'
   simp only [Algo.innerActs, List.mem_append] at hj'
   rcases hj' with ((((hj' | hj') | hj') | hj') | hj')
-  · -- 登り: 中間状態 q の S に b の M-notarisation。正直な投票者がそれより前に投票している
+  · -- `climb`: 中間状態 q の S に b の M-notarisation。正直な投票者がそれより前に投票している
     obtain ⟨b', q, hm, _, hqv, hM, _, _, _, _, hnew, _⟩ :=
       Algo.send_climb (localInv_stateAt hinit hh hr s) hj'
     injection hm with _ hbb
@@ -314,7 +312,7 @@ theorem no_cert_at_entry (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
       exact absurd (vote_slot_ge hinit hh hb hv hlc hemin s' q hqc b' hbv j hj) (not_le.mpr hs')
 
 /-- lead(v) が view v に入るスロット e の S に view v の証明書がなければ、lead(v) は e に
-    登りを view v で終え、まだ提案していない。 -/
+    `climb` を view v で終え、まだ提案していない。 -/
 theorem leader_at_entry_of_no_cert (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {v : View}
     (hlc : Correct s₀ instrs (lead v)) {e : Nat}
     (hnc : ¬ Algo.HasCert f ((State.stateAt s₀ instrs e).procs (lead v)).S v)
@@ -346,7 +344,7 @@ theorem leader_at_entry_of_no_cert (hinit : Init s₀) (hh : Honest f Δ lead s�
       rw [State.stateAt, hinit.procs]; rfl
   · exact h
 
-/-- lead(v) の入場の設定: view v ≥ 1 の lead(v) は正直で、最初の正直者が t に view v に入り、
+/-- lead(v) が view v に入る設定: view v ≥ 1 の lead(v) は正直で、最初の正直者が t に view v に入り、
     lead(v) 自身はスロット e に初めて view v 以上になり、e の S に view v の証明書はない。
     T₀ は t 以上で GST 以上の基準時刻で、e ≤ T₀ + δ。δ ≤ Δ は GST 後の実際の遅延の上界。 -/
 structure LeaderEntry (f Δ δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
@@ -364,7 +362,7 @@ structure LeaderEntry (f Δ δ : Nat) (lead : View → Fin n) (s₀ : State n Tx
   hstart : (viewAt s₀ instrs (lead v) e).val < v.val ∨ (e = 0 ∧ v.val = 1)
   hnc : ¬ Algo.HasCert f ((State.stateAt s₀ instrs e).procs (lead v)).S v
 
-/-- Lemma 5.6 の設定: `LeaderEntry` で最初の入場が t ≥ GST の場合。基準時刻は t。 -/
+/-- Lemma 5.6 の設定: `LeaderEntry` で、最初の正直者が view v に入るのが t ≥ GST の場合。基準時刻は t。 -/
 abbrev LeaderRound (f Δ δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) (GST : Time) (v : View) (t e : Nat) : Prop :=
   LeaderEntry f Δ δ lead s₀ instrs GST v t t e
@@ -494,7 +492,7 @@ theorem leader_valid_at {r : Fin n} {T : Nat} (hT : T₀ + 2 * δ ≤ T) :
 
 
 
-/-- T₀ + 2δ 以降のスロット s に登りを view v で終える正直者 r は、そのスロットで 9〜11 行により
+/-- T₀ + 2δ 以降のスロット s に `climb` を view v で終える正直者 r は、そのスロットで 9〜11 行により
     lead(v) のブロックに投票するか、既に投票しているか、既に nullify(v) を送っている。 -/
 theorem vote_or_flag_at {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : T₀ + 2 * δ ≤ s)
     (hst1v : (Algo.st1 f r ((State.stateAt s₀ instrs s).procs r)).view = v) :
@@ -629,8 +627,7 @@ theorem vote_unique_leaderBlock :
     · exact hinner j' hs'
 
 omit hb in
-/-- 正直者は timeout で nullify(v) を送らない: timeout の時点で lead(v) のブロックは valid
-    proposal として届いていて、9〜11 行が先に投票するから。 -/
+/-- 正直者は timeout で nullify(v) を送らない。 -/
 theorem no_timeout_nullify :
     ∀ s, ∀ r : Fin n, Correct s₀ instrs r → ∀ j,
       Action.send (Msg.nullify r v) j
@@ -828,7 +825,7 @@ theorem vote_at_pass {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat}
     refine ⟨s', Nat.lt_succ_iff.mp hs', j, ?_⟩
     rw [← this]; exact hj
 
-/-- t + 2δ 以降に登りを view v で終える正直者は、そのスロットで 9〜11 行により投票するか、
+/-- t + 2δ 以降に `climb` を view v で終える正直者は、そのスロットで 9〜11 行により投票するか、
     既に投票している。 -/
 theorem vote_at_climb_end {r : Fin n} (hr : Correct s₀ instrs r) {s : Nat} (hT : t + 2 * δ ≤ s)
     (hst1v : (Algo.st1 f r ((State.stateAt s₀ instrs s).procs r)).view = v) :

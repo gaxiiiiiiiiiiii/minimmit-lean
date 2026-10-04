@@ -3,9 +3,7 @@ import Minimmit.Analysis.Liveness.Timing
 /-!
 # Lemma 5.5（Progression through views）
 
-正直者はすべての view に入る。view k で止まる正直者がいれば、他の正直者も止まり、
-全員が timeout で投票か nullify を出し、進捗のなさの証拠から全員が nullify を出して
-nullification ができ、止まれない。
+`Enters`・`FirstEntry` の定義と、正直者がすべての view に入ること。
 -/
 
 namespace Minimmit
@@ -14,15 +12,14 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
   {instrs : Nat → Instr n Tx}
 
-/-- p_i がスロット t に view v にいる（§5 の "enters view v"）: スロット t の view は v 以下で、
-    スロット t + 1 の view は v 以上。view は 1 回の前進で 1 しか増えないので、その間に
-    view = v の時点がある。 -/
+/-- p_i がスロット t で view v に達する（§5 の "enters view v"）: スロット t の view は v 以下で、
+    スロット t + 1 の view は v 以上。1 スロットのうちに v を通り過ぎる場合も含む。 -/
 def Enters (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (v : View) (t : Nat) :
     Prop :=
   (viewAt s₀ instrs i t).val ≤ v.val ∧ v.val ≤ (viewAt s₀ instrs i (t + 1)).val
 
-/-- 「最初の正直者が view v に入るのはスロット t」: スロット t に view v にいる正直者がいて、
-    それより前のスロットにはいない。v = 1 なら t = 0。 -/
+/-- 正直者が最初に view v に達するスロットが t（§5 の "the first correct processor to enter
+    view v"）: スロット t に view v に達する正直者がいて、それより前のスロットにはいない。 -/
 structure FirstEntry (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (v : View) (t : Nat) :
     Prop where
   entered : ∃ i, Correct s₀ instrs i ∧ Enters s₀ instrs i v t
@@ -120,8 +117,7 @@ theorem FirstEntry.first_ge (hinit : Init s₀) {v : View} (hv : 1 ≤ v.val) {t
   exact (h.first r _ hr he).trans (Nat.find_min' hex ⟨i, hi, hle⟩)
 
 
-/-- 正直者 p_i が view k で止まり続けるなら、他の正直者も view k を越えない。越えたなら
-    その証明書が p_i に届いて p_i も進むから。 -/
+/-- 正直者 p_i が view k で止まり続けるなら、他の正直者も view k を越えない。 -/
 theorem stuck_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync Δ GST s₀ instrs)
     {i : Fin n} (hi : Correct s₀ instrs i) {k : Nat} (hk : 1 ≤ k)

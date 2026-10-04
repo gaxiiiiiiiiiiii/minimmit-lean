@@ -428,8 +428,8 @@ theorem timeout (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin
   · left
     exact ⟨b, (hL.notar_view b hnot).trans h4v, hsub (hL.notar_mem b hnot)⟩
 
-/-- 投票済みの正直者が、進捗のなさの証拠を持てば、次のスロットまでに nullify を送るか
-    view を進めている。 -/
+/-- 投票済みの正直者が proof of no progress を持てば、次のスロットまでに nullify を送るか view を
+    進めている。 -/
 theorem noprogress_reaction (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {v : View} {b : Block n Tx} (hv : viewAt s₀ instrs i t = v)
     (hb : ((State.stateAt s₀ instrs t).procs i).notarised = some b)

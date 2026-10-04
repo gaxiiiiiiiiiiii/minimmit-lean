@@ -15,7 +15,7 @@ variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx
   {instrs : Nat → Instr n Tx}
 
 /-- 正直者が初めて view w に入る時刻が T 以下で GST ≤ T なら、view w + k に初めて入る時刻は
-    T + k(2Δ + 3δ) 以下。各 view を Lemma 5.9 の一般形で離れる。 -/
+    T + k(2Δ + 3δ) 以下。 -/
 theorem first_entries_chain (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {w : Nat} (hw : 1 ≤ w)
@@ -46,11 +46,8 @@ theorem first_entries_chain (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     rw [Nat.add_mul, Nat.one_mul]
     omega
 
-/-- Lemma 5.10 の核: 取引 tr を正直者が初めて受け取るのが t ≥ GST なら、正直者は全員
-    t + f_a(2Δ + 3δ) + 8δ までに tr を finalise する。t + δ に進行中の最大の view v₀ を、
-    lead(v₀) が正直なら 5.8 の一般形で 4δ、そうでなければ 5.9 の一般形で 2Δ + 3δ で離れ、
-    以後は正直なリーダーの view v₁ まで f_a 個以下の view を 5.9 で通過し、v₁ で 5.8 により
-    finalise する。 -/
+/-- Lemma 5.10 の本体: 取引 tr を正直者が初めて受け取るのが t ≥ GST なら、正直者は全員
+    t + f_a(2Δ + 3δ) + 8δ までに tr を finalise する。 -/
 theorem tx_finalised_by (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {fa : Nat}
     (hlead : CorrectLeaderWithin s₀ instrs lead fa)

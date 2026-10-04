@@ -4,8 +4,7 @@ import Minimmit.Model.Constraint.Basic
 /-!
 # §5.3 の optimistic responsiveness
 
-論文の §5.3 の定義を、そのまま述語にする。プロトコルがこれを満たすことは
-`optimistic_responsiveness`。
+論文の §5.3 の latency と optimistically responsive の定義。
 -/
 
 namespace Minimmit

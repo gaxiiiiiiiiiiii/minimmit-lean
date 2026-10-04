@@ -6,8 +6,8 @@ import Minimmit.Analysis.Log
 /-!
 # Lemma 5.7（Liveness）
 
-正直者が受け取った取引は、いずれ誰もが finalise したブロックの Tr* に入る。log は finalise した
-どのブロックの Tr* も延長するので、§2 の Liveness が従う。
+正直者が受け取った取引がいずれ全員の finalise したブロックの Tr* に入ること（`tx_finalised`）と、
+§2 の Liveness（`liveness`）。
 -/
 
 namespace Minimmit

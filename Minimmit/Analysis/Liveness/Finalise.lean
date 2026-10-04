@@ -4,11 +4,9 @@ import Minimmit.Analysis.Liveness.Timing
 /-!
 # 確定と祖先の到着
 
-論文の finalise は、S に b の L-notarisation があり、b の全祖先を S が含むときに log を
-b.Tr* に伸ばす（§2、Algorithm 1 の 31〜32 行）。`Finalised` がその条件。b の L-notarisation の
-票は b を成分に持つが祖先は持たないので、祖先が S に入ることは別に示す。論文の Lemma 5.7・5.10
-の証明が「各祖先は M-notarisation を受けているので f + 1 人の正直者がその票を全員へ送って
-いる」と論じる部分に当たる。
+M-notarised なブロックの genesis でない各祖先には前にそれへの票を送った正直者がいること
+（`ancestor_vote_before`）と、全祖先が max(GST, s) + δ までに全員の S に入ること
+（`ancestors_delivered`）。
 -/
 
 namespace Minimmit
@@ -30,8 +28,7 @@ theorem Block.Ancestor.eq_or_parent {a b : Block n Tx} (h : Block.Ancestor a b) 
   | parent q v tr p hp => exact Or.inr ⟨p, rfl, hp⟩
 
 /-- スロット s の誰かの S に M-notarised なブロックの、genesis でない各祖先には、s より前に
-    それへの票を送った正直者がいる。b の最初の正直な票は valid proposal によるので、その
-    正直者の S に親の M-notarisation があり、親についても同じことが言える。 -/
+    それへの票を送った正直者がいる。 -/
 theorem ancestor_vote_before (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hb : ByzBound f s₀ instrs) :
     ∀ (b : Block n Tx) {i : Fin n} {s : Nat},

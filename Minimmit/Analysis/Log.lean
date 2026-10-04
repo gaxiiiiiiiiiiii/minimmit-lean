@@ -4,10 +4,7 @@ import Minimmit.Model.Constraint.Basic
 /-!
 # log と §2 の性質
 
-論文の log_i は finalise が書く変数で、その値は S から定まる: finalise したブロックのうち
-最も深いものの Tr*。log を S の関数として定義し、§2 の Consistency と Liveness を論文の
-文どおりに定義する。プロトコルがこれらを満たすことは `consistency` と
-`liveness`。
+log を S の関数として定義し、§2 の compatible・Consistency・Liveness を論文の文どおりに定義する。
 -/
 
 namespace Minimmit
@@ -16,7 +13,7 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f : Nat} {s₀ : State n Tx} {instrs : Nat → Instr n Tx}
 
 open Classical in
-/-- S で finalise したブロックの列 -/
+/-- 投票されたブロックのうち `Finalised` なものの列 -/
 noncomputable def finalisedBlocks (f : Nat) (S : Finset (Msg n Tx)) : List (Block n Tx) :=
   (Algo.votedBlocks S).filter fun b => decide (Finalised f S b)
 
@@ -45,7 +42,7 @@ theorem mem_finalisedBlocks {S : Finset (Msg n Tx)} {b : Block n Tx} :
     b ∈ finalisedBlocks f S ↔ b ∈ Algo.votedBlocks S ∧ Finalised f S b := by
   simp [finalisedBlocks]
 
-/-- finalise したブロックが祖先関係で鎖をなすなら、log はそのどれよりも深い finalise した
+/-- finalise したブロックのどの 2 つも一方が他方の祖先なら、log はそのどれよりも深い finalise した
     ブロックの Tr*。 -/
 theorem log_eq_of_finalised {S : Finset (Msg n Tx)}
     (hchain : ∀ b b', Finalised f S b → Finalised f S b' →

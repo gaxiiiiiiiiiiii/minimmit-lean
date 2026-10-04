@@ -13,7 +13,7 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
   {instrs : Nat → Instr n Tx}
 
-/-- Lemma 5.8 の核: 全正直者の票が t + 2δ までに出て t + 3δ までに届く。 -/
+/-- Lemma 5.8 の本体: 全正直者の票が t + 2δ までに出て t + 3δ までに届く。 -/
 theorem leaderBlock_lnotarised_by (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs)
     {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs GST v t e) {j : Fin n} :
@@ -33,8 +33,7 @@ theorem leaderBlock_lnotarised_by (hinit : Init s₀)
   rw [mem_voters]
   exact delivered hinit hh hs hrc hj'' (by omega) (by omega)
 
-/-- lead(v) のブロックは t + 3δ までに全正直者が finalise する: L-notarisation に加えて、
-    親の M-notarisation が t + 2δ までに全員に届いているので、祖先は t + 3δ までに届く。 -/
+/-- lead(v) のブロックは t + 3δ までに全正直者が finalise する。 -/
 theorem leaderBlock_finalised_by (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs)
     {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs GST v t e) {j : Fin n} :

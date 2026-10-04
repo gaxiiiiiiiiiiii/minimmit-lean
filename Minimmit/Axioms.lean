@@ -13,10 +13,10 @@ import Minimmit.Model.Constraint.Witness
 /-!
 # 主定理と依存公理
 
-§5 の Lemma 5.1〜5.10 の定理と、制約の充足可能性の定理を 1 か所に並べ、それぞれが依存する
-公理を `#guard_msgs` で固定する。依存公理が変わるか `sorry` が入ると、このファイルのビルドが
-失敗する。`propext`・`Classical.choice`・`Quot.sound` は Lean の標準ライブラリと Mathlib が
-使う公理。
+§5 の Lemma 5.1〜5.10 の定理と、Minimmit の実行の存在と輪番のリーダーの定理を 1 か所に並べ、
+それぞれが依存する公理を `#guard_msgs` で固定する。依存公理が変わるか `sorry` が入ると、この
+ファイルのビルドが失敗する。`propext`・`Classical.choice`・`Quot.sound` は Lean の標準ライブラリと
+Mathlib が使う公理。
 -/
 
 -- Lemma 5.1 One vote per view

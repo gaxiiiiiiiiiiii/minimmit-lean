@@ -4,9 +4,8 @@ import Minimmit.Analysis.Log
 /-!
 # Lemma 5.4（Consistency）
 
-M-notarisation を受けたブロックの親と祖先も M-notarisation を受けることから、
-L-notarisation を受けた 2 つのブロックは一方が他方の祖先。log はそのようなブロックの Tr* なので、
-§2 の Consistency が従う。
+M-notarisation を受けたブロックの祖先も M-notarisation を受けること、L-notarisation を受けた
+2 つのブロックは一方が他方の祖先であること（`receivesL_consistent`）、§2 の Consistency（`consistency`）。
 -/
 
 namespace Minimmit
@@ -27,7 +26,7 @@ theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   · obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hL)
     exact one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
 
-/-- 正直者の各段の S にあるメッセージは、その正直者が実行上で送ったものか、そのスロットの
+/-- 正直者の各部分の S にあるメッセージは、その正直者が実行上で送ったものか、そのスロットの
     自分の送信。 -/
 theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {m : Msg n Tx}
@@ -42,7 +41,7 @@ theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
     exact List.mem_append_left _ hj
 
 /-- M-notarisation を受けた genesis でないブロックには、9〜11 行で投票した正直者がいる。
-    その段の入力 st2 の S に valid proposal がある。 -/
+    その部分の入力 st2 の S に valid proposal がある。 -/
 theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hb : ByzBound f s₀ instrs) {b₂ : Block n Tx} (hg : b₂ ≠ .gen) (hM : ReceivesM f s₀ instrs b₂) :
     ∃ q t, Correct s₀ instrs q
@@ -72,7 +71,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
     exact hmin t' ht' w hw j' hj'
   have hact := hh (Nat.find hex) q (hqc _)
   rw [hact] at hj
-  -- 転送なら転送以外の段に遡る
+  -- 転送なら転送以外の部分に遡る
   obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.vote q b₂) j'
       ∈ Algo.innerActs f Δ lead q ((State.stateAt s₀ instrs (Nat.find hex)).procs q) := by
     rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj

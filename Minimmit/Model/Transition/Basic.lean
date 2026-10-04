@@ -304,8 +304,8 @@ def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   let s := instr.submits.foldl (fun s x => s.submit x.1 x.2) s
   instr.corrupts.foldl corrupt s
 
-/-- 実行: 初期状態 s₀ に指示の列 instrs を順に適用する。`instrs t` の deliveries と
-    submits はスロット t + 1 に届く。`stateAt s₀ instrs t` はスロット t の状態で、t に届いた
+/-- `stateAt s₀ instrs t` は、初期状態 s₀ にスロット t − 1 までの指示を順に適用して得られる
+    スロット t の状態。`instrs t` の deliveries と submits はスロット t + 1 に届く。t に届いた
     メッセージが S に入っていて、t の動作はまだしていない。 -/
 def stateAt [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
   | 0 => s₀

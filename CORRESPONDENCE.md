@@ -24,7 +24,7 @@ Lemma 5.1〜5.10 をすべて証明した。`sorry` はなく、主定理の依�
 
 論文は署名方式と PKI と衝突困難なハッシュ関数を使い、敵対者がそれらを破れない実行だけを考える。本形式化は暗号を持たず、同じ仮定を次の 3 つで表す。
 
-- ブロックと message への署名は、署名者の成分で表す。
+- ブロックとメッセージへの署名は、署名者の成分で表す。
 - 署名の偽造不能は、送信可能な条件として表す。
 - ハッシュによる親の参照は、親ブロックそのものを持つことで表す。
 
@@ -95,7 +95,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
         Block.Ancestor a p → Block.Ancestor a (.node q v tr p)
   ```
 
-#### ■ message
+#### ■ メッセージ
 
 - **原文**
 
@@ -157,7 +157,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
     prevS : Finset (Msg n Tx)
   ```
 
-  `containsBlock` は、S が b を成分に持つ message を含むこと。
+  `containsBlock` は、S が b を成分に持つメッセージを含むこと。
 
   ```lean
   def containsBlock [DecidableEq Tx] (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
@@ -269,7 +269,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
   - `procs` は n 個のプロセッサそれぞれの局所状態を並べる。原文は「We consider a set Π = {p_1, . . . , p_n} of n processors.」と番号を 1 から振るが、本形式化は `Fin n` で 0 から数える。
   - `byz` はこれまでに腐敗したプロセッサを集める。原文の「at most f processors may become corrupted by the adversary during the course of the execution」に当たり、腐敗は取り消せないので `byz` は増える一方になる。一度も `byz` に入らないプロセッサが、原文が correct と呼ぶプロセッサに当たる。
-  - `pool` は送られた packet の全体を持つ。原文の「Processors communicate by point-to-point authenticated channels.」の通信路に当たり、`Packet` は message に送信元 `src` と宛先 `dst` を添えて 1 対 1 の送信を表す。authenticated channel は受信者が送信元を知る通信路なので、packet は送信元を持つ。届いた packet も取り除かず `pool` に残す。
+  - `pool` は送られた packet の全体を持つ。原文の「Processors communicate by point-to-point authenticated channels.」の通信路に当たり、`Packet` はメッセージに送信元 `src` と宛先 `dst` を添えて 1 対 1 の送信を表す。authenticated channel は受信者が送信元を知る通信路なので、packet は送信元を持つ。届いた packet も取り除かず `pool` に残す。
   - `sentAt` は packet を送ったスロットを覚える。原文の「a message sent at time t must arrive at time t′ > t with t′ ≤ max{GST, t} + Δ」の t に当たり、受信の期限を測るのに使う。
   - `now` は現在のスロットを指す。原文の「the execution is divided into discrete timeslots t ∈ N≥0」の t に当たる。
 
@@ -277,7 +277,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
   - `State.update` : procs i を f で置き換える
   - `State.transmit` : pool に packet を加える
-  - `State.send` : message の送信、署名の偽造不能に当たる判定を含む
+  - `State.send` : メッセージの送信、署名の偽造不能に当たる判定を含む
   - `State.progress` : p_i に `Processor.progress` を適用
   - `State.deliver` : pool にある packet だけを宛先の S に入れる
   - `State.submit` : p_j の S に取引を入れる
@@ -287,7 +287,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 #### ■ 動作
 
-プロセッサの動作は、message を誰かへ送ることと、次の view へ進むことの 2 つからなる。
+プロセッサの動作は、メッセージを誰かへ送ることと、次の view へ進むことの 2 つからなる。
 
 - **実装**
 
@@ -333,7 +333,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```
 
   - プロセッサの動作、時刻の前進、packet の受信、新しい取引の投入、腐敗の順に適用する。論文ではスロット内の事象の順序を定めていない。本形式化ではこの順に固定する。この固定が挙動を狭めないことは未証明。
-  - この順序により、`instrs t` の動作で送る packet の sentAt は t になり、その message が宛先の S に入るのは早くてもスロット t + 1 になる。原文の「a message sent at time t must arrive at time t′ > t」はこれで満たされる。
+  - この順序により、`instrs t` の動作で送る packet の sentAt は t になり、そのメッセージが宛先の S に入るのは早くてもスロット t + 1 になる。原文の「a message sent at time t must arrive at time t′ > t」はこれで満たされる。
 
 #### ■ 実行
 
@@ -368,7 +368,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 - `mNotarisedAt (f : Nat) (S : Finset (Msg n Tx)) (v : View) : List (Block n Tx)`  
   S にある M-notarisation を持つ view v のブロックの列
 - `maxView (S : Finset (Msg n Tx)) : Nat`  
-  S にある message が言及する view の最大
+  S にあるメッセージが言及する view の最大
 - `leastNullifiers (f : Nat) (S : Finset (Msg n Tx)) (v : View) : Finset (Fin n)`  
   nullify(v) の署名者のうち番号順の先頭 2f + 1 人、原文の「lexicographically least」
 - `leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin n)`  
@@ -611,7 +611,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
   未 nullify で投票済みのとき、S に、nullify(v) か自分の投票先と違う view v のブロックへの票が 2f + 1 人分ある。S についての部分を 3 つの定義で表す。
 
-  `NoProgressWitness` は、プロセッサ q が (i) か (ii) の message を S に持つこと。
+  `NoProgressWitness` は、プロセッサ q が (i) か (ii) のメッセージを S に持つこと。
 
   ```lean
   inductive NoProgressWitness (S : Finset (Msg n Tx)) (v : View) (notarised : Option (Block n Tx))
@@ -686,7 +686,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 - **処理内容**
 
-  new な証明書を構成する message と新しい取引を集め、`disseminateAll` で全員へ送る。
+  new な証明書を構成するメッセージと新しい取引を集め、`disseminateAll` で全員へ送る。
 
 - **実装**
 
@@ -706,7 +706,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
   - `nulls` は、new な nullification の view の列。
   - `notas` は、new な M-notarisation を持つブロックの列。
-  - `ms` は送る message の列。`nulls` と `notas` の各証明書から署名者番号順に 2f + 1 人分の message を取り、新しい取引を加える。新しい取引も、S にあって prevS にないもの。
+  - `ms` は送るメッセージの列。`nulls` と `notas` の各証明書から署名者番号順に 2f + 1 人分のメッセージを取り、新しい取引を加える。新しい取引も、S にあって prevS にないもの。
   - 初期の S にある genesis の証明書は送らない。原文の定義では最初のスロットで new になるが、本形式化では prevS の初期値が S と同じなので new にならない。
   - L-notarisation は送らない。
 
@@ -836,7 +836,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
     now : s₀.now = ⟨0⟩
   ```
 
-  - b_gen とその M/L-notarisation は message の集合では持てないので、全員の genesis への票で表す。
+  - b_gen とその M/L-notarisation はメッセージの集合では持てないので、全員の genesis への票で表す。
   - `byz`・`pool`・`now` の条件は論文に明示されていないので、設定に合わせて補った。
 
 #### ■ 正直さ
@@ -1418,7 +1418,7 @@ Minimmit の実行が存在することを示す。
 
 #### ■ 送信のガード
 
-論文は署名を偽造できない敵対者を仮定する。本形式化には署名の操作がなく、message とブロックは署名者を成分として持つので、署名が偽造でないことは送信時に確かめる。偽造不能は仮定としては書けないので、その働きを 2 つに分けて確かめる。
+論文は署名を偽造できない敵対者を仮定する。本形式化には署名の操作がなく、メッセージとブロックは署名者を成分として持つので、署名が偽造でないことは送信時に確かめる。偽造不能は仮定としては書けないので、その働きを 2 つに分けて確かめる。
 
 - **原文**
 
@@ -1426,7 +1426,7 @@ Minimmit の実行が存在することを示す。
 
 - **偽造不能が成り立つこと**
 
-  message の署名の妥当性。
+  メッセージの署名の妥当性。
 
   ```lean
   theorem sends_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} {q : Fin n}

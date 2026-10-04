@@ -34,7 +34,7 @@ Minimmit
 ├── Axioms.lean             主定理の一覧と、依存公理の固定
 ├── Model
 │   ├── Transition
-│   │   ├── Basic.lean          状態、message、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.run
+│   │   ├── Basic.lean          状態、メッセージ、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.run
 │   │   └── Execute.lean        原始関数の局所効果、動作列の畳み込み、1 スロット後の状態との関係
 │   ├── Certificate
 │   │   ├── Basic.lean          §4 の述語（M/L-notarisation、nullification、valid proposal、proof of no progress）
@@ -45,7 +45,7 @@ Minimmit
 │   │   ├── Stage.lean          Algo.step の段ごとの分解、各段の入力状態 st1〜st5、各段の S と view
 │   │   ├── LocalInv.lean       局所不変量（LocalInv・PropInv）と各段での保存
 │   │   ├── Climb.lean          登り（16〜21 行の繰り返し）の補題
-│   │   ├── Send.lean           各段の S の中身、各段が送る message とその条件、票と nullify の出所
+│   │   ├── Send.lean           各段の S の中身、各段が送るメッセージとその条件、票と nullify の出所
 │   │   └── Forward.lean        転送と反応の補題、SelectParent と valid proposal
 │   └── Constraint
 │       ├── Basic.lean          Init、PartialSync、Correct、ByzBound、Fair、Honest、IsMinimmit

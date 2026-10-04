@@ -442,31 +442,30 @@ theorem nullifyTimeout (h : LocalInv f i p) (Δ : Nat) : LocalInv f i (nullifyTi
   · exact h.disseminate_nullify (Or.inl hg.2.2)
   · exact h
 
-theorem advanceM (h : LocalInv f i p) : LocalInv f i (advanceM f i p).1 := by
-  unfold Algo.advanceM
-  rcases hm : mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
+/-- 19〜21 行で、M-notarisation のあるブロックに投票するかしないかしても保たれる。 -/
+theorem ite_vote (h : LocalInv f i p) {b : Block n Tx} (hb : b ∈ mNotarisedAt f p.S p.view) :
+    LocalInv f i (if p.notarised = none ∧ p.nullified = false then disseminate i p (.vote i b)
+      else (p, [])).1 := by
+  split_ifs with hg
+  · refine h.disseminate_vote (mem_mNotarisedAt hb).1 (Or.inl hg.1) fun hw => ?_
+    have := h.null_flag hw
+    rw [hg.2] at this
+    cases this
   · exact h
-  · simp only
-    split_ifs with hg
-    · refine (h.disseminate_vote (mem_mNotarisedAt (hm ▸ List.mem_cons_self ..)).1
-        (Or.inl hg.1) fun hw => ?_).progress
-      have := h.null_flag hw
-      rw [hg.2] at this
-      cases this
-    · exact h.progress
 
-theorem advanceOnce (h : LocalInv f i p) : LocalInv f i (advanceOnce f i p).1 := by
-  rw [advanceOnce_eq]; split_ifs
-  · exact h.progress
-  · exact h.advanceM
-
-theorem climb (h : LocalInv f i p) (fuel : Nat) : LocalInv f i (climb f i fuel p).1 := by
-  induction fuel generalizing p with
-  | zero => exact h
-  | succ fuel ih =>
-    simp only [Algo.climb]; split_ifs
-    · exact ih h.advanceOnce
-    · exact h
+theorem climb (h : LocalInv f i p) : LocalInv f i (Algo.climb f i p).1 := by
+  revert h
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih h
+    rw [climb_of_nullified i hN]
+    exact ih h.progress
+  · intro p hN hM ih h
+    rw [climb_of_mnotarised i hN hM]
+    dsimp only
+    exact ih (h.ite_vote (List.head_mem hM)).progress
+  · intro p hN hM h
+    rw [climb_of_not i fun h => h.elim hN hM]
+    exact h
 
 theorem nullifyNoProgress (h : LocalInv f i p) : LocalInv f i (nullifyNoProgress f i p).1 := by
   unfold Algo.nullifyNoProgress
@@ -477,9 +476,10 @@ theorem nullifyNoProgress (h : LocalInv f i p) : LocalInv f i (nullifyNoProgress
   · exact h
 
 /-- Algorithm 1 の 1 スロット分の動作は不変量を保つ。 -/
-theorem stepPair (h : LocalInv f i p) (Δ : Nat) (lead : View → Fin n) :
-    LocalInv f i (stepPair f Δ lead i p).1 :=
-  (((((h.climb _).propose lead).voteProposal lead).nullifyTimeout Δ).nullifyNoProgress).forwardNew
+theorem step (h : LocalInv f i p) (Δ : Nat) (lead : View → Fin n) :
+    LocalInv f i (p.executeAll i (Algo.step f Δ lead i p)) := by
+  rw [executeAll_step]
+  exact ((((h.climb.propose lead).voteProposal lead).nullifyTimeout Δ).nullifyNoProgress).forwardNew
 
 end LocalInv
 
@@ -682,30 +682,29 @@ theorem nullifyTimeout (h : PropInv i p) (Δ : Nat) : PropInv i (nullifyTimeout 
   · exact h.disseminate (safe_of_block_none rfl)
   · exact h
 
-theorem advanceM (h : PropInv i p) : PropInv i (advanceM f i p).1 := by
-  unfold Algo.advanceM
-  rcases hl : mNotarisedAt f p.S p.view with _ | ⟨b, l⟩
+/-- 19〜21 行で、M-notarisation のあるブロックに投票するかしないかしても保たれる。 -/
+theorem ite_vote (h : PropInv i p) {b : Block n Tx} (hb : b ∈ mNotarisedAt f p.S p.view) :
+    PropInv i (if p.notarised = none ∧ p.nullified = false then Algo.disseminate i p (.vote i b)
+      else (p, [])).1 := by
+  split_ifs
+  · refine h.disseminate fun b'' hb'' _ => ?_
+    cases hb''
+    exact containsBlock_of_mem_mNotarisedAt hb
   · exact h
-  · simp only
-    split_ifs
-    · refine (h.disseminate fun b'' hb'' _ => ?_).progress
-      cases hb''
-      have hb : b ∈ mNotarisedAt f p.S p.view := by rw [hl]; exact List.mem_cons_self ..
-      exact containsBlock_of_mem_mNotarisedAt hb
-    · exact h.progress
 
-theorem advanceOnce (h : PropInv i p) : PropInv i (advanceOnce f i p).1 := by
-  rw [advanceOnce_eq]; split_ifs
-  · exact h.progress
-  · exact h.advanceM
-
-theorem climb (h : PropInv i p) (fuel : Nat) : PropInv i (climb f i fuel p).1 := by
-  induction fuel generalizing p with
-  | zero => exact h
-  | succ fuel ih =>
-    simp only [Algo.climb]; split_ifs
-    · exact ih h.advanceOnce
-    · exact h
+theorem climb (h : PropInv i p) : PropInv i (Algo.climb f i p).1 := by
+  revert h
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih h
+    rw [climb_of_nullified i hN]
+    exact ih h.progress
+  · intro p hN hM ih h
+    rw [climb_of_mnotarised i hN hM]
+    dsimp only
+    exact ih (h.ite_vote (List.head_mem hM)).progress
+  · intro p hN hM h
+    rw [climb_of_not i fun h => h.elim hN hM]
+    exact h
 
 theorem nullifyNoProgress (h : PropInv i p) : PropInv i (nullifyNoProgress f i p).1 := by
   unfold Algo.nullifyNoProgress
@@ -714,9 +713,10 @@ theorem nullifyNoProgress (h : PropInv i p) : PropInv i (nullifyNoProgress f i p
   · exact h
 
 /-- Algorithm 1 の 1 スロット分の動作は不変量を保つ。 -/
-theorem stepPair (h : PropInv i p) (Δ : Nat) (lead : View → Fin n) :
-    PropInv i (stepPair f Δ lead i p).1 :=
-  (((((h.climb _).propose lead).voteProposal lead).nullifyTimeout Δ).nullifyNoProgress).forwardNew
+theorem step (h : PropInv i p) (Δ : Nat) (lead : View → Fin n) :
+    PropInv i (p.executeAll i (Algo.step f Δ lead i p)) := by
+  rw [executeAll_step]
+  exact ((((h.climb.propose lead).voteProposal lead).nullifyTimeout Δ).nullifyNoProgress).forwardNew
 
 end PropInv
 

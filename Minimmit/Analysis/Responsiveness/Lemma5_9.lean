@@ -264,7 +264,7 @@ theorem leave_view_fast_anchor (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     rcases vote_or_flag_at hinit hh hs E hr (le_refl _) hst1v with ⟨j, hj⟩ | ⟨c, hc⟩ | hnl
     · refine Or.inl ⟨_, leaderBlockAt_view hinit hh E, ?_⟩
       rw [hh (T₀ + 2 * δ) r (hr _)] at hj
-      exact S_stepPair_subset_succ hh hr _ (Algo.mem_S_of_send_step hj)
+      exact S_executeAll_step_subset_succ hh hr _ (Algo.mem_S_of_send_step hj)
     · exact Or.inl ⟨c, (hL1.notar_view c hc).trans hst1v, hsub (hL1.notar_mem c hc)⟩
     · have hmem := hL1.null_mem hnl
       rw [hst1v] at hmem

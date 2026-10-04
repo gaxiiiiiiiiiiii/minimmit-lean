@@ -82,7 +82,7 @@ theorem mem_S_nullifyNoProgress {f : Nat} {i : Fin n} {q : Processor n Tx} {m : 
 theorem mem_S_st1 {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (st1 f i p).S) :
     m ∈ p.S ∨ ∃ b, m = Msg.vote i b ∧ b.view.val < (st1 f i p).view.val
-      ∧ ∃ j, Action.send (Msg.vote i b) j ∈ (climb f i (maxView p.S + 1) p).2 :=
+      ∧ ∃ j, Action.send (Msg.vote i b) j ∈ (climb f i p).2 :=
   mem_S_climb hm
 
 theorem mem_S_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
@@ -269,64 +269,51 @@ theorem send_nullifyTimeout_eq {Δ : Nat} {i : Fin n} {p : Processor n Tx} {m : 
     exact key _ p (List.ne_nil_of_mem (List.mem_finRange i)) rfl
   · simp at h
 
-theorem send_advanceM_eq {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ (advanceM f i p).2) :
-    ∃ b, m = Msg.vote i b ∧ b.view = p.view ∧ MNotarised f p.S b ∧ p.notarised = none
-      ∧ p.nullified = false ∧ (advanceM f i p).1.view.val = p.view.val + 1 := by
-  unfold advanceM at h ⊢
-  generalize hl : mNotarisedAt f p.S p.view = l at h ⊢
-  rcases l with _ | ⟨b, l⟩
-  · simp at h
-  · simp only [List.mem_append, List.mem_singleton, reduceCtorEq, or_false] at h
-    simp only
-    split_ifs at h ⊢ with hg
-    · obtain ⟨_, hm⟩ := mem_disseminate_snd.mp h
-      cases hm
-      have hb := mem_mNotarisedAt (hl ▸ List.mem_cons_self ..)
-      exact ⟨b, rfl, hb.1, hb.2, hg.1, hg.2, by simp [Processor.progress, disseminate_view]⟩
-    · simp at h
-
-theorem send_advanceOnce_eq {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ (advanceOnce f i p).2) :
-    ∃ b, m = Msg.vote i b ∧ b.view = p.view ∧ MNotarised f p.S b ∧ p.notarised = none
-      ∧ p.nullified = false ∧ (advanceOnce f i p).1.view.val = p.view.val + 1 := by
-  rw [advanceOnce_eq] at h ⊢; split_ifs at h ⊢
-  · simp at h
-  · exact send_advanceM_eq h
-
 /-- `climb` で自分の票を出すなら、ある中間状態 q で 19〜21 行が出している。q は投票先の view に
-    いて未投票で、S は`climb` の前の S に、それより前の view のブロックへの自分の票を足したもの。 -/
-theorem send_climb {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} {m : Msg n Tx}
-    {j : Fin n} (hL : LocalInv f i p) (h : Action.send m j ∈ (climb f i fuel p).2) :
+    いて未投票で、S は `climb` の前の S に、それより前の view のブロックへの自分の票を足したもの。 -/
+theorem send_climb {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
+    {j : Fin n} (hL : LocalInv f i p) (h : Action.send m j ∈ (climb f i p).2) :
     ∃ b q, m = Msg.vote i b ∧ LocalInv f i q ∧ q.view = b.view ∧ MNotarised f q.S b
       ∧ q.notarised = none ∧ q.nullified = false ∧ p.S ⊆ q.S ∧ p.view.val ≤ q.view.val
       ∧ (∀ m' ∈ q.S, m' ∈ p.S ∨ ∃ b', m' = Msg.vote i b' ∧ b'.view.val < q.view.val)
-      ∧ b.view.val < (climb f i fuel p).1.view.val := by
-  induction fuel generalizing p with
-  | zero => simp [climb] at h
-  | succ fuel ih =>
-    by_cases hc : HasCert f p.S p.view
-    · rw [climb_succ_of i hc] at h ⊢
-      have hv := advanceOnce_view_succ (f := f) i hc
-      have hle := view_le_climb f i fuel (advanceOnce f i p).1
-      rcases List.mem_append.mp h with h | h
-      · obtain ⟨b, rfl, hbv, hM, hnot, hnl, _⟩ := send_advanceOnce_eq h
-        refine ⟨b, p, rfl, hL, hbv.symm, hM, hnot, hnl, Finset.Subset.refl _, le_refl _,
-          fun m' hm' => Or.inl hm', ?_⟩
-        show b.view.val < (climb f i fuel (advanceOnce f i p).1).1.view.val
-        rw [hbv]; omega
-      · obtain ⟨b, q, rfl, hLq, hqv, hM, hnot, hnl, hsub, hpq, hnew, hlt⟩ := ih hL.advanceOnce h
-        refine ⟨b, q, rfl, hLq, hqv, hM, hnot, hnl, (S_subset_advanceOnce f i p).trans hsub,
-          by omega, ?_, hlt⟩
-        intro m' hm'
-        rcases hnew m' hm' with hm' | hm'
-        · rcases mem_S_advanceOnce hm' with hm' | ⟨b', rfl, hb', _⟩
-          · exact Or.inl hm'
-          · right
-            refine ⟨b', rfl, ?_⟩
-            rw [(mem_mNotarisedAt hb').1]; omega
-        · exact Or.inr hm'
-    · rw [climb_of_not i hc] at h; simp at h
+      ∧ b.view.val < (climb f i p).1.view.val := by
+  revert hL h
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih hL h
+    rw [climb_of_nullified i hN] at h ⊢
+    simp only [List.mem_cons, reduceCtorEq, false_or] at h
+    obtain ⟨b, q, rfl, hLq, hqv, hM, hnot, hnl, hsub, hpq, hnew, hlt⟩ := ih hL.progress h
+    exact ⟨b, q, rfl, hLq, hqv, hM, hnot, hnl, hsub, Nat.le_of_succ_le hpq, hnew, hlt⟩
+  · intro p hN hM ih hL h
+    rw [climb_of_mnotarised i hN hM] at h ⊢
+    dsimp only at ih h ⊢
+    have hb₀ := List.head_mem hM
+    generalize (mNotarisedAt f p.S p.view).head hM = b₀ at ih h hb₀ ⊢
+    have hv := ite_vote_progress_view i p b₀
+    have hle := view_le_climb f i (if p.notarised = none ∧ p.nullified = false
+      then disseminate i p (.vote i b₀) else (p, [])).1.progress
+    rcases List.mem_append.mp h with h | h
+    · obtain ⟨rfl, hnot, hnl⟩ := send_ite_vote_eq h
+      have hbv := (mem_mNotarisedAt hb₀).1
+      refine ⟨b₀, p, rfl, hL, hbv.symm, (mem_mNotarisedAt hb₀).2, hnot, hnl, Finset.Subset.refl _,
+        le_refl _, fun m' hm' => Or.inl hm', ?_⟩
+      rw [hbv]; omega
+    · simp only [List.mem_cons, reduceCtorEq, false_or] at h
+      obtain ⟨b, q, rfl, hLq, hqv, hM', hnot, hnl, hsub, hpq, hnew, hlt⟩ :=
+        ih (hL.ite_vote hb₀).progress h
+      refine ⟨b, q, rfl, hLq, hqv, hM', hnot, hnl, (S_subset_ite_vote i p b₀).trans hsub,
+        by omega, ?_, hlt⟩
+      intro m' hm'
+      rcases hnew m' hm' with hm' | hm'
+      · rcases mem_S_ite_vote_or hm' with hm' | ⟨rfl, _⟩
+        · exact Or.inl hm'
+        · right
+          refine ⟨b₀, rfl, ?_⟩
+          rw [(mem_mNotarisedAt hb₀).1]; omega
+      · exact Or.inr hm'
+  · intro p hN hM _ h
+    rw [climb_of_not i fun h => h.elim hN hM] at h
+    simp at h
 
 theorem send_nullifyNoProgress_eq {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     {j : Fin n} (h : Action.send m j ∈ (nullifyNoProgress f i p).2) :
@@ -340,44 +327,35 @@ theorem send_nullifyNoProgress_eq {f : Nat} {i : Fin n} {p : Processor n Tx} {m 
     exact ⟨rfl, hg.1, c₀, hc₀, by rw [← hc₀]; exact hg.2.2⟩
   · simp at h
 
-theorem send_all_advanceM {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ (advanceM f i p).2) (j' : Fin n) :
-    Action.send m j' ∈ (advanceM f i p).2 := by
-  unfold advanceM at h ⊢
-  generalize mNotarisedAt f p.S p.view = l at h ⊢
-  rcases l with _ | ⟨b, l⟩
-  · simp at h
-  · simp only [List.mem_append, List.mem_singleton, reduceCtorEq, or_false] at h ⊢
-    split_ifs at h ⊢
-    · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
-      exact mem_disseminate_snd.mpr ⟨j', rfl⟩
-    · simp at h
-
-theorem send_all_advanceOnce {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
-    (h : Action.send m j ∈ (advanceOnce f i p).2) (j' : Fin n) :
-    Action.send m j' ∈ (advanceOnce f i p).2 := by
-  rw [advanceOnce_eq] at h ⊢; split_ifs at h ⊢
-  · simp at h
-  · exact send_all_advanceM h j'
-
-theorem send_all_climb {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} {m : Msg n Tx}
-    {j : Fin n} (h : Action.send m j ∈ (climb f i fuel p).2) (j' : Fin n) :
-    Action.send m j' ∈ (climb f i fuel p).2 := by
-  induction fuel generalizing p with
-  | zero => simp [climb] at h
-  | succ fuel ih =>
-    by_cases hc : HasCert f p.S p.view
-    · rw [climb_succ_of i hc] at h ⊢
-      rcases List.mem_append.mp h with h | h
-      · exact List.mem_append_left _ (send_all_advanceOnce h j')
-      · exact List.mem_append_right _ (ih h)
-    · rw [climb_of_not i hc] at h; simp at h
+theorem send_all_climb {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
+    (h : Action.send m j ∈ (climb f i p).2) (j' : Fin n) :
+    Action.send m j' ∈ (climb f i p).2 := by
+  revert h
+  refine climb_induction f i ?_ ?_ ?_ p
+  · intro p hN ih h
+    rw [climb_of_nullified i hN] at h ⊢
+    simp only [List.mem_cons, reduceCtorEq, false_or] at h
+    exact List.mem_cons_of_mem _ (ih h)
+  · intro p hN hM ih h
+    rw [climb_of_mnotarised i hN hM] at h ⊢
+    dsimp only at ih h ⊢
+    rcases List.mem_append.mp h with h | h
+    · refine List.mem_append_left _ ?_
+      split_ifs at h ⊢
+      · obtain ⟨_, hmm⟩ := mem_disseminate_snd.mp h; cases hmm
+        exact mem_disseminate_snd.mpr ⟨j', rfl⟩
+      · simp at h
+    · simp only [List.mem_cons, reduceCtorEq, false_or] at h
+      exact List.mem_append_right _ (List.mem_cons_of_mem _ (ih h))
+  · intro p hN hM h
+    rw [climb_of_not i fun h => h.elim hN hM] at h
+    simp at h
 
 /-- 送るメッセージは全員へ送る。 -/
 theorem send_all {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) (j' : Fin n) :
     Action.send m j' ∈ Algo.step f Δ lead i p := by
-  rw [step_eq_stepPair, stepPair_snd] at h ⊢
+  rw [step_eq_parts] at h ⊢
   simp only [List.mem_append] at h ⊢
   rcases h with (((((h | h) | h) | h) | h) | h)
   · left; left; left; left; left
@@ -420,7 +398,7 @@ theorem send_all {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor
 /-! #### 票と nullify の出所 -/
 
 theorem localInv_st1 {f : Nat} {i : Fin n} {p : Processor n Tx} (h : LocalInv f i p) :
-    LocalInv f i (st1 f i p) := h.climb _
+    LocalInv f i (st1 f i p) := h.climb
 
 theorem localInv_st2 {f : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     (h : LocalInv f i p) : LocalInv f i (st2 f lead i p) := (localInv_st1 h).propose lead
@@ -477,7 +455,7 @@ theorem vote_emission {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Proc
       ∧ q.notarised = none ∧ q.nullified = false ∧ p.S ⊆ q.S
       ∧ (∀ m ∈ q.S, m ∈ p.S ∨ m.signer = some i)
       ∧ (ValidProposal f lead q.S q.view b ∨ MNotarised f q.S b) := by
-  rw [step_eq_stepPair, stepPair_snd'] at hv
+  rw [step_eq_innerActs] at hv
   rcases List.mem_append.mp hv with hv | hv
   · exact Or.inr (vote_emission_core h hv)
   · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hv) with hm | ⟨_, j', hs⟩
@@ -520,7 +498,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
       ∨ (Msg.vote i b ∈ (st3 f lead i p).S ∧ (st3 f lead i p).notarised = some b) := by
     rcases hb with hb | hb
     · exact Or.inl hb
-    · rw [step_eq_stepPair, stepPair_snd'] at hb
+    · rw [step_eq_innerActs] at hb
       rcases List.mem_append.mp hb with hb | hb
       · exact Or.inr (hcore hb)
       · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hb) with hm | ⟨_, _, hs⟩
@@ -528,7 +506,7 @@ theorem nullify_after_vote {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p :
         · exact Or.inr (hcore hs)
   -- nullify の出所（転送なら転送以外の部分に遡る）
   obtain ⟨j'', hn'⟩ : ∃ j, Action.send (Msg.nullify i b.view) j ∈ innerActs f Δ lead i p := by
-    rw [step_eq_stepPair, stepPair_snd'] at hn
+    rw [step_eq_innerActs] at hn
     rcases List.mem_append.mp hn with hn | hn
     · exact ⟨j', hn⟩
     · rcases mem_S_stage_or_sent f Δ lead i p (send_forwardNew_mem hn) with hm | ⟨_, j'', hs⟩

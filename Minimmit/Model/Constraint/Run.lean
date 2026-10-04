@@ -308,7 +308,7 @@ theorem mem_S_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi :
   have hact := hh t i (hi t)
   rw [hact] at h
   have hm := Algo.mem_S_of_send_step h
-  rw [← Algo.executeAll_step, ← hact] at hm
+  rw [← hact] at hm
   have hsub := (State.step_procs (State.stateAt s₀ instrs t) (instrs t) i).S
   rw [Processor.tick_S] at hsub
   exact hsub hm
@@ -331,7 +331,7 @@ theorem own_mem_act_of_mem_succ (hinit : Init s₀) (hh : Honest f Δ lead s₀ 
     rw [State.act_procs]
     exact Processor.S_subset_executeAll i _ _ (hsub hmem)
   · have hact := hh t' i (hi t')
-    rw [State.act_procs, hact, Algo.executeAll_step]
+    rw [State.act_procs, hact]
     rw [hact] at hj
     exact Algo.mem_S_of_send_step hj
 
@@ -356,7 +356,7 @@ theorem own_containsBlock_act_of_succ (hinit : Init s₀) (hh : Honest f Δ lead
     rw [State.act_procs]
     exact Processor.S_subset_executeAll i _ _ (hsub hmem)
   · have hact := hh t' i (hi t')
-    rw [State.act_procs, hact, Algo.executeAll_step]
+    rw [State.act_procs, hact]
     rw [hact] at hj
     exact Algo.mem_S_of_send_step hj
 
@@ -380,8 +380,8 @@ theorem localInv_step (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i
   have hact := hh t i (hi t)
   have hloc : Algo.LocalInv f i ((((State.stateAt s₀ instrs t).procs i).executeAll i
       ((instrs t).actions i)).tick) := by
-    rw [hact, Algo.executeAll_step]
-    exact (h.stepPair Δ lead).tick
+    rw [hact]
+    exact (h.step Δ lead).tick
   refine hloc.of_sgrows (State.step_procs _ _ i) (fun c hc => ?_) (fun w hw => ?_)
   · rw [Processor.tick_S, ← State.act_procs]; exact own_mem_act_of_mem_succ hinit hh hi rfl hc
   · rw [Processor.tick_S, ← State.act_procs]; exact own_mem_act_of_mem_succ hinit hh hi rfl hw
@@ -409,8 +409,8 @@ theorem propInv_step (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
   have hact := hh t i (hi t)
   have hloc : Algo.PropInv i ((((State.stateAt s₀ instrs t).procs i).executeAll i
       ((instrs t).actions i)).tick) := by
-    rw [hact, Algo.executeAll_step]
-    exact (h.stepPair (f := f) Δ lead).tick
+    rw [hact]
+    exact (h.step (f := f) Δ lead).tick
   refine hloc.of_sgrows (State.step_procs _ _ i) fun b ⟨hs, hb⟩ => ⟨hs, ?_⟩
   rw [Processor.tick_S, ← State.act_procs]; exact own_containsBlock_act_of_succ hinit hh hi hs hb
 
@@ -428,7 +428,7 @@ theorem send_propose_leaderBlock (hinit : Init s₀) (hh : Honest f Δ lead s₀
     b = Algo.leaderBlock f i (Algo.st1 f i ((State.stateAt s₀ instrs t).procs i))
       ∧ lead (Algo.st1 f i ((State.stateAt s₀ instrs t).procs i)).view = i
       ∧ (Algo.st1 f i ((State.stateAt s₀ instrs t).procs i)).proposed = false := by
-  rw [hh t i (hi t), Algo.step_eq_stepPair, Algo.stepPair_snd] at h
+  rw [hh t i (hi t), Algo.step_eq_parts] at h
   simp only [List.mem_append] at h
   rcases h with (((((h | h) | h) | h) | h) | h)
   · obtain ⟨_, _, hm, _⟩ := Algo.send_climb (localInv_stateAt hinit hh hi t) h

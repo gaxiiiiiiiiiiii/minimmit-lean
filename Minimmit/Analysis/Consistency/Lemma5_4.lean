@@ -37,7 +37,7 @@ theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
   · rw [hs] at hw
     obtain rfl := Option.some.inj hw
     refine sends_of_send hinit hh hqc (t := t) (j := j) ?_
-    rw [hh t q (hqc t), Algo.step_eq_stepPair, Algo.stepPair_snd']
+    rw [hh t q (hqc t), Algo.step_eq_innerActs]
     exact List.mem_append_left _ hj
 
 /-- M-notarisation を受けた genesis でないブロックには、9〜11 行で投票した正直者がいる。
@@ -74,7 +74,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
   -- 転送なら転送以外の部分に遡る
   obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.vote q b₂) j'
       ∈ Algo.innerActs f Δ lead q ((State.stateAt s₀ instrs (Nat.find hex)).procs q) := by
-    rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
+    rw [Algo.step_eq_innerActs] at hj
     rcases List.mem_append.mp hj with hj | hj
     · exact ⟨j, hj⟩
     · rcases Algo.mem_S_stage_or_sent f Δ lead q _ (Algo.send_forwardNew_mem hj)

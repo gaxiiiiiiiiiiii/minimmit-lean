@@ -3,7 +3,7 @@ import Minimmit.Model.Constraint.Run
 /-!
 # 時間についての補題
 
-view は減らない、timer は現在の view に入ってからのスロット数、正直者が送った message は
+view は減らない、timer は現在の view に入ってからのスロット数、正直者が送ったメッセージは
 部分同期の期限までに全員の S に入る、新しい証明書は転送されて全員に届く、証明書を持つ
 正直者は次のスロットで view を進める。
 -/
@@ -116,7 +116,7 @@ theorem PartialSync.mono {δ Δ : Nat} (hs : PartialSync δ GST s₀ instrs) (h�
 
 /-! ### 正直者の送信は届く -/
 
-/-- 正直者 p_i がスロット t に j へ送った message は、t + 1 以降で期限 max(GST, t) + δ に
+/-- 正直者 p_i がスロット t に j へ送ったメッセージは、t + 1 以降で期限 max(GST, t) + δ に
     達したスロットの p_j の S にある。 -/
 theorem delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs)

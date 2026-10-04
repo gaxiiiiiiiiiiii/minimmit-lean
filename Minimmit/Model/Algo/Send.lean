@@ -3,7 +3,7 @@ import Minimmit.Model.Algo.Climb
 /-!
 # 各段の S の中身と送信
 
-各段の後の S にある message の出所、各段が送る message とそのときの条件、
+各段の後の S にあるメッセージの出所、各段が送るメッセージとそのときの条件、
 票と nullify の出所（`vote_emission`・`nullify_after_vote`）。
 -/
 
@@ -130,8 +130,8 @@ theorem mem_S_st4_nullify {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : 
     subst hw
     exact Or.inr hs
 
-/-- 動作を終えた後の S にある message は、前からあったか、このスロットの転送以外の段で
-    自分が送った自分の署名付きの message。 -/
+/-- 動作を終えた後の S にあるメッセージは、前からあったか、このスロットの転送以外の段で
+    自分が送った自分の署名付きのメッセージ。 -/
 theorem mem_S_stage_or_sent (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx)
     {m : Msg n Tx} (h : m ∈ (st5 f Δ lead i p).S) :
     m ∈ p.S ∨ (m.signer = some i ∧ ∃ j, Action.send m j ∈ innerActs f Δ lead i p) := by
@@ -152,7 +152,7 @@ theorem mem_S_stage_or (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Pro
     {m : Msg n Tx} (h : m ∈ (st5 f Δ lead i p).S) : m ∈ p.S ∨ m.signer = some i :=
   (mem_S_stage_or_sent f Δ lead i p h).imp_right And.left
 
-/-! #### 各段が送る message とそのときの条件 -/
+/-! #### 各段が送るメッセージとそのときの条件 -/
 
 theorem send_forwardNew_mem {f : Nat} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (forwardNew f i p).2) : m ∈ p.S := by
@@ -373,7 +373,7 @@ theorem send_all_climb {f : Nat} {i : Fin n} {fuel : Nat} {p : Processor n Tx} {
       · exact List.mem_append_right _ (ih h)
     · rw [climb_of_not i hc] at h; simp at h
 
-/-- 送る message は全員へ送る。 -/
+/-- 送るメッセージは全員へ送る。 -/
 theorem send_all {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx} {m : Msg n Tx}
     {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) (j' : Fin n) :
     Action.send m j' ∈ Algo.step f Δ lead i p := by

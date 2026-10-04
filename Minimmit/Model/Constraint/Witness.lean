@@ -88,7 +88,7 @@ theorem byzBound (f Δ : Nat) (lead : View → Fin n) :
   rw [run_eq, byz_eq, Finset.card_empty]
   exact Nat.zero_le _
 
-/-- pool にある packet を全部配送すると、各 packet の message は宛先の S にある。 -/
+/-- pool にある packet を全部配送すると、各 packet のメッセージは宛先の S にある。 -/
 theorem mem_S_foldl_deliver_of_mem (s : State n Tx) (xs : List (Packet n Tx)) {x : Packet n Tx}
     (hx : x ∈ xs) (hp : x ∈ s.pool) : x.msg ∈ ((xs.foldl State.deliver s).procs x.dst).S := by
   induction xs generalizing s with
@@ -102,7 +102,7 @@ theorem mem_S_foldl_deliver_of_mem (s : State n Tx) (xs : List (Packet n Tx)) {x
       exact Finset.mem_insert_self _ _
     · exact ih _ hx (by rwa [State.deliver_pool])
 
-/-- 各スロットで、pool にある packet の message は宛先の S にある。 -/
+/-- 各スロットで、pool にある packet のメッセージは宛先の S にある。 -/
 theorem pool_delivered (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     ∀ x ∈ (trace (Tx := Tx) f Δ lead t).1.pool, x.msg ∈ ((trace f Δ lead t).1.procs x.dst).S := by
   intro x hx

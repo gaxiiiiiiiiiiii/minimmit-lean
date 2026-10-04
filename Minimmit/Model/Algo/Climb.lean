@@ -52,7 +52,7 @@ theorem view_le_maxView {S : Finset (Msg n Tx)} {m : Msg n Tx} (h : m ∈ S) :
     m.view.val ≤ maxView S :=
   Finset.le_sup (f := fun m => m.view.val) h
 
-/-- 証明書のある view は、S にある message の view を超えない。 -/
+/-- 証明書のある view は、S にあるメッセージの view を超えない。 -/
 theorem hasCert_le_maxView {f : Nat} {S : Finset (Msg n Tx)} {v : View} (h : HasCert f S v) :
     v.val ≤ maxView S := by
   rcases h with h | h
@@ -184,7 +184,7 @@ theorem climb_exhaust (f : Nat) (i : Fin n) (fuel : Nat) (p : Processor n Tx) :
       · exact Or.inr h
     · rw [climb_of_not i hc]; exact Or.inr hc
 
-/-! #### 各段の後の S にある message は、前からあったか自分の署名付き -/
+/-! #### 各段の後の S にあるメッセージは、前からあったか自分の署名付き -/
 
 theorem mem_S_send_or_signer (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) (j : Fin n)
     {m' : Msg n Tx} (h : m' ∈ (p.send i m j).S) : m' ∈ p.S ∨ m' = m := by
@@ -228,7 +228,7 @@ theorem mem_S_advanceOnce {f : Nat} {i : Fin n} {q : Processor n Tx} {m : Msg n 
   · exact Or.inl hm
   · exact mem_S_advanceM hm
 
-/-- 登りの後の S にある message は、前からあったか、登りで出した自分の票。票の view は
+/-- 登りの後の S にあるメッセージは、前からあったか、登りで出した自分の票。票の view は
     登りの後の view より小さい。 -/
 theorem mem_S_climb {f : Nat} {i : Fin n} {fuel : Nat} {q : Processor n Tx} {m : Msg n Tx}
     (hm : m ∈ (climb f i fuel q).1.S) :

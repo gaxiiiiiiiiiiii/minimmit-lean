@@ -219,7 +219,7 @@ theorem send_propose_proposed (i : Fin n) (p : Processor n Tx) (b : Block n Tx) 
   simp only [send]
   split_ifs <;> rfl
 
-/-- 署名者が k でない message が k の動作の後に S にあるなら、動作の前からあった。 -/
+/-- 署名者が k でないメッセージが k の動作の後に S にあるなら、動作の前からあった。 -/
 theorem mem_S_executeAll_of_signer_ne (k : Fin n) (p : Processor n Tx) (acts : List (Action n Tx))
     {m : Msg n Tx} (hm : m ∈ (p.executeAll k acts).S) (hs : m.signer ≠ some k) : m ∈ p.S := by
   induction acts generalizing p with
@@ -242,7 +242,7 @@ theorem mem_S_executeAll_of_signer_ne (k : Fin n) (p : Processor n Tx) (acts : L
       · exact h
     | progress => exact h
 
-/-- k の動作の後に S にある message は、前からあったか、k がこの動作の列で送ったもの。 -/
+/-- k の動作の後に S にあるメッセージは、前からあったか、k がこの動作の列で送ったもの。 -/
 theorem mem_S_executeAll (k : Fin n) (p : Processor n Tx) (acts : List (Action n Tx))
     {m : Msg n Tx} (hm : m ∈ (p.executeAll k acts).S) :
     m ∈ p.S ∨ ∃ j, Action.send m j ∈ acts := by
@@ -266,7 +266,7 @@ theorem mem_S_executeAll (k : Fin n) (p : Processor n Tx) (acts : List (Action n
     · exact Or.inr ⟨j, List.mem_cons_of_mem _ hj⟩
 
 /-- k の動作の後の S が含むブロックは、前から含まれていたか、k の署名付きで、k がこの動作の列で
-    送った message の成分。 -/
+    送ったメッセージの成分。 -/
 theorem containsBlock_executeAll (k : Fin n) (p : Processor n Tx)
     (acts : List (Action n Tx)) {b : Block n Tx} (hb : containsBlock (p.executeAll k acts).S b) :
     containsBlock p.S b
@@ -546,7 +546,7 @@ theorem mem_pool_act {s : State n Tx} {instr : Instr n Tx} {x : Packet n Tx}
 
 /-! ### 動作の後の S と pool -/
 
-/-- i の動作の後に S にある message は、前からあったか、i が自分宛に送ってその packet が
+/-- i の動作の後に S にあるメッセージは、前からあったか、i が自分宛に送ってその packet が
     pool に載ったもの。 -/
 theorem mem_S_foldl_execute_self {s : State n Tx} {i : Fin n} {acts : List (Action n Tx)}
     {m : Msg n Tx} (hm : m ∈ ((acts.foldl (fun s a => s.execute i a) s).procs i).S) :
@@ -596,14 +596,14 @@ theorem mem_S_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List (Fin n)}
       · rw [foldl_execute_procs_ne _ hk] at h; exact Or.inl h
     · rw [foldl_execute_now] at h; exact Or.inr h
 
-/-- 動作の後に p_k の S にある message は、前からあったか、k が自分宛に送ってその packet が
+/-- 動作の後に p_k の S にあるメッセージは、前からあったか、k が自分宛に送ってその packet が
     pool に載ったもの。 -/
 theorem mem_S_act {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {m : Msg n Tx}
     (hm : m ∈ ((s.act instr).procs k).S) :
     m ∈ (s.procs k).S ∨ (⟨k, m, k, s.now⟩ : Packet n Tx) ∈ (s.act instr).pool :=
   mem_S_foldl_act (List.nodup_finRange n) hm
 
-/-- i の動作の後の S が含むブロックは、前から含まれていたか、i の署名付きで、i が送った message
+/-- i の動作の後の S が含むブロックは、前から含まれていたか、i の署名付きで、i が送ったメッセージ
     の成分としてその packet が pool に載ったもの。 -/
 theorem containsBlock_foldl_execute {s : State n Tx} {i : Fin n} {acts : List (Action n Tx)}
     {b : Block n Tx}
@@ -663,7 +663,7 @@ theorem containsBlock_foldl_act {s : State n Tx} {instr : Instr n Tx} {l : List 
     · rw [foldl_execute_now] at hx; exact Or.inr ⟨hs, m, j, hmb, hx⟩
 
 /-- 動作の後の p_k の S が含むブロックは、前から含まれていたか、k の署名付きで、k が送った
-    message の成分としてその packet が pool に載ったもの。 -/
+    メッセージの成分としてその packet が pool に載ったもの。 -/
 theorem containsBlock_act {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {b : Block n Tx}
     (hb : containsBlock ((s.act instr).procs k).S b) :
     containsBlock (s.procs k).S b
@@ -704,7 +704,7 @@ theorem foldl_corrupt_pool (s : State n Tx) (l : List (Fin n)) :
   | nil => rfl
   | cons k l ih => rw [List.foldl_cons, ih, corrupt_pool]
 
-/-- message が配送で S に入るなら、pool の packet として届いた。 -/
+/-- メッセージが配送で S に入るなら、pool の packet として届いた。 -/
 theorem mem_S_deliver {s : State n Tx} {x : Packet n Tx} {k : Fin n} {m : Msg n Tx}
     (hm : m ∈ ((s.deliver x).procs k).S) :
     m ∈ (s.procs k).S ∨ (x ∈ s.pool ∧ x.dst = k ∧ m = x.msg) := by
@@ -871,8 +871,8 @@ theorem foldl_corrupt_now (s : State n Tx) (l : List (Fin n)) :
 theorem step_now (s : State n Tx) (instr : Instr n Tx) : (s.step instr).now = ⟨s.now.val + 1⟩ := by
   rw [step_eq, foldl_corrupt_now, foldl_submit_now, foldl_deliver_now, tick_now, act_now]
 
-/-- 1 スロット後に p_k の S にある message は、動作の後からあったか、pool の packet として
-    届いたか、取引の message。 -/
+/-- 1 スロット後に p_k の S にあるメッセージは、動作の後からあったか、pool の packet として
+    届いたか、取引のメッセージ。 -/
 theorem mem_S_step {s : State n Tx} {instr : Instr n Tx} {k : Fin n} {m : Msg n Tx}
     (hm : m ∈ ((s.step instr).procs k).S) :
     m ∈ ((s.act instr).procs k).S

@@ -6,7 +6,7 @@ import Mathlib.Data.Fintype.Card
 # 証明書
 
 §4 の用語（M/L-notarisation・nullification・valid proposal・proof of no progress）を
-message の集合 S 上の述語として定義し、§5.1 の「b が M-notarisation を受ける」などを
+メッセージの集合 S 上の述語として定義し、§5.1 の「b が M-notarisation を受ける」などを
 実行上の述語として定義する。
 -/
 

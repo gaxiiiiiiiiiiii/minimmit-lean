@@ -16,7 +16,7 @@ namespace Algo
 /-! ### 段ごとの分解
 `Algo.step` の各段を名前付きの関数にする。本体は `Algo.step` と同じ。 -/
 
-/-- 2〜3 行で送る message の列 -/
+/-- 2〜3 行で送るメッセージの列 -/
 noncomputable def forwardMsgs (f : Nat) (p : Processor n Tx) : List (Msg n Tx) :=
   let nulls := (nullifyViews p.S).filter fun v =>
     decide (Nullified f p.S v ∧ ¬ Nullified f p.prevS v)
@@ -285,7 +285,7 @@ theorem guardOK_step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Proce
   · exact guardOK_nullifyNoProgress f i _
   · exact guardOK_forwardNew f i _
 
-/-! ### 各段で送る message は、その段の後の S にある -/
+/-! ### 各段で送るメッセージは、その段の後の S にある -/
 
 theorem S_subset_disseminateAll_fst (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
     p.S ⊆ (disseminateAll i p ms).1.S := by
@@ -371,7 +371,7 @@ theorem S_subset_forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     p.S ⊆ (forwardNew f i p).1.S := by
   rw [forwardNew_eq]; exact S_subset_disseminateAll_fst i p _
 
-/-! #### 送った message はその段の後の S にある -/
+/-! #### 送ったメッセージはその段の後の S にある -/
 
 theorem mem_S_of_send_disseminate {i : Fin n} {p : Processor n Tx} {m m' : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (disseminate i p m').2) : m ∈ (disseminate i p m').1.S := by
@@ -445,7 +445,7 @@ theorem mem_S_of_send_nullifyNoProgress {f : Nat} {i : Fin n} {p : Processor n T
   · exact mem_S_of_send_disseminate h
   · simp at h
 
-/-- `Algo.step` が送る message は、その動作をすべて実行した後の S にある。 -/
+/-- `Algo.step` が送るメッセージは、その動作をすべて実行した後の S にある。 -/
 theorem mem_S_of_send_step {f Δ : Nat} {lead : View → Fin n} {i : Fin n} {p : Processor n Tx}
     {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ Algo.step f Δ lead i p) :
     m ∈ (stepPair f Δ lead i p).1.S := by

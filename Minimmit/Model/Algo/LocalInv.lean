@@ -98,7 +98,7 @@ theorem mem_S_send_iff_of_ne (i : Fin n) (p : Processor n Tx) {m m' : Msg n Tx} 
   · simp [Finset.mem_insert, hne]
   · exact Iff.rfl
 
-/-- 自分の票でも自分の nullify でもない message の送信は不変量を保つ。 -/
+/-- 自分の票でも自分の nullify でもないメッセージの送信は不変量を保つ。 -/
 theorem send_of_not_own (h : PreInv f i p) {m : Msg n Tx} (hv : ∀ b, m ≠ Msg.vote i b)
     (hn : ∀ v, m ≠ Msg.nullify i v) (j : Fin n) : PreInv f i (p.send i m j) := by
   refine h.of_grow (Processor.send_view i p m j)
@@ -108,7 +108,7 @@ theorem send_of_not_own (h : PreInv f i p) {m : Msg n Tx} (hv : ∀ b, m ≠ Msg
   · exact (mem_S_send_iff_of_ne i p j fun h' => hv c h'.symm).mp hc
   · exact (mem_S_send_iff_of_ne i p j fun h' => hn w h'.symm).mp hw
 
-/-- S にある message の再送は、view・notarised・nullified・S を変えない。 -/
+/-- S にあるメッセージの再送は、view・notarised・nullified・S を変えない。 -/
 theorem send_of_mem_eq (h : PreInv f i p) {m : Msg n Tx} (hm : m ∈ p.S) (j : Fin n) :
     (p.send i m j).notarised = p.notarised ∧ (p.send i m j).nullified = p.nullified
       ∧ (p.send i m j).S = p.S := by
@@ -528,7 +528,7 @@ theorem progress (h : PropInv i p) : PropInv i p.progress := by
     simp only [Processor.progress] at this
     omega
 
-/-- 送る message の成分に自分のブロックがあるなら S に含まれている、という条件。 -/
+/-- 送るメッセージの成分に自分のブロックがあるなら S に含まれている、という条件。 -/
 def Safe (i : Fin n) (S : Finset (Msg n Tx)) (m : Msg n Tx) : Prop :=
   ∀ b, m.block = some b → b.signer = some i → containsBlock S b
 
@@ -538,7 +538,7 @@ theorem safe_of_mem {S : Finset (Msg n Tx)} {m : Msg n Tx} (hm : m ∈ S) : Safe
 theorem safe_of_block_none {S : Finset (Msg n Tx)} {m : Msg n Tx} (hm : m.block = none) :
     Safe i S m := fun b hb _ => by rw [hm] at hb; cases hb
 
-/-- 送った message の S への追加で、自分のブロックが増えない。 -/
+/-- 送ったメッセージの S への追加で、自分のブロックが増えない。 -/
 theorem ownBlock_send {m : Msg n Tx} (hm : Safe i p.S m) {j : Fin n} {b : Block n Tx}
     (hb : OwnBlock i (p.send i m j).S b) : OwnBlock i p.S b := by
   obtain ⟨hsig, m', hm', hmb⟩ := hb
@@ -549,7 +549,7 @@ theorem ownBlock_send {m : Msg n Tx} (hm : Safe i p.S m) {j : Fin n} {b : Block 
     · exact ⟨hsig, m', hm', hmb⟩
   · exact ⟨hsig, m', hm', hmb⟩
 
-/-- 成分の自分のブロックが S に含まれている message を送っても保たれる。 -/
+/-- 成分の自分のブロックが S に含まれているメッセージを送っても保たれる。 -/
 theorem send (h : PropInv i p) {m : Msg n Tx} (hm : Safe i p.S m) (j : Fin n) :
     PropInv i (p.send i m j) := by
   have hview := Processor.send_view i p m j

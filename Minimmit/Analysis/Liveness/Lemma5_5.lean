@@ -58,7 +58,7 @@ theorem card_correctSet (hb : ByzBound f s₀ instrs) : n - f ≤ (correctSet s�
   rw [Finset.card_univ, Fintype.card_fin] at h1
   omega
 
-/-- 正直者 p_j が t + 1 の S に持つ自分の署名付き message は、p_i に期限までに届く。 -/
+/-- 正直者 p_j が t + 1 の S に持つ自分の署名付きメッセージは、p_i に期限までに届く。 -/
 theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs)
     {i j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}

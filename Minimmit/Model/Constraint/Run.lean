@@ -6,8 +6,8 @@ import Mathlib.Data.Fintype.Card
 # 実行の補題
 
 `State.run` に沿って成り立つ事実。前半は正直/腐敗によらない: 署名の偽造不能の帰結（S や
-pool にある署名付き message は、その署名者が前に送った。S や pool が含む署名付きブロックは、
-その署名者が前に送った message の成分）、byz の単調性、定足数の交わり。
+pool にある署名付きメッセージは、その署名者が前に送った。S や pool が含む署名付きブロックは、
+その署名者が前に送ったメッセージの成分）、byz の単調性、定足数の交わり。
 後半は正直者について: 局所不変量 `LocalInv`・`PropInv` が全スロットで成り立つこと、
 送るブロックは登りの後の `leaderBlock` であること、自分の署名付きのブロックは自分の S に
 含まれること、同じ view の自分の署名付きのブロックは 1 つしかないこと。
@@ -76,7 +76,7 @@ theorem Sends.instructed {q : Fin n} {m : Msg n Tx} (h : Sends s₀ instrs q m) 
 
 /-! ### 署名の偽造不能の帰結 -/
 
-/-- スロット t の S か pool にある、q の署名付きの message は、初期の S にある genesis への票
+/-- スロット t の S か pool にある、q の署名付きのメッセージは、初期の S にある genesis への票
     でなければ、q が t より前に送った。 -/
 theorem sendsBefore_of_mem (hinit : Init s₀) (t : Nat) :
     (∀ k (m : Msg n Tx) q, m ∈ ((State.run s₀ instrs t).procs k).S → m.signer = some q →
@@ -128,7 +128,7 @@ theorem sendsBefore_of_mem (hinit : Init s₀) (t : Nat) :
     · rw [hrun, State.step_pool] at hx
       exact hactP x hx q hq
 
-/-- スロット t の S にある、q の署名付きで genesis への票でない message は、q が t より前に
+/-- スロット t の S にある、q の署名付きで genesis への票でないメッセージは、q が t より前に
     送った。 -/
 theorem sendsBefore_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} {q : Fin n}
     (hm : m ∈ ((State.run s₀ instrs t).procs k).S) (hq : m.signer = some q)
@@ -150,7 +150,7 @@ theorem instructed_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n
     (hg : m ≠ .vote q .gen) : ∃ t' < t, ∃ j, Action.send m j ∈ (instrs t').actions q :=
   (sendsBefore_of_mem_S hinit hm hq hg).instructed hinit
 
-/-- p_q がスロット t より前に、b を成分に持つ message を送る: q を送信元とし b を成分に持つ
+/-- p_q がスロット t より前に、b を成分に持つメッセージを送る: q を送信元とし b を成分に持つ
     packet がスロット t の pool にある。 -/
 def SendsBlockBefore (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (q : Fin n) (b : Block n Tx)
     (t : Nat) : Prop :=
@@ -168,7 +168,7 @@ theorem SendsBlockBefore.instructed {q : Fin n} {b : Block n Tx} {t : Nat}
   obtain ⟨t', ht', h⟩ := instructed_of_mem_pool hinit hx
   exact ⟨t', ht', x.msg, x.dst, hb, h⟩
 
-/-- スロット t の S か pool が含む、q の署名付きのブロックは、q が t より前に送った message の
+/-- スロット t の S か pool が含む、q の署名付きのブロックは、q が t より前に送ったメッセージの
     成分。 -/
 theorem sendsBlockBefore_of_containsBlock (hinit : Init s₀) (t : Nat) :
     (∀ k (b : Block n Tx) q, containsBlock ((State.run s₀ instrs t).procs k).S b →
@@ -309,7 +309,7 @@ theorem genesisS_subset_prevS_run (hinit : Init s₀) (k : Fin n) :
     rw [State.run, (State.step_procs _ _ k).prevS, Processor.tick_prevS]
     exact (genesisS_subset_run hinit k t).trans (Processor.S_subset_executeAll k _ _)
 
-/-- 正直者 p_i がスロット t に送った message は、スロット t + 1 の S にある。 -/
+/-- 正直者 p_i がスロット t に送ったメッセージは、スロット t + 1 の S にある。 -/
 theorem mem_S_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (instrs t).actions i) :
     m ∈ ((State.run s₀ instrs (t + 1)).procs i).S := by
@@ -321,7 +321,7 @@ theorem mem_S_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi :
   rw [Processor.tick_S] at hsub
   exact hsub hm
 
-/-- 正直者 p_i の署名付きの message がスロット t + 1 の S にあれば、スロット t の動作の後の
+/-- 正直者 p_i の署名付きのメッセージがスロット t + 1 の S にあれば、スロット t の動作の後の
     S に既にある。配送で初めて入ることはない。 -/
 theorem own_mem_act_of_mem_succ (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} (hm : m.signer = some i)
@@ -343,7 +343,7 @@ theorem own_mem_act_of_mem_succ (hinit : Init s₀) (hh : Honest f Δ lead s₀ 
     rw [hact] at hj
     exact Algo.mem_S_of_send_step hj
 
-/-- 正直者 p_i がスロット t に送った message の成分のブロックは、スロット t + 1 の S に含まれる。 -/
+/-- 正直者 p_i がスロット t に送ったメッセージの成分のブロックは、スロット t + 1 の S に含まれる。 -/
 theorem containsBlock_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n} {b : Block n Tx}
     (h : Action.send m j ∈ (instrs t).actions i) (hmb : m.block = some b) :
@@ -530,7 +530,7 @@ theorem State.mem_pool_step_of_send (s : State n Tx) (instr : Instr n Tx) {i : F
   rw [State.step_pool]
   exact State.mem_pool_foldl_act_of_send s instr (List.nodup_finRange n) (List.mem_finRange i) h hg
 
-/-- 正直者 p_i がスロット t に j へ送った message の packet は、t + 1 以降の pool にある。 -/
+/-- 正直者 p_i がスロット t に j へ送ったメッセージの packet は、t + 1 以降の pool にある。 -/
 theorem mem_pool_run_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (instrs t).actions i) {t' : Nat} (ht : t + 1 ≤ t') :
@@ -541,13 +541,13 @@ theorem mem_pool_run_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
   rw [run_now hinit] at this
   exact pool_subset_run ht this
 
-/-- 正直者がスロット t に送るよう指示された message は、t + 1 より前に送った。 -/
+/-- 正直者がスロット t に送るよう指示されたメッセージは、t + 1 より前に送った。 -/
 theorem sendsBefore_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (instrs t).actions i) : SendsBefore s₀ instrs i m (t + 1) :=
   ⟨_, mem_pool_run_of_send hinit hh hi h (le_refl _), rfl, rfl⟩
 
-/-- 正直者が送るよう指示された message は、送った。 -/
+/-- 正直者が送るよう指示されたメッセージは、送った。 -/
 theorem sends_of_send (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {m : Msg n Tx} {j : Fin n}
     (h : Action.send m j ∈ (instrs t).actions i) : Sends s₀ instrs i m :=

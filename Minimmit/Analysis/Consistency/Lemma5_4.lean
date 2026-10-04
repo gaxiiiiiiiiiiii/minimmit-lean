@@ -27,7 +27,7 @@ theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   · obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hL)
     exact one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
 
-/-- 正直者の各段の S にある message は、その正直者が実行上で送ったものか、そのスロットの
+/-- 正直者の各段の S にあるメッセージは、その正直者が実行上で送ったものか、そのスロットの
     自分の送信。 -/
 theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {m : Msg n Tx}

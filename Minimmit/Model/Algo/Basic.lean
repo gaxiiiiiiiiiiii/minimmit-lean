@@ -9,7 +9,7 @@ import Mathlib.Data.Finset.Sort
 局所状態から 1 スロット分の動作の列を返す関数 `Algo.step` と、その部品。`step` の各段は
 Algo/Stage で `forwardMsgs`・`propose`・`voteProposal`・`nullifyTimeout`・`advanceM`・
 `nullifyNoProgress` として切り出してあり、`step` との一致は `step_eq_stepPair`。補題は段の
-名前で述べる。`step` が送る message が遷移系の送信ガードを通ることは Timing の `Algo.send_guard`。
+名前で述べる。`step` が送るメッセージが遷移系の送信ガードを通ることは Timing の `Algo.send_guard`。
 -/
 
 namespace Minimmit
@@ -31,7 +31,7 @@ def disseminate (i : Fin n) (p : Processor n Tx) (m : Msg n Tx) :
       (pa.1.send i m j, pa.2 ++ [Action.send m j]))
     (p, [])
 
-/-- ms の各 message を順に全員へ送る。 -/
+/-- ms の各メッセージを順に全員へ送る。 -/
 def disseminateAll (i : Fin n) (p : Processor n Tx) (ms : List (Msg n Tx)) :
     Processor n Tx × List (Action n Tx) :=
   ms.foldl
@@ -96,7 +96,7 @@ theorem containsBlock_of_mem_mNotarisedAt {f : Nat} {S : Finset (Msg n Tx)} {v :
 
 /-! ### 16〜21 行 -/
 
-/-- S にある message が言及する view の最大 -/
+/-- S にあるメッセージが言及する view の最大 -/
 noncomputable def maxView (S : Finset (Msg n Tx)) : Nat := S.sup fun m => m.view.val
 
 /-- S に view v の証明書がある: v の nullification か、view v のブロックの M-notarisation。
@@ -164,7 +164,7 @@ def leastVoters (f : Nat) (S : Finset (Msg n Tx)) (b : Block n Tx) : Finset (Fin
     取引（§4 本文）。「新しい」とは、S にあって prevS にないこと。スロットの最後に評価する
     ので、このスロットで届いたものと自分の送信で完成した証明書をこのスロットで送る。
     その証明書での view 前進は、16〜21 行をスロットの最初に評価するので次のスロット。
-    証明書は、署名者の番号が小さい順に 2f + 1 人分の message を送る。論文の辞書順最小の組に
+    証明書は、署名者の番号が小さい順に 2f + 1 人分のメッセージを送る。論文の辞書順最小の組に
     当たる。 -/
 noncomputable def forwardNew (f : Nat) (i : Fin n) (p : Processor n Tx) :
     Processor n Tx × List (Action n Tx) :=
@@ -186,7 +186,7 @@ open Classical in
     使う。 -/
 noncomputable def step (f Δ : Nat) (lead : View → Fin n) (i : Fin n) (p : Processor n Tx) :
     List (Action n Tx) :=
-  -- 16〜21 行。証明書のある view は S にある message の view を超えないので、
+  -- 16〜21 行。証明書のある view は S にあるメッセージの view を超えないので、
   -- maxView p.S + 1 回で止まる
   let r₁ := climb f i (maxView p.S + 1) p
   let p := r₁.1

@@ -72,7 +72,7 @@ inductive Block.Ancestor : Block n Tx → Block n Tx → Prop where
   | parent {a : Block n Tx} (q : Fin n) (v : View) (tr : List Tx) (p : Block n Tx) :
       Block.Ancestor a p → Block.Ancestor a (.node q v tr p)
 
-/-- message（§4）: 提案はブロックそのもので、署名者はブロックの署名者。票と nullify は
+/-- メッセージ（§4）: 提案はブロックそのもので、署名者はブロックの署名者。票と nullify は
     署名者 q を持つ。取引（§2）は環境が出すので署名者を持たず、Tx 型の値はすべて取引として
     扱う。 -/
 inductive Msg (n : Nat) (Tx : Type) : Type where
@@ -89,20 +89,20 @@ def Msg.signer : Msg n Tx → Option (Fin n)
   | .nullify q _ => some q
   | .tx _        => none
 
-/-- message が言及する view、取引では 0 -/
+/-- メッセージが言及する view、取引では 0 -/
 def Msg.view : Msg n Tx → View
   | .propose b   => b.view
   | .vote _ b    => b.view
   | .nullify _ v => v
   | .tx _        => ⟨0⟩
 
-/-- message の成分にあるブロック、提案と票が持つ。 -/
+/-- メッセージの成分にあるブロック、提案と票が持つ。 -/
 def Msg.block : Msg n Tx → Option (Block n Tx)
   | .propose b => some b
   | .vote _ b  => some b
   | _          => none
 
-/-- S がブロック b を含む（§4）: 成分に b を持つ message が S にある。 -/
+/-- S がブロック b を含む（§4）: 成分に b を持つメッセージが S にある。 -/
 def containsBlock [DecidableEq Tx] (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
   ∃ m ∈ S, m.block = some b
 
@@ -120,7 +120,7 @@ theorem mem_genesisS [DecidableEq Tx] {m : Msg n Tx} :
   simp only [genesisS, Finset.mem_image, Finset.mem_univ, true_and]
   exact ⟨fun ⟨q, h⟩ => ⟨q, h.symm⟩, fun ⟨q, h⟩ => ⟨q, h.symm⟩⟩
 
-/-- ネットワークに載る単位: 送信元、message、宛先、送信したスロット。§2 の authenticated channel は
+/-- ネットワークに載る単位: 送信元、メッセージ、宛先、送信したスロット。§2 の authenticated channel は
     受信者が送信元を知る通信路なので、packet は送信元を持つ。 -/
 structure Packet (n : Nat) (Tx : Type) where
   src : Fin n
@@ -147,7 +147,7 @@ structure Processor (n : Nat) (Tx : Type) where
   proposed : Bool
   /-- この view で投票したブロック、未投票なら none -/
   notarised : Option (Block n Tx)
-  /-- 受信した message の集合 -/
+  /-- 受信したメッセージの集合 -/
   S : Finset (Msg n Tx)
   /-- 前スロットの動作を終えた時点の S、`tick` で退避する -/
   prevS : Finset (Msg n Tx)
@@ -247,7 +247,7 @@ def send [DecidableEq Tx] (s : State n Tx) (i : Fin n) (m : Msg n Tx) (j : Fin n
 def progress (s : State n Tx) (i : Fin n) : State n Tx :=
   s.update i Processor.progress
 
-/-- packet x の message が宛先に届く。x が pool にあるときだけ届き、そうでなければ
+/-- packet x のメッセージが宛先に届く。x が pool にあるときだけ届き、そうでなければ
     何もしない。 -/
 def deliver [DecidableEq Tx] (s : State n Tx) (x : Packet n Tx) : State n Tx :=
   if x ∈ s.pool then s.update x.dst (·.receive x.msg) else s
@@ -306,7 +306,7 @@ def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
 
 /-- 実行: 初期状態 s₀ に指示の列 instrs を順に適用する。`instrs t` の deliveries と
     submits はスロット t + 1 に届く。`run s₀ instrs t` はスロット t の状態で、t に届いた
-    message が S に入っていて、t の動作はまだしていない。 -/
+    メッセージが S に入っていて、t の動作はまだしていない。 -/
 def run [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
   | 0 => s₀
   | t + 1 => (run s₀ instrs t).step (instrs t)

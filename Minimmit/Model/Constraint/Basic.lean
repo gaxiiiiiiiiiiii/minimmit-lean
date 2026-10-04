@@ -1,10 +1,10 @@
 import Minimmit.Model.Algo.Basic
 
 /-!
-# 制約
+# Minimmit の定義
 
-遷移系が課さない規則。定理の仮定になる。初期状態、部分同期、腐敗、リーダー、
-プロトコルに従うこと、の順。
+実行が Minimmit であることの定義 `IsMinimmit` と、その成分。初期状態、部分同期、腐敗、
+リーダー、正直さ、の順。
 -/
 
 namespace Minimmit
@@ -27,7 +27,7 @@ def State.Timely (Δ : Nat) (GST : Time) (s : State n Tx) : Prop :=
   ∀ x ∈ s.pool, max GST.val x.sentAt.val + Δ ≤ s.now.val → x.msg ∈ (s.procs x.dst).S
 
 /-- 部分同期（§2）: t に送られた packet は max(GST, t) + Δ までに宛先の S に入る。Δ は既知、
-    GST は敵が選ぶ。 -/
+    GST は敵対者が選ぶ。 -/
 structure PartialSync [DecidableEq Tx] (Δ : Nat) (GST : Time) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) : Prop where
   timely : ∀ t, (State.stateAt s₀ instrs t).Timely Δ GST
@@ -47,18 +47,16 @@ def ByzBound [DecidableEq Tx] (f : Nat) (s₀ : State n Tx) (instrs : Nat → In
 
 /-! ### リーダー -/
 
-/-- lead は公平: どのプロセッサも、どの view 以降にも自分がリーダーになる view を持つ。
-    論文の lead(v) = p_{(v mod n)+1} はこれを満たす。 -/
+/-- lead は公平: どのプロセッサも、どの view 以降にも自分がリーダーになる view を持つ。 -/
 def Fair (lead : View → Fin n) : Prop :=
   ∀ i : Fin n, ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ lead v' = i
 
-/-- どの fa + 1 個の連続する view にも正直なリーダーがいる（Lemma 5.10 のリーダーの仮定）。
-    論文の輪番は、腐敗が fa 人以下ならこれを満たす。 -/
+/-- どの fa + 1 個の連続する view にも正直なリーダーがいる。 -/
 def CorrectLeaderWithin [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx)
     (lead : View → Fin n) (fa : Nat) : Prop :=
   ∀ v : View, ∃ v' : View, v.val ≤ v'.val ∧ v'.val ≤ v.val + fa ∧ Correct s₀ instrs (lead v')
 
-/-! ### プロトコルに従うこと -/
+/-! ### 正直さ -/
 
 /-- 腐敗していないプロセッサは Algorithm 1 に従う: 全スロット t で、`(stateAt t).byz` にない i
     の動作は `Algo.step` の出力。 -/

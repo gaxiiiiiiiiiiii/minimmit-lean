@@ -9,7 +9,7 @@ import Mathlib.Data.Fintype.Card
 pool にある署名付きメッセージは、その署名者が前に送った。S や pool が含む署名付きブロックは、
 その署名者が前に送ったメッセージの成分）、byz の単調性、定足数の交わり。
 後半は正直者について: 局所不変量 `LocalInv`・`PropInv` が全スロットで成り立つこと、
-送るブロックは登りの後の `leaderBlock` であること、自分の署名付きのブロックは自分の S に
+送るブロックは `climb` の後の `leaderBlock` であること、自分の署名付きのブロックは自分の S に
 含まれること、同じ view の自分の署名付きのブロックは 1 つしかないこと。
 -/
 
@@ -429,7 +429,7 @@ theorem propInv_stateAt (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) 
   | zero => exact propInv_init hinit i
   | succ t ih => exact propInv_step hinit hh hi t ih
 
-/-- 正直者がスロット t に送るブロックは、登りの後の状態の `leaderBlock`。 -/
+/-- 正直者がスロット t に送るブロックは、`climb` の後の状態の `leaderBlock`。 -/
 theorem send_propose_leaderBlock (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} {j : Fin n}
     (h : Action.send (Msg.propose b) j ∈ (instrs t).actions i) :

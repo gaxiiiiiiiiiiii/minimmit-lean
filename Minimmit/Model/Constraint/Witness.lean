@@ -3,14 +3,13 @@ import Minimmit.Model.Constraint.Run
 import Minimmit.Model.Transition.Execute
 
 /-!
-# 制約の充足可能性
+# Minimmit の実行の存在
 
-`Init`・`Honest`・`ByzBound`・`PartialSync` を同時に満たす実行の例。腐敗がなく、全員が
-`Algo.step` に従い、送った packet がそのスロットのうちに届く実行を、スロットの状態から
-そのスロットの指示を作る再帰で定義する。§5 の補題の仮定が矛盾しないことを
-`constraints_satisfiable` として示す。あわせて、論文の輪番のリーダー関数が `Fair` を満たすことを
-`roundRobin_fair` として、Lemma 5.10 のリーダーの仮定を満たすことを `roundRobin_correct_leader`
-として示す。
+Minimmit を満たす実行の例。腐敗がなく、全員が `Algo.step` に従い、送った packet がそのスロットの
+うちに届く実行を、スロットの状態からそのスロットの指示を作る再帰で定義し、`IsMinimmit` を
+満たすことを `isMinimmit_satisfiable` として示す。あわせて、論文の輪番 `roundRobin` が `Fair` を
+満たすことを `roundRobin_fair` として、腐敗が fa 人以下なら `CorrectLeaderWithin fa` を満たすことを
+`roundRobin_correct_leader` として示す。
 -/
 
 namespace Minimmit
@@ -58,7 +57,7 @@ theorem trace_snd (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     (trace (Tx := Tx) f Δ lead t).2 = instrOf f Δ lead (trace f Δ lead t).1 := by
   cases t <;> rfl
 
-/-- 実行は `trace` の状態成分。 -/
+/-- `stateAt` は `trace` の状態成分。 -/
 theorem run_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     State.stateAt (init (Tx := Tx)) (instrs f Δ lead) t = (trace f Δ lead t).1 := by
   induction t with
@@ -126,8 +125,8 @@ theorem partialSync (f Δ : Nat) (lead : View → Fin n) (hΔ : 1 ≤ Δ) :
 
 end Witness
 
-/-- `IsMinimmit` は満たせる: 5f + 1 ≤ n と Δ ≥ 1 のもと、公平な lead について、Minimmit の
-    実行である初期状態と指示の列と GST がある。 -/
+/-- Minimmit を満たす実行が存在する: 5f + 1 ≤ n と Δ ≥ 1 のもと、公平な lead について、
+    `IsMinimmit` を満たす初期状態と指示の列と GST がある。 -/
 theorem isMinimmit_satisfiable (f Δ : Nat) (hn : 5 * f + 1 ≤ n) (hΔ : 1 ≤ Δ)
     (lead : View → Fin n) (hfair : Fair lead) :
     ∃ (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (GST : Time),
@@ -151,8 +150,7 @@ theorem roundRobin_fair (hn : 0 < n) : Fair (roundRobin hn) := by
     show (i.val + (v.val / n + 1) * n) % n = i.val
     rw [Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt i.isLt]
 
-/-- 論文の輪番は、腐敗が fa 人以下で fa + 1 ≤ n なら、どの fa + 1 個の連続する view にも正直な
-    リーダーを持つ（Lemma 5.10 のリーダーの仮定）。 -/
+/-- 論文の輪番は、腐敗が fa 人以下で fa + 1 ≤ n なら、`CorrectLeaderWithin fa` を満たす。 -/
 theorem roundRobin_correct_leader {s₀ : State n Tx} {instrs : Nat → Instr n Tx} (hn : 0 < n)
     {fa : Nat} (hfa : fa + 1 ≤ n) (hb : ByzBound fa s₀ instrs) :
     CorrectLeaderWithin s₀ instrs (roundRobin hn) fa := by

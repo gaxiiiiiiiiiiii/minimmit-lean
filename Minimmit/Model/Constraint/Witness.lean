@@ -58,7 +58,7 @@ theorem trace_snd (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
   cases t <;> rfl
 
 /-- `stateAt` は `trace` の状態成分。 -/
-theorem run_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
+theorem stateAt_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     State.stateAt (init (Tx := Tx)) (instrs f Δ lead) t = (trace f Δ lead t).1 := by
   induction t with
   | zero => rfl
@@ -70,7 +70,7 @@ theorem init_spec : Init (init (n := n) (Tx := Tx)) :=
 theorem honest (f Δ : Nat) (lead : View → Fin n) :
     Honest f Δ lead (init (Tx := Tx)) (instrs f Δ lead) := by
   intro t i _
-  rw [run_eq, instrs, trace_snd, instrOf_actions]
+  rw [stateAt_eq, instrs, trace_snd, instrOf_actions]
 
 theorem byz_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
     (trace (Tx := Tx) f Δ lead t).1.byz = ∅ := by
@@ -84,7 +84,7 @@ theorem byz_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
 theorem byzBound (f Δ : Nat) (lead : View → Fin n) :
     ByzBound f (init (Tx := Tx)) (instrs f Δ lead) := by
   intro t
-  rw [run_eq, byz_eq, Finset.card_empty]
+  rw [stateAt_eq, byz_eq, Finset.card_empty]
   exact Nat.zero_le _
 
 /-- pool にある packet を全部配送すると、各 packet のメッセージは宛先の S にある。 -/
@@ -119,7 +119,7 @@ theorem pool_delivered (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
 theorem partialSync (f Δ : Nat) (lead : View → Fin n) (hΔ : 1 ≤ Δ) :
     PartialSync Δ ⟨0⟩ (init (Tx := Tx)) (instrs f Δ lead) where
   timely := fun t x hx _ => by
-    rw [run_eq] at hx ⊢
+    rw [stateAt_eq] at hx ⊢
     exact pool_delivered f Δ lead t x hx
   one_le := hΔ
 

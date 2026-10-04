@@ -65,7 +65,7 @@ theorem canSend_nullify [DecidableEq Tx] {p : Processor n Tx} {i : Fin n} {v : V
 
 /-! ### S だけが増える関係 -/
 
-/-- q から p へ、S が増える以外は変わらない。配送・取引が局所状態に与える効果はこの形。 -/
+/-- q から p へ、S が増える以外は変わらない。 -/
 structure SGrows (q p : Processor n Tx) : Prop where
   view : p.view = q.view
   timer : p.timer = q.timer
@@ -88,8 +88,8 @@ variable [DecidableEq Tx]
 theorem SGrows.receive (p : Processor n Tx) (m : Msg n Tx) : p.SGrows (p.receive m) :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, Finset.subset_insert _ _⟩
 
-/-- 動作 a の局所効果: `State.execute` が procs i に与える効果と一致する。send には
-    `State.send` と同じガードが付く。 -/
+/-- 動作 a の局所効果: `State.execute` が procs i に与える効果。send には `State.send` と同じ
+    ガードが付く。 -/
 def execute (i : Fin n) (p : Processor n Tx) : Action n Tx → Processor n Tx
   | .send m j => if p.canSend i m then p.send i m j else p
   | .progress => p.progress
@@ -383,7 +383,7 @@ theorem foldl_execute_procs_ne (s : State n Tx) {i k : Fin n} (hk : k ≠ i)
   | nil => rfl
   | cons a acts ih => simp [ih, execute_procs_ne _ hk]
 
-/-- 全プロセッサの動作を畳み込む、`step` の最初の段 -/
+/-- 全プロセッサの動作を畳み込む、`State.step` の最初の部分 -/
 def act (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   (List.finRange n).foldl (fun s i => (instr.actions i).foldl (fun s a => s.execute i a) s) s
 
@@ -812,7 +812,7 @@ theorem byz_subset_foldl_corrupt (s : State n Tx) (l : List (Fin n)) :
 omit [DecidableEq Tx] in
 theorem tick_procs (s : State n Tx) (i : Fin n) : s.tick.procs i = (s.procs i).tick := rfl
 
-/-- `step` を段ごとに書いたもの -/
+/-- `State.step` を部分ごとに書いたもの -/
 theorem step_eq (s : State n Tx) (instr : Instr n Tx) :
     s.step instr = instr.corrupts.foldl corrupt
       (instr.submits.foldl (fun s x => s.submit x.1 x.2)

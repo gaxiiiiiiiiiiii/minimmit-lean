@@ -246,7 +246,17 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 #### ■ 大域状態
 
-本形式化の `State` は、ある時点で実行が到達している状況の全体に当たる。
+- **原文**
+
+  > We consider a set Π = {p_1, . . . , p_n} of n processors.
+
+  > For f such that 5f + 1 ≤ n, at most f processors may become corrupted by the adversary during the course of the execution, and may then display Byzantine (arbitrary) behaviour. Processors that never become corrupted by the adversary are referred to as correct.
+
+  > Processors communicate by point-to-point authenticated channels.
+
+  > the execution is divided into discrete timeslots t ∈ N≥0
+
+  > a message sent at time t must arrive at time t′ > t with t′ ≤ max{GST, t} + Δ.
 
 - **実装**
 
@@ -267,11 +277,12 @@ view 番号とタイムスロットを意味する自然数のラッパー
     now : Time
   ```
 
-  - `procs` は n 個のプロセッサそれぞれの局所状態を並べる。原文は「We consider a set Π = {p_1, . . . , p_n} of n processors.」と番号を 1 から振るが、本形式化は `Fin n` で 0 から数える。
-  - `byz` はこれまでに腐敗したプロセッサを集める。原文の「at most f processors may become corrupted by the adversary during the course of the execution」に当たり、腐敗は取り消せないので `byz` は増える一方になる。一度も `byz` に入らないプロセッサが、原文が correct と呼ぶプロセッサに当たる。
-  - `pool` は送られた packet の全体を持つ。原文の「Processors communicate by point-to-point authenticated channels.」の通信路に当たり、`Packet` はメッセージに送信元 `src` と宛先 `dst` を添えて 1 対 1 の送信を表す。authenticated channel は受信者が送信元を知る通信路なので、packet は送信元を持つ。届いた packet も取り除かず `pool` に残す。
-  - `sentAt` は packet を送ったスロットを覚える。原文の「a message sent at time t must arrive at time t′ > t with t′ ≤ max{GST, t} + Δ」の t に当たり、受信の期限を測るのに使う。
-  - `now` は現在のスロットを指す。原文の「the execution is divided into discrete timeslots t ∈ N≥0」の t に当たる。
+  - `procs` は Π に当たり、番号を 0 から数える。
+  - `byz` はこれまでに腐敗したプロセッサの集合で、増える一方である。一度も `byz` に入らないプロセッサが correct に当たる。
+  - `pool` は通信路に当たり、送られた packet の全体を持つ。届いた packet も取り除かず残す。
+  - `Packet` は 1 対 1 の送信を表し、authenticated channel のとおり送信元を持つ。
+  - `sentAt` は packet を送ったスロット t で、受信の期限を測るのに使う。
+  - `now` は現在のスロット t を指す。
 
 - **操作**
 
@@ -299,7 +310,15 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
 #### ■ 指示
 
-プロトコルは 1 スロットの進み方を一通りには決めない。指示は、決まらずに残る選択をスロットごとに 1 つにまとめたものに当たる。
+1 スロット分の遷移の構成
+
+- **原文**
+
+  > at most f processors may become corrupted by the adversary during the course of the execution, and may then display Byzantine (arbitrary) behaviour.
+
+  > The adversary chooses GST and also message delivery times, subject to the constraints already defined.
+
+  > Each timeslot, each processor may receive some finite set of transactions directly from the environment.
 
 - **実装**
 
@@ -311,10 +330,10 @@ view 番号とタイムスロットを意味する自然数のラッパー
     corrupts : List (Fin n)
   ```
 
-  - `actions` は、各プロセッサがそのスロットで行う動作の列を、プロセッサごとに与える。
-  - `deliveries` はこのスロットに届く packet。原文の「The adversary chooses GST and also message delivery times, subject to the constraints already defined.」の受信時刻の選択に当たる。
-  - `submits` は環境が渡す取引とその宛先。原文の「Each timeslot, each processor may receive some finite set of transactions directly from the environment.」に当たる。
-  - `corrupts` はこのスロットで腐敗するプロセッサ。原文の「at most f processors may become corrupted by the adversary during the course of the execution」の腐敗させる選択に当たる。
+  - `actions` は、各プロセッサがそのスロットで行う動作の列である。
+  - `deliveries` は、このスロットに届く packet である。
+  - `submits` は、環境がプロセッサに渡す取引である。
+  - `corrupts` は、このスロットで腐敗するプロセッサである。
 
 #### ■ スロット遷移
 
@@ -333,7 +352,6 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```
 
   - プロセッサの動作、時刻の前進、packet の受信、新しい取引の投入、腐敗の順に適用する。論文ではスロット内の事象の順序を定めていない。本形式化ではこの順に固定する。この固定が挙動を狭めないことは未証明。
-  - この順序により、`instrs t` の動作で送る packet の sentAt は t になり、そのメッセージが宛先の S に入るのは早くてもスロット t + 1 になる。原文の「a message sent at time t must arrive at time t′ > t」はこれで満たされる。
 
 #### ■ 実行
 

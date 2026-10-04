@@ -19,17 +19,21 @@ theorem receivesM_unique_of_receivesL (hprot : IsMinimmit f Δ lead GST s₀ ins
   rcases hM with rfl | hM
   · rcases hL with rfl | hL
     · rfl
-    · exfalso
+    · by_cases hg : b = .gen
+      · exact hg.symm
+      exfalso
       have hlt : f < (voteSenders s₀ instrs b).card := lt_of_lt_of_le (by omega) hL
       obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
-      have h1 := one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
+      have h1 := one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq) hg
       rw [← hview] at h1
       simp [Block.view] at h1
   · rcases hL with rfl | hL
-    · exfalso
+    · by_cases hg : b' = .gen
+      · exact hg
+      exfalso
       have hlt : f < (voteSenders s₀ instrs b').card := lt_of_lt_of_le (by omega) hM
       obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
-      have h1 := one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
+      have h1 := one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq) hg
       rw [hview] at h1
       simp [Block.view] at h1
     · have hinter := card_inter_add_n_ge (voteSenders s₀ instrs b) (voteSenders s₀ instrs b')

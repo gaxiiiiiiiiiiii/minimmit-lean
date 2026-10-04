@@ -53,28 +53,6 @@ theorem MNotarised.gen {f : Nat} {S : Finset (Msg n Tx)} (hn : 2 * f + 1 ≤ n)
     (h : genesisS n Tx ⊆ S) : MNotarised f S .gen := by
   unfold MNotarised; rw [voters_gen_eq_univ h, Finset.card_univ, Fintype.card_fin]; exact hn
 
-/-- genesis の M-notarisation をどこかの S が含むなら、初期の S を含むどの S も含む。 -/
-theorem MNotarised.gen_of {f : Nat} {S S' : Finset (Msg n Tx)} (h : MNotarised f S .gen)
-    (h' : genesisS n Tx ⊆ S') : MNotarised f S' .gen := by
-  unfold MNotarised at *
-  rw [voters_gen_eq_univ h', Finset.card_univ, Fintype.card_fin]
-  exact h.trans ((Finset.card_le_univ _).trans (by rw [Fintype.card_fin]))
-
-/-- 初期の S には、genesis 以外への票はない。 -/
-theorem voters_genesisS_of_ne_gen {b : Block n Tx} (hg : b ≠ .gen) :
-    voters (genesisS n Tx) b = ∅ := by
-  ext q
-  simp only [voters, Finset.mem_filter, Finset.mem_univ, true_and, mem_genesisS,
-    Finset.notMem_empty, iff_false, not_exists]
-  intro q' h
-  injection h with _ hb
-  exact hg hb
-
-/-- 初期の S には nullify はない。 -/
-theorem nullifiers_genesisS (v : View) : nullifiers (genesisS n Tx) v = ∅ := by
-  ext q
-  simp [nullifiers, mem_genesisS]
-
 /-- 初期の S を含む S は、genesis の L-notarisation を含む。 -/
 theorem LNotarised.gen {f : Nat} {S : Finset (Msg n Tx)} (h : genesisS n Tx ⊆ S) :
     LNotarised f S .gen := by

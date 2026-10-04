@@ -143,7 +143,7 @@ theorem prevS_stateAt_honest (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi
   rw [prevS_stateAt, hh t i (hi t), Algo.executeAll_step, Algo.stepPair_S]
 
 theorem prevS_zero (hinit : Init s₀) (i : Fin n) :
-    ((State.stateAt s₀ instrs 0).procs i).prevS = genesisS n Tx := by
+    ((State.stateAt s₀ instrs 0).procs i).prevS = ∅ := by
   rw [State.stateAt, hinit.procs i]; rfl
 
 /-- 正直者が動作を終えた時点の S に nullification を持つなら、それが初めて完成した
@@ -164,7 +164,7 @@ theorem forward_nullification_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
-      simp [Nullified, nullifiers_genesisS]
+      simp [Nullified, nullifiers]
     · obtain ⟨t'', ht''⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
       rw [ht'', prevS_stateAt_honest hh hi]
       exact Nat.find_min hex (by rw [ht'']; exact Nat.lt_succ_self t'')
@@ -184,7 +184,7 @@ theorem forward_nullification (hinit : Init s₀) (hh : Honest f Δ lead s₀ in
   forward_nullification_end hinit hh hi (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
 theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} (hg : b ≠ .gen)
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx}
     (ht : MNotarised f (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t).procs i)).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t').procs i)).S b
       ∧ ∀ q ∈ Algo.leastVoters f (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t').procs i)).S b,
@@ -199,10 +199,7 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
     rw [Algo.st5_prevS]
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0, prevS_zero hinit]
-      intro hM
-      unfold MNotarised at hM
-      rw [voters_genesisS_of_ne_gen hg] at hM
-      simp at hM
+      simp [MNotarised, voters]
     · obtain ⟨t'', ht''⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
       rw [ht'', prevS_stateAt_honest hh hi]
       exact Nat.find_min hex (by rw [ht'']; exact Nat.lt_succ_self t'')
@@ -210,16 +207,16 @@ theorem forward_mnotarisation_end (hinit : Init s₀) (hh : Honest f Δ lead s�
   exact Algo.send_mem_step_of_mem_forwardMsgs
     (Algo.mem_forwardMsgs_vote (Nat.find_spec hex) hnew hq) j
 
-/-- 正直者が genesis でないブロックの M-notarisation を持つなら、その動作を終えた時点の S で
-    初めてそれが完成したスロットに、番号の小さい順 2f + 1 人の票を全員へ送っている。 -/
+/-- 正直者がブロックの M-notarisation を持つなら、その動作を終えた時点の S で初めてそれが
+    完成したスロットに、番号の小さい順 2f + 1 人の票を全員へ送っている。 -/
 theorem forward_mnotarisation (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
-    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx} (hg : b ≠ .gen)
+    (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx}
     (h : MNotarised f ((State.stateAt s₀ instrs t).procs i).S b) :
     ∃ t' ≤ t, MNotarised f (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t').procs i)).S b
       ∧ ∀ q ∈ Algo.leastVoters f (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t').procs i)).S b,
         ∀ j,
         Action.send (Msg.vote q b) j ∈ (instrs t').actions i :=
-  forward_mnotarisation_end hinit hh hi hg (h.mono (Algo.S_subset_st5 f Δ lead i _))
+  forward_mnotarisation_end hinit hh hi (h.mono (Algo.S_subset_st5 f Δ lead i _))
 
 /-- 正直者 p_i がスロット t に nullification を持つなら、p_j は期限までにそれを持つ。 -/
 theorem nullified_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
@@ -238,9 +235,7 @@ theorem mnotarised_all (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {b : Block n Tx}
     (h : MNotarised f ((State.stateAt s₀ instrs t).procs i).S b) {T : Nat} (hT₁ : t + 1 ≤ T)
     (hT₂ : max GST.val t + δ ≤ T) : MNotarised f ((State.stateAt s₀ instrs T).procs j).S b := by
-  by_cases hg : b = .gen
-  · subst hg; exact MNotarised.gen_of h (genesisS_subset_stateAt hinit j T)
-  obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation hinit hh hi hg h
+  obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation hinit hh hi h
   refine (Algo.card_leastVoters hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)
@@ -264,9 +259,7 @@ theorem mnotarised_all_end (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
     (h : MNotarised f (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t).procs i)).S b) {T : Nat}
     (hT₁ : t + 1 ≤ T) (hT₂ : max GST.val t + δ ≤ T) :
     MNotarised f ((State.stateAt s₀ instrs T).procs j).S b := by
-  by_cases hg : b = .gen
-  · subst hg; exact MNotarised.gen_of h (genesisS_subset_stateAt hinit j T)
-  obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation_end hinit hh hi hg h
+  obtain ⟨t', ht', hn', hsend⟩ := forward_mnotarisation_end hinit hh hi h
   refine (Algo.card_leastVoters hn').symm.le.trans (Finset.card_le_card fun q hq => ?_)
   rw [mem_voters]
   exact delivered hinit hh hs hi (hsend q hq j) (by omega)

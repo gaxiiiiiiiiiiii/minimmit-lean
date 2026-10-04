@@ -24,7 +24,7 @@ theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
   rcases hL with rfl | hL
   · exact absurd rfl hg
   · obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb (lt_of_lt_of_le (by omega) hL)
-    exact one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq)
+    exact one_le_view_of_sends hinit hh hqc (mem_voteSenders.mp hq) hg
 
 /-- 正直者の各部分の S にあるメッセージは、その正直者が実行上で送ったものか、そのスロットの
     自分の送信。 -/

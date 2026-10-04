@@ -87,7 +87,7 @@ theorem tx_forwarded (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i 
   have hnew : Msg.tx tr ∉ (Algo.st5 f Δ lead i ((State.stateAt s₀ instrs t).procs i)).prevS := by
     rw [Algo.st5_prevS]
     cases t with
-    | zero => rw [prevS_zero hinit]; simp [mem_genesisS]
+    | zero => rw [prevS_zero hinit]; simp
     | succ t' =>
       rw [prevS_stateAt_honest hh hi]
       intro hm

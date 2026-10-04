@@ -301,14 +301,6 @@ theorem genesisS_subset_stateAt (hinit : Init s₀) (k : Fin n) (t : Nat) :
   apply S_subset_stateAt s₀ instrs k (Nat.zero_le t)
   rw [State.stateAt, hinit.procs k]; exact hm
 
-/-- 初期の S はどのスロットの prevS にも含まれる。 -/
-theorem genesisS_subset_prevS_stateAt (hinit : Init s₀) (k : Fin n) :
-    ∀ t, genesisS n Tx ⊆ ((State.stateAt s₀ instrs t).procs k).prevS
-  | 0 => by rw [State.stateAt, hinit.procs k]; exact Finset.Subset.refl _
-  | t + 1 => by
-    rw [State.stateAt, (State.step_procs _ _ k).prevS, Processor.tick_prevS]
-    exact (genesisS_subset_stateAt hinit k t).trans (Processor.S_subset_executeAll k _ _)
-
 /-- 正直者 p_i がスロット t に送ったメッセージは、スロット t + 1 の S にある。 -/
 theorem mem_S_succ_of_send (hh : Honest f Δ lead s₀ instrs) {i : Fin n} (hi : Correct s₀ instrs i)
     {t : Nat} {m : Msg n Tx} {j : Fin n} (h : Action.send m j ∈ (instrs t).actions i) :

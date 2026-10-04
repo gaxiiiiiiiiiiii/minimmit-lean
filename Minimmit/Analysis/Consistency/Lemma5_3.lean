@@ -19,13 +19,15 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
   have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
   intro hN
   classical
-  rcases hL with rfl | hL
-  · -- genesis: view 0 の nullify を正直者は送らない
+  -- b は genesis でない: view 0 の nullify を正直者は送らない
+  have hg : b ≠ .gen := by
+    rintro rfl
     have hlt : f < (nullifySenders s₀ instrs Block.gen.view).card := lt_of_lt_of_le (by omega) hN
     obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
     obtain ⟨t, j, ht⟩ := (mem_nullifySenders.mp hq).instructed hinit
     have h1 := ((localInv_stateAt hinit hh hqc (t + 1)).null_view _ (mem_S_succ_of_send hh hqc ht)).1
     simp [Block.view] at h1
+  have hL : n - f ≤ (voteSenders s₀ instrs b).card := hL.resolve_left hg
   set P := voteSenders s₀ instrs b with hP
   set N := nullifySenders s₀ instrs b.view with hNdef
   have hN' : 2 * f + 1 ≤ N.card := hN
@@ -71,7 +73,7 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
   have hvote_no : Msg.vote q₀ b ∉ ((State.stateAt s₀ instrs (Nat.find hexv)).procs q₀).S := by
     intro hmem
     obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hmem rfl
-      (Msg.vote_ne_gen_vote (one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P)))
+      (Msg.vote_ne_gen_vote (one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P) hg))
     exact absurd (Nat.find_min' hexv ⟨j', hj'⟩) (not_le.mpr ht')
   have hbvote : Msg.vote q₀ b ∈ ((State.stateAt s₀ instrs (T q₀)).procs q₀).S
       ∨ Action.send (Msg.vote q₀ b) j₁
@@ -133,7 +135,8 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
           · rcases Algo.mem_S_stage_or f Δ lead q₀ _ (Algo.S_st4_subset_st5 f Δ lead q₀ _ hm)
               with hm' | hs
             · have hs'' := sends_of_mem_S hinit hm' rfl (Msg.vote_ne_gen_vote
-                (by rw [hbv]; exact one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P)))
+                (by rw [hbv]
+                    exact one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P) hg))
               have := one_vote_per_view hprot hwc (mem_voteSenders.mp hwP) hs'' hbv.symm
               exact hne (congrArg some this.symm)
             · simp only [Msg.signer, Option.some.injEq] at hs

@@ -731,7 +731,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   - `nulls` は、new な nullification の view の列。
   - `notas` は、new な M-notarisation を持つブロックの列。
   - `ms` は送るメッセージの列。`nulls` と `notas` の各証明書から署名者番号順に 2f + 1 人分のメッセージを取り、新しい取引を加える。新しい取引も、S にあって prevS にないもの。
-  - 初期の S にある genesis の証明書は送らない。原文の定義では最初のスロットで new になるが、本形式化では prevS の初期値が S と同じなので new にならない。
+  - 初期の S にある genesis の証明書は、最初のスロットで new になり送られる。
   - L-notarisation は送らない。
 
 #### ■ 確定
@@ -849,7 +849,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def init [DecidableEq Tx] : Processor n Tx :=
     { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
-      S := genesisS n Tx, prevS := genesisS n Tx }
+      S := genesisS n Tx, prevS := ∅ }
   ```
 
   `Init` は、実行の初期状態の条件。
@@ -863,6 +863,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```
 
   - b_gen とその M/L-notarisation はメッセージの集合では持てないので、全員の genesis への票で表す。
+  - `prevS` の初期値は空。初期の S にある genesis の証明書が、原文の定義どおり最初のスロットで new になる。
   - `byz`・`pool`・`now` の条件は論文に明示されていないので、設定に合わせて補った。
 
 #### ■ 正直さ

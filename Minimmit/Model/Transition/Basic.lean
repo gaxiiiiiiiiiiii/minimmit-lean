@@ -143,10 +143,11 @@ structure Processor (n : Nat) (Tx : Type) where
 
 namespace Processor
 
-/-- 初期値（§4）: view 1、T = 0、フラグは false、notarised は none、S と prevS は genesis への全員の票 -/
+/-- 初期値（§4）: view 1、T = 0、フラグは false、notarised は none、S は genesis への全員の票、
+    prevS は空 -/
 def init [DecidableEq Tx] : Processor n Tx :=
   { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
-    S := genesisS n Tx, prevS := genesisS n Tx }
+    S := genesisS n Tx, prevS := ∅ }
 
 /-- 受信: S に m を入れる。 -/
 def receive [DecidableEq Tx] (p : Processor n Tx) (m : Msg n Tx) : Processor n Tx :=

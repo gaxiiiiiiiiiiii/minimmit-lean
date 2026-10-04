@@ -20,13 +20,21 @@ Lemma 5.1〜5.10 をすべて証明した。`sorry` はなく、主定理の依�
 - 論文の部分同期で暗に仮定されていた Δ ≥ 1 を明示した。
 - Lemma 5.10 の証明には Lemma 5.8・5.9 だけでは不足だったため、一般化した補題を追加した。
 
+### 1.4 暗号の仮定
+
+論文は署名方式と PKI と衝突困難なハッシュ関数を使い、敵対者がそれらを破れない実行だけを考える。本形式化は暗号を持たず、同じ仮定を次の 3 つで表す。
+
+- ブロックと message への署名は、署名者の成分で表す。
+- 署名の偽造不能は、送信可能な条件として表す。
+- ハッシュによる親の参照は、親ブロックそのものを持つことで表す。
+
 ## 2. プロトコル
 
 ### 2.1 表現
 
 #### ■ 基本の型
 
-view 番号とタイムスロットの型。どちらも自然数を包む構造体。
+view 番号とタイムスロットを意味する自然数のラッパー
 
 - **実装**
 
@@ -61,8 +69,8 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
 
   - `Tx` は取引の型で、ブロックはこれを引数にとる。取引の中身には立ち入らない。
   - `signer` は署名者で、原文の「signed by lead(v)」の lead(v) に当たる。
-  - `tr` は Tr。相異なる列であることは型に含めない。Tr* が重複を除くので定理は影響を受けず、重複を含む組を許す分だけ広い範囲で成り立つ。
-  - `parent` は親ブロックそのもの。原文はハッシュ値 h で参照している。
+  - `tr` は Tr だが、要素が相異なることは要求しない。重複を含む組も許す分、仮定を弱めたより強い主張をしている。
+  - `parent` は親ブロックそのものを持つ。論文ではハッシュ値 h で親を参照している。
 
 - **属性**
 
@@ -112,8 +120,8 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
 
   - 対応は、block が `propose b`、vote for b が `vote q b`、nullify(v) が `nullify q v`、transaction が `tx tr`。`vote q b` と `nullify q v` の q が署名者。
   - 署名は署名者の成分で表す。
-  - 取引の message にも環境からの署名が要るが、署名者が環境と決まっていて特定する必要がないので、`tx tr` には署名者の成分を置かない。
-  - 原文では、内容が同じで別の取引は無いと仮定している。本形式化では内容が同じ取引は区別がつかないので、仮定は成り立つ。
+  - 取引の署名者は常に環境で、特定する必要がない。そのため `tx tr` は署名者の成分を持たない。
+  - 論文では、内容が同じで別の取引は無いと仮定している。本形式化の取引は `Tx` の値そのものなので、内容が同じ取引は同じ取引である。
 
 - **属性**
 
@@ -149,14 +157,19 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
     prevS : Finset (Msg n Tx)
   ```
 
-  - ⊥ は none。
-  - `prevS` は論文にない補助で、前スロットの動作を終えた時点の S。「新しい」証明書の判定に `forwardNew` が使う。
+  `containsBlock` は、S が b を成分に持つ message を含むこと。
 
-- **付属**
+  ```lean
+  def containsBlock [DecidableEq Tx] (S : Finset (Msg n Tx)) (b : Block n Tx) : Prop :=
+    ∃ m ∈ S, m.block = some b
+  ```
 
-  - `Processor.init` : 初期値
-  - `genesisS` : 初期の S。b_gen と M/L-notarisation は message の集合では持てないので、全員の genesis への票で表す
-  - `containsBlock` : S がブロックを含むこと。ブロックは再帰的に先祖の情報も持つが、判定は message が直接持つブロックだけを対象とする
+  - ⊥ は none で表す。
+  - `prevS` は論文にない成分で、前スロットの動作を終えた時点の S を持つ。原文の new の判定に使う。
+  - ブロックが値として持つ親は、成分に数えない。論文でも h は親を指すだけで、親を含むことにはならない。
+
+- **操作**
+
   - `Processor.receive` : S に m を入れる、pool からの受信と自分の送信の即時受信がここを通る
   - `Processor.send` : p_i が m を j へ送ったときの効果、現在の view の自分の m なら種類に応じて proposed・notarised・nullified を更新し、j = i なら即時受信
   - `Processor.progress` : 17 行と 21 行の view の前進
@@ -260,7 +273,7 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
   - `sentAt` は packet を送ったスロットを覚える。原文の「a message sent at time t must arrive at time t′ > t with t′ ≤ max{GST, t} + Δ」の t に当たり、受信の期限を測るのに使う。
   - `now` は現在のスロットを指す。原文の「the execution is divided into discrete timeslots t ∈ N≥0」の t に当たる。
 
-- **付属**
+- **操作**
 
   - `State.update` : procs i を f で置き換える
   - `State.transmit` : pool に packet を加える
@@ -425,7 +438,7 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
   - 原文は 16〜21 行を 1 スロットに 1 回評価するが、`climb` は証明書がある限り繰り返す。
   - `climb` の fuel は論文にない引数で、Lean の停止性のために繰り返しの上限を与える。`step` は `maxView` + 1 を渡す。この上限で打ち切られないこと、すなわち `climb` の後に現在の view の証明書が残らないことは、別に証明してある。
 
-- **付属**
+- **操作**
 
   - `advanceM` : `advanceOnce` の 19〜21 行の側、証明で使う
 
@@ -775,7 +788,7 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
 
   - フラグと view の更新はそれぞれ、`Processor.send` と `Processor.progress` の実行時になされる。
 
-- **付属**
+- **操作**
 
   - `step` : `stepPair` の動作の列だけを返す形
 
@@ -785,7 +798,7 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
 
 #### ■ 初期状態
 
-実行の初期状態を、それが満たすべき述語 `Init` で定める。論文は初期状態をまとめて述べていないので、局所状態の各変数の説明にある初期値を、`Init` の条件として抜き出す。
+論文は初期状態をまとめて述べていないので、局所状態の初期値を `Processor.init` に集め、実行の初期状態の条件を `Init` で定める。
 
 - **原文**
 
@@ -798,6 +811,23 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
 
 - **実装**
 
+  `genesisS` は、初期の S。
+
+  ```lean
+  def genesisS (n : Nat) (Tx : Type) [DecidableEq Tx] : Finset (Msg n Tx) :=
+    Finset.univ.image fun q => Msg.vote q .gen
+  ```
+
+  `Processor.init` は、局所状態の初期値。
+
+  ```lean
+  def init [DecidableEq Tx] : Processor n Tx :=
+    { view := ⟨1⟩, timer := 0, nullified := false, proposed := false, notarised := none,
+      S := genesisS n Tx, prevS := genesisS n Tx }
+  ```
+
+  `Init` は、実行の初期状態の条件。
+
   ```lean
   structure Init [DecidableEq Tx] (s₀ : State n Tx) : Prop where
     procs : ∀ i, s₀.procs i = Processor.init
@@ -806,6 +836,7 @@ view 番号とタイムスロットの型。どちらも自然数を包む構造
     now : s₀.now = ⟨0⟩
   ```
 
+  - b_gen とその M/L-notarisation は message の集合では持てないので、全員の genesis への票で表す。
   - `byz`・`pool`・`now` の条件は論文に明示されていないので、設定に合わせて補った。
 
 #### ■ 正直さ
@@ -1451,8 +1482,6 @@ Minimmit の実行が存在することを示す。
   - `st1` は、`step` の view の前進を終えた時点の局所状態。上限に達する前に証明書が尽きるので、上限なしで繰り返した場合と同じ状態で止まる。
 
 ## 5. 対応の外
-
-暗号は論文と同じく理想化する。署名は署名者の成分と送信のガード、ハッシュは親の実体参照で表し、確率的な議論は無い。論文でも暗号を破る実行は考えないとしているので、これは差異ではない。
 
 スロット遷移の項で述べた、スロット内の動作の順序の固定について、tick と tick の間で原始関数がどの順に並んでも同じ状態に至ること、この固定順で表せない挙動が「送ったスロットの中での受信」だけであることは、可換性による形式化の外の議論に依っていて未証明。
 

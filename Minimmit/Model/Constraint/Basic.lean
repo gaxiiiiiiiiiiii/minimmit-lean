@@ -30,7 +30,7 @@ def State.Timely (Δ : Nat) (GST : Time) (s : State n Tx) : Prop :=
     GST は敵が選ぶ。 -/
 structure PartialSync [DecidableEq Tx] (Δ : Nat) (GST : Time) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) : Prop where
-  timely : ∀ t, (State.run s₀ instrs t).Timely Δ GST
+  timely : ∀ t, (State.stateAt s₀ instrs t).Timely Δ GST
   one_le : 1 ≤ Δ
 
 /-! ### 腐敗 -/
@@ -38,12 +38,12 @@ structure PartialSync [DecidableEq Tx] (Δ : Nat) (GST : Time) (s₀ : State n T
 /-- p_i は正直者（§2 の correct）: 全スロットで byz にない。 -/
 def Correct [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) :
     Prop :=
-  ∀ t, i ∉ (State.run s₀ instrs t).byz
+  ∀ t, i ∉ (State.stateAt s₀ instrs t).byz
 
 /-- 腐敗するのは最大 f 人（§2）: 全スロットで byz の要素数が f 以下。 -/
 def ByzBound [DecidableEq Tx] (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) :
     Prop :=
-  ∀ t, (State.run s₀ instrs t).byz.card ≤ f
+  ∀ t, (State.stateAt s₀ instrs t).byz.card ≤ f
 
 /-! ### リーダー -/
 
@@ -60,12 +60,12 @@ def CorrectLeaderWithin [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → I
 
 /-! ### プロトコルに従うこと -/
 
-/-- 腐敗していないプロセッサは Algorithm 1 に従う: 全スロット t で、`(run t).byz` にない i
+/-- 腐敗していないプロセッサは Algorithm 1 に従う: 全スロット t で、`(stateAt t).byz` にない i
     の動作は `Algo.step` の出力。 -/
 def Honest [DecidableEq Tx] (f Δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
     (instrs : Nat → Instr n Tx) : Prop :=
-  ∀ t i, i ∉ (State.run s₀ instrs t).byz →
-    (instrs t).actions i = Algo.step f Δ lead i ((State.run s₀ instrs t).procs i)
+  ∀ t i, i ∉ (State.stateAt s₀ instrs t).byz →
+    (instrs t).actions i = Algo.step f Δ lead i ((State.stateAt s₀ instrs t).procs i)
 
 /-! ### Minimmit -/
 

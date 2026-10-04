@@ -36,7 +36,7 @@ theorem FirstEntry.entered_ge {v : View} {t : Nat} (h : FirstEntry s₀ instrs v
 
 theorem viewAt_pos (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {i : Fin n}
     (hi : Correct s₀ instrs i) (t : Nat) : 1 ≤ (viewAt s₀ instrs i t).val :=
-  (localInv_run hinit hh hi t).view_pos
+  (localInv_stateAt hinit hh hi t).view_pos
 
 /-- 正直者の集合 -/
 noncomputable def correctSet (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Finset (Fin n) :=
@@ -62,11 +62,11 @@ theorem card_correctSet (hb : ByzBound f s₀ instrs) : n - f ≤ (correctSet s�
 theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hs : PartialSync δ GST s₀ instrs)
     {i j : Fin n} (hj : Correct s₀ instrs j) {s : Nat} {m : Msg n Tx}
-    (hm : m ∈ ((State.run s₀ instrs (s + 1)).procs j).S) (hsig : m.signer = some j) {T : Nat}
+    (hm : m ∈ ((State.stateAt s₀ instrs (s + 1)).procs j).S) (hsig : m.signer = some j) {T : Nat}
     (hT₁ : s + 1 ≤ T) (hT₂ : max GST.val s + δ ≤ T) :
-    m ∈ ((State.run s₀ instrs T).procs i).S := by
+    m ∈ ((State.stateAt s₀ instrs T).procs i).S := by
   by_cases hg : m = .vote j .gen
-  · subst hg; exact genesisS_subset_run hinit i T (mem_genesisS.mpr ⟨j, rfl⟩)
+  · subst hg; exact genesisS_subset_stateAt hinit i T (mem_genesisS.mpr ⟨j, rfl⟩)
   obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hm hsig hg
   have hact := hh t' j (hj t')
   have hsend : Action.send m i ∈ (instrs t').actions j := by
@@ -76,7 +76,7 @@ theorem own_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     ((Nat.add_le_add_right (max_le_max (le_refl _) (Nat.le_of_lt_succ ht')) δ).trans hT₂)
 
 theorem viewAt_zero (hinit : Init s₀) (j : Fin n) : (viewAt s₀ instrs j 0).val = 1 := by
-  unfold viewAt; rw [State.run, hinit.procs j]; rfl
+  unfold viewAt; rw [State.stateAt, hinit.procs j]; rfl
 
 open Classical in
 /-- view v 以上に達する正直者は、最初にそうなるスロットに v にいる。 -/
@@ -164,8 +164,8 @@ theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     {j : Fin n} (hj : Correct s₀ instrs j) {k : Nat} (hreach : ∃ t, k ≤ (viewAt s₀ instrs j t).val)
     (hstuck : ∀ t, (viewAt s₀ instrs j t).val ≤ k) :
     ∃ s, k ≤ (viewAt s₀ instrs j s).val
-      ∧ ((∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.run s₀ instrs (s + 1)).procs j).S)
-        ∨ Msg.nullify j ⟨k⟩ ∈ ((State.run s₀ instrs (s + 1)).procs j).S) := by
+      ∧ ((∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.stateAt s₀ instrs (s + 1)).procs j).S)
+        ∨ Msg.nullify j ⟨k⟩ ∈ ((State.stateAt s₀ instrs (s + 1)).procs j).S) := by
   classical
   have hex := hreach
   have he : (viewAt s₀ instrs j (Nat.find hex)).val = k :=
@@ -176,8 +176,8 @@ theorem timeout_stuck (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
   have htimer : timerAt s₀ instrs j (Nat.find hex) ≤ 1 := by
     rcases Nat.eq_zero_or_pos (Nat.find hex) with h0 | hpos
     · rw [h0]
-      show ((State.run s₀ instrs 0).procs j).timer ≤ 1
-      rw [State.run, hinit.procs j]; exact Nat.zero_le 1
+      show ((State.stateAt s₀ instrs 0).procs j).timer ≤ 1
+      rw [State.stateAt, hinit.procs j]; exact Nat.zero_le 1
     · obtain ⟨e', he'⟩ := Nat.exists_eq_add_one_of_ne_zero (Nat.pos_iff_ne_zero.mp hpos)
       have hlt : (viewAt s₀ instrs j e').val < k :=
         not_le.mp (Nat.find_min hex (by rw [he']; exact Nat.lt_succ_self e'))
@@ -222,15 +222,15 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     have hall : ∀ j, Correct s₀ instrs j → ∀ t, (viewAt s₀ instrs j t).val ≤ k :=
       fun j hj => stuck_all hinit hh hs hi hk hstuck (ih i hi) hj
     have hto : ∀ j, Correct s₀ instrs j → ∃ s, k ≤ (viewAt s₀ instrs j s).val
-        ∧ ((∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.run s₀ instrs (s + 1)).procs j).S)
-          ∨ Msg.nullify j ⟨k⟩ ∈ ((State.run s₀ instrs (s + 1)).procs j).S) :=
+        ∧ ((∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.stateAt s₀ instrs (s + 1)).procs j).S)
+          ∨ Msg.nullify j ⟨k⟩ ∈ ((State.stateAt s₀ instrs (s + 1)).procs j).S) :=
       fun j hj => timeout_stuck hinit hh hs hj (ih j hj) (hall j hj)
     classical
     let sf : Fin n → Nat := fun j =>
       if h : Correct s₀ instrs j then Classical.choose (hto j h) else 0
     have hsf : ∀ j (hj : Correct s₀ instrs j), k ≤ (viewAt s₀ instrs j (sf j)).val
-        ∧ ((∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.run s₀ instrs (sf j + 1)).procs j).S)
-          ∨ Msg.nullify j ⟨k⟩ ∈ ((State.run s₀ instrs (sf j + 1)).procs j).S) := by
+        ∧ ((∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.stateAt s₀ instrs (sf j + 1)).procs j).S)
+          ∨ Msg.nullify j ⟨k⟩ ∈ ((State.stateAt s₀ instrs (sf j + 1)).procs j).S) := by
       intro j hj
       simp only [sf, dif_pos hj]
       exact Classical.choose_spec (hto j hj)
@@ -250,8 +250,8 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       exact View.val_injective (le_antisymm (hall j hj t) (h1.trans (viewAt_mono j (by omega))))
     -- T₂ には全正直者の投票か nullify が全正直者に届いている
     have hmsg : ∀ j ∈ correctSet s₀ instrs, ∀ i' ∈ correctSet s₀ instrs,
-        (∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.run s₀ instrs T₂).procs i').S)
-          ∨ Msg.nullify j ⟨k⟩ ∈ ((State.run s₀ instrs T₂).procs i').S := by
+        (∃ b, b.view = ⟨k⟩ ∧ Msg.vote j b ∈ ((State.stateAt s₀ instrs T₂).procs i').S)
+          ∨ Msg.nullify j ⟨k⟩ ∈ ((State.stateAt s₀ instrs T₂).procs i').S := by
       intro j hj i' hi'
       have hjc := mem_correctSet.mp hj
       have hi'c := mem_correctSet.mp hi'
@@ -260,35 +260,35 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
       · exact Or.inr (own_delivered hinit hh hs hjc hm rfl (hT₂ j hj).1 (hT₂ j hj).2)
     -- 全正直者が T₂ + 1 までに nullify(k) を送る
     have hnull : ∀ j ∈ correctSet s₀ instrs,
-        Msg.nullify j ⟨k⟩ ∈ ((State.run s₀ instrs (T₂ + 1)).procs j).S := by
+        Msg.nullify j ⟨k⟩ ∈ ((State.stateAt s₀ instrs (T₂ + 1)).procs j).S := by
       intro j hj
       have hjc := mem_correctSet.mp hj
       rcases (hsf j hjc).2 with ⟨b, hbv, hm⟩ | hm
       · have hvT : viewAt s₀ instrs j T₂ = ⟨k⟩ := hview j hjc T₂ (le_refl _)
-        have hmT : Msg.vote j b ∈ ((State.run s₀ instrs T₂).procs j).S :=
-          S_subset_run s₀ instrs j (hT₂ j hj).1 hm
-        have hL := localInv_run hinit hh hjc T₂
+        have hmT : Msg.vote j b ∈ ((State.stateAt s₀ instrs T₂).procs j).S :=
+          S_subset_stateAt s₀ instrs j (hT₂ j hj).1 hm
+        have hL := localInv_stateAt hinit hh hjc T₂
         have hg : b ≠ .gen := by
           intro h; subst h; simp [Block.view] at hbv; omega
-        have hnot : ((State.run s₀ instrs T₂).procs j).notarised = some b := by
+        have hnot : ((State.stateAt s₀ instrs T₂).procs j).notarised = some b := by
           refine ((hL.notar b hg hmT).2.resolve_left ?_).2
           rw [hbv]
           change ¬ k < (viewAt s₀ instrs j T₂).val
           rw [hvT]; exact lt_irrefl _
-        have hnoM : ¬ MNotarised f ((State.run s₀ instrs T₂).procs j).S b := by
+        have hnoM : ¬ MNotarised f ((State.stateAt s₀ instrs T₂).procs j).S b := by
           intro hM
           have := leave_of_mnotarised hh hjc (hvT.trans hbv.symm) hM
           rw [hbv] at this
           exact absurd (hall j hjc (T₂ + 1)) (not_le.mpr this)
-        have hvoters : (voters ((State.run s₀ instrs T₂).procs j).S b).card ≤ 2 * f := by
+        have hvoters : (voters ((State.stateAt s₀ instrs T₂).procs j).S b).card ≤ 2 * f := by
           by_contra h
           exact hnoM (not_le.mp h)
-        have hnp : NoProgress f ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) := by
+        have hnp : NoProgress f ((State.stateAt s₀ instrs T₂).procs j).S ⟨k⟩ (some b) := by
           have hCsub : correctSet s₀ instrs ⊆
               (correctSet s₀ instrs).filter
-                (fun c => NoProgressWitness ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c)
+                (fun c => NoProgressWitness ((State.stateAt s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c)
               ∪ (correctSet s₀ instrs).filter
-                (fun c => Msg.vote c b ∈ ((State.run s₀ instrs T₂).procs j).S) := by
+                (fun c => Msg.vote c b ∈ ((State.stateAt s₀ instrs T₂).procs j).S) := by
             intro c hc
             rcases hmsg c hc j hj with ⟨b', hb'v, hm'⟩ | hm'
             · by_cases hbb : b' = b
@@ -298,30 +298,30 @@ theorem progression_aux (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
                   ⟨hc, .vote b' hb'v (fun h => hbb (Option.some.inj h)) hm'⟩)
             · exact Finset.mem_union_left _ (Finset.mem_filter.mpr ⟨hc, .nullify hm'⟩)
           have hV : ((correctSet s₀ instrs).filter
-              (fun c => Msg.vote c b ∈ ((State.run s₀ instrs T₂).procs j).S)).card ≤ 2 * f :=
+              (fun c => Msg.vote c b ∈ ((State.stateAt s₀ instrs T₂).procs j).S)).card ≤ 2 * f :=
             (Finset.card_le_card fun c hc => mem_voters.mpr (Finset.mem_filter.mp hc).2).trans
             hvoters
           have hW : (correctSet s₀ instrs).filter
-              (fun c => NoProgressWitness ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c)
-              ⊆ noProgressWitnesses ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) :=
+              (fun c => NoProgressWitness ((State.stateAt s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c)
+              ⊆ noProgressWitnesses ((State.stateAt s₀ instrs T₂).procs j).S ⟨k⟩ (some b) :=
             fun c hc => mem_noProgressWitnesses.mpr (Finset.mem_filter.mp hc).2
           have h1 := Finset.card_le_card hCsub
           have h2 := Finset.card_union_le ((correctSet s₀ instrs).filter
-              (fun c => NoProgressWitness ((State.run s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c))
+              (fun c => NoProgressWitness ((State.stateAt s₀ instrs T₂).procs j).S ⟨k⟩ (some b) c))
             ((correctSet s₀ instrs).filter
-              (fun c => Msg.vote c b ∈ ((State.run s₀ instrs T₂).procs j).S))
+              (fun c => Msg.vote c b ∈ ((State.stateAt s₀ instrs T₂).procs j).S))
           have h4 := Finset.card_le_card hW
           unfold NoProgress
           omega
         rcases noprogress_reaction hinit hh hjc hvT hnot hnp with h | h
         · exact h
         · exact absurd (hall j hjc (T₂ + 1)) (not_le.mpr h)
-      · exact S_subset_run s₀ instrs j (by have := (hT₂ j hj).1; omega) hm
+      · exact S_subset_stateAt s₀ instrs j (by have := (hT₂ j hj).1; omega) hm
     -- nullification が i に届き、i が進む
     have hN :
-        Nullified f ((State.run s₀ instrs (max GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
+        Nullified f ((State.stateAt s₀ instrs (max GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ := by
       have hsub : correctSet s₀ instrs
-          ⊆ nullifiers ((State.run s₀ instrs (max GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ :=
+          ⊆ nullifiers ((State.stateAt s₀ instrs (max GST.val (T₂ + 1) + Δ + 1)).procs i).S ⟨k⟩ :=
         fun j hj => mem_nullifiers.mpr (own_delivered hinit hh hs (mem_correctSet.mp hj)
           (hnull j hj) rfl (by omega) (by omega))
       have := Finset.card_le_card hsub

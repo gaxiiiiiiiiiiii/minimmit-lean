@@ -34,7 +34,7 @@ Minimmit
 ├── Axioms.lean             主定理の一覧と、依存公理の固定
 ├── Model
 │   ├── Transition
-│   │   ├── Basic.lean          状態、メッセージ、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.run
+│   │   ├── Basic.lean          状態、メッセージ、原始関数（send・progress・deliver・submit・corrupt）、State.step、State.stateAt
 │   │   └── Execute.lean        原始関数の局所効果、動作列の畳み込み、1 スロット後の状態との関係
 │   ├── Certificate
 │   │   ├── Basic.lean          §4 の述語（M/L-notarisation、nullification、valid proposal、proof of no progress）

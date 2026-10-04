@@ -15,15 +15,15 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 /-- 取引 tr を正直者が初めて受け取るのが t（§5.3）: t にある正直者の S にあり、t より前には
     どの正直者の S にもない。 -/
 def FirstReceived (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (tr : Tx) (t : Nat) : Prop :=
-  (∃ i, Correct s₀ instrs i ∧ Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
-  ∧ ∀ j t', Correct s₀ instrs j → t' < t → Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S
+  (∃ i, Correct s₀ instrs i ∧ Msg.tx tr ∈ ((State.stateAt s₀ instrs t).procs i).S)
+  ∧ ∀ j t', Correct s₀ instrs j → t' < t → Msg.tx tr ∉ ((State.stateAt s₀ instrs t').procs j).S
 
 /-- 全正直者が T までに tr を finalise している（§5.3）: T の S で finalise したブロックの Tr* に
     tr が入っている。 -/
 def FinalisedByAll (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (tr : Tx) (T : Nat) :
     Prop :=
   ∀ j, Correct s₀ instrs j → ∃ b : Block n Tx,
-    Finalised f ((State.run s₀ instrs T).procs j).S b ∧ tr ∈ b.trStar
+    Finalised f ((State.stateAt s₀ instrs T).procs j).S b ∧ tr ∈ b.trStar
 
 /-- tr の latency が ℓ（§5.3）: 正直者が初めて受け取るのが t で、全正直者が初めて finalise
     しているのが t + ℓ。 -/

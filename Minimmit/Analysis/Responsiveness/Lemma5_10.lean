@@ -55,12 +55,12 @@ theorem tx_finalised_by (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     (hδ : δ ≤ Δ) (hs : PartialSync δ GST s₀ instrs) {fa : Nat}
     (hlead : CorrectLeaderWithin s₀ instrs lead fa)
     {i : Fin n} (hi : Correct s₀ instrs i) {t : Nat} {tr : Tx}
-    (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
+    (htr : Msg.tx tr ∈ ((State.stateAt s₀ instrs t).procs i).S)
     (hfirst : ∀ j t', Correct s₀ instrs j → t' < t →
-      Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S)
+      Msg.tx tr ∉ ((State.stateAt s₀ instrs t').procs j).S)
     (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j → ∃ b : Block n Tx,
-      Finalised f ((State.run s₀ instrs (t + fa * (2 * Δ + 3 * δ) + 8 * δ)).procs j).S b
+      Finalised f ((State.stateAt s₀ instrs (t + fa * (2 * Δ + 3 * δ) + 8 * δ)).procs j).S b
       ∧ tr ∈ b.trStar := by
   classical
   have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
@@ -68,7 +68,7 @@ theorem tx_finalised_by (hprot : IsMinimmit f Δ lead GST s₀ instrs)
   have hΔ1 : 1 ≤ Δ := le_trans hδ1 hδ
   -- tr は t + δ までに全正直者に届く
   have htx : ∀ r, Correct s₀ instrs r → ∀ T, t + δ ≤ T →
-      Msg.tx tr ∈ ((State.run s₀ instrs T).procs r).S := fun r hr T hT =>
+      Msg.tx tr ∈ ((State.stateAt s₀ instrs T).procs r).S := fun r hr T hT =>
     delivered hinit hh hs hi (tx_forwarded hinit hh hi htr (fun t' ht' => hfirst i t' hi ht') r)
       (by omega) (by omega)
   -- v₀: t + δ における正直者の view の最大
@@ -151,7 +151,7 @@ theorem tx_finalised_by (hprot : IsMinimmit f Δ lead GST s₀ instrs)
   intro j hj
   refine ⟨leaderBlockAt f lead s₀ instrs v₁ e, ?_, ?_⟩
   · exact (leaderBlock_finalised_by (j := j) hinit hh hb hs R).mono
-      (S_subset_run s₀ instrs j (by omega))
+      (S_subset_stateAt s₀ instrs j (by omega))
   · apply mem_trStar_leaderBlock
     apply Algo.S_subset_st1 f (lead v₁) _
     exact htx (lead v₁) hlc e (by omega)
@@ -166,7 +166,7 @@ theorem optimistic_responsiveness : OptimisticallyResponsive := by
   have hB : FinalisedByAll f s₀ instrs tr (t + 8 * (fa * Δ + δ)) := by
     intro j hj
     obtain ⟨b, hb, hmem⟩ := tx_finalised_by hprot hδ hs hlead hi htr hfirst hgst j hj
-    refine ⟨b, hb.mono (S_subset_run s₀ instrs j ?_), hmem⟩
+    refine ⟨b, hb.mono (S_subset_stateAt s₀ instrs j ?_), hmem⟩
     rw [Nat.mul_add fa (2 * Δ) (3 * δ), Nat.mul_left_comm fa 2 Δ, Nat.mul_left_comm fa 3 δ]
     have h1 : fa * δ ≤ fa * Δ := Nat.mul_le_mul_left fa hδ
     omega

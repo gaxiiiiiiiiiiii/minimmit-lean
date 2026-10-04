@@ -24,7 +24,7 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
     have hlt : f < (nullifySenders s₀ instrs Block.gen.view).card := lt_of_lt_of_le (by omega) hN
     obtain ⟨q, hq, hqc⟩ := exists_correct_of_lt_card hb hlt
     obtain ⟨t, j, ht⟩ := (mem_nullifySenders.mp hq).instructed hinit
-    have h1 := ((localInv_run hinit hh hqc (t + 1)).null_view _ (mem_S_succ_of_send hh hqc ht)).1
+    have h1 := ((localInv_stateAt hinit hh hqc (t + 1)).null_view _ (mem_S_succ_of_send hh hqc ht)).1
     simp [Block.view] at h1
   set P := voteSenders s₀ instrs b with hP
   set N := nullifySenders s₀ instrs b.view with hNdef
@@ -56,10 +56,10 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
   have hj₀' := hj₀
   have hact := hh (T q₀) q₀ (hq₀c (T q₀))
   rw [hact] at hj₀
-  have hp : Algo.LocalInv f q₀ ((State.run s₀ instrs (T q₀)).procs q₀) :=
-    localInv_run hinit hh hq₀c (T q₀)
+  have hp : Algo.LocalInv f q₀ ((State.stateAt s₀ instrs (T q₀)).procs q₀) :=
+    localInv_stateAt hinit hh hq₀c (T q₀)
   -- 最初の nullify なので、その前の S に自分の nullify は無い
-  have hno : Msg.nullify q₀ b.view ∉ ((State.run s₀ instrs (T q₀)).procs q₀).S := by
+  have hno : Msg.nullify q₀ b.view ∉ ((State.stateAt s₀ instrs (T q₀)).procs q₀).S := by
     intro hmem
     obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hmem rfl nofun
     have := hT_min q₀ hexq₀ t' ⟨j', hj'⟩
@@ -68,17 +68,17 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
   have hexv : ∃ t, ∃ j, Action.send (Msg.vote q₀ b) j ∈ (instrs t).actions q₀ :=
     (mem_voteSenders.mp hq₀P).instructed hinit
   obtain ⟨j₁, hj₁⟩ := Nat.find_spec hexv
-  have hvote_no : Msg.vote q₀ b ∉ ((State.run s₀ instrs (Nat.find hexv)).procs q₀).S := by
+  have hvote_no : Msg.vote q₀ b ∉ ((State.stateAt s₀ instrs (Nat.find hexv)).procs q₀).S := by
     intro hmem
     obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hmem rfl
       (Msg.vote_ne_gen_vote (one_le_view_of_sends hinit hh hq₀c (mem_voteSenders.mp hq₀P)))
     exact absurd (Nat.find_min' hexv ⟨j', hj'⟩) (not_le.mpr ht')
-  have hbvote : Msg.vote q₀ b ∈ ((State.run s₀ instrs (T q₀)).procs q₀).S
+  have hbvote : Msg.vote q₀ b ∈ ((State.stateAt s₀ instrs (T q₀)).procs q₀).S
       ∨ Action.send (Msg.vote q₀ b) j₁
-      ∈ Algo.step f Δ lead q₀ ((State.run s₀ instrs (T q₀)).procs q₀) := by
+      ∈ Algo.step f Δ lead q₀ ((State.stateAt s₀ instrs (T q₀)).procs q₀) := by
     rcases lt_trichotomy (Nat.find hexv) (T q₀) with hlt | heq | hgt
     · left
-      exact S_subset_run s₀ instrs q₀ (Nat.succ_le_of_lt hlt) (mem_S_succ_of_send hh hq₀c hj₁)
+      exact S_subset_stateAt s₀ instrs q₀ (Nat.succ_le_of_lt hlt) (mem_S_succ_of_send hh hq₀c hj₁)
     · right
       have hact₁ := hh (Nat.find hexv) q₀ (hq₀c _)
       rw [hact₁] at hj₁
@@ -86,11 +86,11 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
       exact hj₁
     · exfalso
       -- t₀ に nullify(b.view) を出した後、view b.view で b に投票できない
-      have hnull_mem : Msg.nullify q₀ b.view ∈ ((State.run s₀ instrs (Nat.find hexv)).procs q₀).S :=
-        S_subset_run s₀ instrs q₀ (Nat.succ_le_of_lt hgt) (mem_S_succ_of_send hh hq₀c hj₀')
+      have hnull_mem : Msg.nullify q₀ b.view ∈ ((State.stateAt s₀ instrs (Nat.find hexv)).procs q₀).S :=
+        S_subset_stateAt s₀ instrs q₀ (Nat.succ_le_of_lt hgt) (mem_S_succ_of_send hh hq₀c hj₀')
       have hact₁ := hh (Nat.find hexv) q₀ (hq₀c _)
       rw [hact₁] at hj₁
-      rcases Algo.vote_emission (localInv_run hinit hh hq₀c _) hj₁
+      rcases Algo.vote_emission (localInv_stateAt hinit hh hq₀c _) hj₁
           with hmem | ⟨q, hq, hqv, _, hqnl, hqS, _, _⟩
       · exact hvote_no hmem
       · have := hq.null_flag (by rw [hqv]; exact hqS hnull_mem)
@@ -98,7 +98,7 @@ theorem not_receivesNullification_of_receivesL (hprot : IsMinimmit f Δ lead GST
         cases this
   obtain ⟨h6, hv6, hnl6, hvote6, hnp⟩ := Algo.nullify_after_vote hp hbvote hj₀ hno
   -- 証拠の署名者 W を数える
-  set W := noProgressWitnesses (Algo.st4 f Δ lead q₀ ((State.run s₀ instrs (T q₀)).procs q₀)).S
+  set W := noProgressWitnesses (Algo.st4 f Δ lead q₀ ((State.stateAt s₀ instrs (T q₀)).procs q₀)).S
     b.view (some b) with hW
   have hWcard : 2 * f + 1 ≤ W.card := hnp
   have hWsub : W ⊆ Pᶜ ∪ W.filter (fun w => ¬ Correct s₀ instrs w) := by

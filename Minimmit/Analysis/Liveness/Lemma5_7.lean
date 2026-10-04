@@ -20,8 +20,8 @@ variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx
     finalise したブロックの Tr* に入る。 -/
 theorem tx_finalised (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {i j : Fin n} (hi : Correct s₀ instrs i)
-    {t : Nat} {tr : Tx} (htr : Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S) :
-    ∃ t' b, Finalised f ((State.run s₀ instrs t').procs j).S b ∧ tr ∈ b.trStar := by
+    {t : Nat} {tr : Tx} (htr : Msg.tx tr ∈ ((State.stateAt s₀ instrs t).procs i).S) :
+    ∃ t' b, Finalised f ((State.stateAt s₀ instrs t').procs j).S b ∧ tr ∈ b.trStar := by
   classical
   have ⟨hn, hinit, hh, hb, hs, hlead⟩ := hprot
   have hΔ := hs.one_le
@@ -51,13 +51,13 @@ theorem tx_finalised (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     apply mem_trStar_leaderBlock
     apply Algo.S_subset_st1 f (lead v') _
     rw [hlv']
-    exact S_subset_run s₀ instrs i (by omega) htr
+    exact S_subset_stateAt s₀ instrs i (by omega) htr
   -- 全正直者の票が j に届く
   have hvotes : ∀ r ∈ correctSet s₀ instrs, ∃ s, ∃ j',
       Action.send (Msg.vote r (leaderBlockAt f lead s₀ instrs v' e)) j' ∈ (instrs s).actions r :=
     fun r hr => (all_vote_leaderBlock hinit hh hb hs R hn (mem_correctSet.mp hr)).instructed hinit
   obtain ⟨T, hT⟩ := exists_bound hvotes
-  have hLN : LNotarised f ((State.run s₀ instrs (T + GST.val + Δ + 1)).procs j).S
+  have hLN : LNotarised f ((State.stateAt s₀ instrs (T + GST.val + Δ + 1)).procs j).S
       (leaderBlockAt f lead s₀ instrs v' e) := by
     refine (card_correctSet hb).trans (Finset.card_le_card fun r hr => ?_)
     obtain ⟨s, hsT, j', hj'⟩ := hT r hr
@@ -69,10 +69,10 @@ theorem tx_finalised (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     rw [mem_voters]
     exact delivered hinit hh hs hrc hj'' (by omega) (by omega)
   refine ⟨T + GST.val + Δ + 1 + (Nat.find hreach + 3 * Δ), leaderBlockAt f lead s₀ instrs v' e,
-    ⟨hLN.mono (S_subset_run s₀ instrs j (by omega)), fun a ha => ?_⟩, htr'⟩
+    ⟨hLN.mono (S_subset_stateAt s₀ instrs j (by omega)), fun a ha => ?_⟩, htr'⟩
   rcases ha.eq_or_parent with rfl | ⟨p, hp, hap⟩
   · obtain ⟨w, hw⟩ := Finset.card_pos.mp (lt_of_lt_of_le (by omega) (show n - f ≤ _ from hLN))
-    exact ⟨_, S_subset_run s₀ instrs j (by omega) (mem_voters.mp hw), rfl⟩
+    exact ⟨_, S_subset_stateAt s₀ instrs j (by omega) (mem_voters.mp hw), rfl⟩
   · have hpar : (leaderBlockAt f lead s₀ instrs v' e).parent
         = some (leaderParentAt f lead s₀ instrs v' e) := rfl
     rw [hpar, Option.mem_some_iff] at hp
@@ -86,7 +86,7 @@ theorem liveness (hprot : IsMinimmit f Δ lead GST s₀ instrs) : Liveness f s�
   intro i j hi _ t tr htr
   have hn := hprot.resilience
   obtain ⟨t', b, hfin, hmem⟩ := tx_finalised (j := j) hprot hi htr
-  have hvb : b ∈ Algo.votedBlocks ((State.run s₀ instrs t').procs j).S := by
+  have hvb : b ∈ Algo.votedBlocks ((State.stateAt s₀ instrs t').procs j).S := by
     obtain ⟨w, hw⟩ := Finset.card_pos.mp (lt_of_lt_of_le (by omega) (show n - f ≤ _ from hfin.1))
     exact Algo.mem_votedBlocks (mem_voters.mp hw)
   obtain ⟨b', _, hanc, hlog⟩ := log_eq_of_finalised

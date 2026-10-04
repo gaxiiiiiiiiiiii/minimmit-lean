@@ -35,7 +35,7 @@ theorem Block.Ancestor.eq_or_parent {a b : Block n Tx} (h : Block.Ancestor a b) 
 theorem ancestor_vote_before (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hb : ByzBound f s₀ instrs) :
     ∀ (b : Block n Tx) {i : Fin n} {s : Nat},
-      MNotarised f ((State.run s₀ instrs s).procs i).S b →
+      MNotarised f ((State.stateAt s₀ instrs s).procs i).S b →
       ∀ a, Block.Ancestor a b → a ≠ .gen →
         ∃ w s', Correct s₀ instrs w ∧ s' < s
           ∧ ∃ j, Action.send (Msg.vote w a) j ∈ (instrs s').actions w
@@ -53,7 +53,7 @@ theorem ancestor_vote_before (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
       have hRM : ReceivesM f s₀ instrs (.node q v tr p) := receivesM_of_MNotarised hinit hM
       obtain ⟨q', t₀, hq'c, _, hvp, hmin⟩ := exists_valid_proposal_vote hinit hh hb (by simp) hRM
       have ht₀ : t₀ ≤ s' := hmin s' w j hwc hj
-      have hMp : MNotarised f ((State.run s₀ instrs (t₀ + 1)).procs q').S p :=
+      have hMp : MNotarised f ((State.stateAt s₀ instrs (t₀ + 1)).procs q').S p :=
         (hvp.parent p (by simp [Block.parent])).mono
           ((Algo.S_st2_subset_st5 f Δ lead q' _).trans (S_st5_subset_succ hh hq'c t₀))
       obtain ⟨w', s'', hw'c, hs'', hsend⟩ := ancestor_vote_before hinit hh hb p hMp a hap hg
@@ -63,13 +63,13 @@ theorem ancestor_vote_before (hinit : Init s₀) (hh : Honest f Δ lead s₀ ins
     までに全員の S に含まれる。 -/
 theorem ancestors_delivered (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs)
-    {i : Fin n} {s : Nat} {b : Block n Tx} (hM : MNotarised f ((State.run s₀ instrs s).procs i).S b)
+    {i : Fin n} {s : Nat} {b : Block n Tx} (hM : MNotarised f ((State.stateAt s₀ instrs s).procs i).S b)
     {j : Fin n} {T : Nat} (hT₁ : s ≤ T) (hT₂ : max GST.val s + δ ≤ T) :
-    ∀ a, Block.Ancestor a b → containsBlock ((State.run s₀ instrs T).procs j).S a := by
+    ∀ a, Block.Ancestor a b → containsBlock ((State.stateAt s₀ instrs T).procs j).S a := by
   intro a ha
   by_cases hg : a = .gen
   · subst hg
-    exact ⟨.vote j .gen, genesisS_subset_run hinit j T (mem_genesisS.mpr ⟨j, rfl⟩), rfl⟩
+    exact ⟨.vote j .gen, genesisS_subset_stateAt hinit j T (mem_genesisS.mpr ⟨j, rfl⟩), rfl⟩
   obtain ⟨w, s', hwc, hs', j', hj'⟩ := ancestor_vote_before hinit hh hb b hM a ha hg
   have hsend : Action.send (Msg.vote w a) j ∈ (instrs s').actions w := by
     rw [hh s' w (hwc s')] at hj' ⊢

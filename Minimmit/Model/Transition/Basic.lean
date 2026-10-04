@@ -4,7 +4,7 @@ import Mathlib.Data.Fintype.Basic
 /-!
 # 遷移系
 
-1 スロット分の遷移 `State.step` と、その繰り返しである実行 `State.run` を定義する。
+1 スロット分の遷移 `State.step` と、その繰り返しである実行 `State.stateAt` を定義する。
 そのための §2・§4 の型（View・Time・Block・Msg・Packet）、プロセッサの局所状態
 `Processor` と大域状態 `State` とそれぞれの原始関数、および 1 スロット分の指示 `Instr`。
 -/
@@ -305,11 +305,11 @@ def step [DecidableEq Tx] (s : State n Tx) (instr : Instr n Tx) : State n Tx :=
   instr.corrupts.foldl corrupt s
 
 /-- 実行: 初期状態 s₀ に指示の列 instrs を順に適用する。`instrs t` の deliveries と
-    submits はスロット t + 1 に届く。`run s₀ instrs t` はスロット t の状態で、t に届いた
+    submits はスロット t + 1 に届く。`stateAt s₀ instrs t` はスロット t の状態で、t に届いた
     メッセージが S に入っていて、t の動作はまだしていない。 -/
-def run [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
+def stateAt [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
   | 0 => s₀
-  | t + 1 => (run s₀ instrs t).step (instrs t)
+  | t + 1 => (stateAt s₀ instrs t).step (instrs t)
 
 end State
 
@@ -317,6 +317,6 @@ end State
     pool にある。 -/
 def Sends [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n)
     (m : Msg n Tx) : Prop :=
-  ∃ t, ∃ x ∈ (State.run s₀ instrs t).pool, x.src = i ∧ x.msg = m
+  ∃ t, ∃ x ∈ (State.stateAt s₀ instrs t).pool, x.src = i ∧ x.msg = m
 
 end Minimmit

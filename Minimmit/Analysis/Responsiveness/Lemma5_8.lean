@@ -17,7 +17,7 @@ variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx
 theorem leaderBlock_lnotarised_by (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs)
     {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs GST v t e) {j : Fin n} :
-    LNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
+    LNotarised f ((State.stateAt s₀ instrs (t + 3 * δ)).procs j).S
     (leaderBlockAt f lead s₀ instrs v e) := by
   have hδ1 := hs.one_le
   have hgst := R.hgst
@@ -38,7 +38,7 @@ theorem leaderBlock_lnotarised_by (hinit : Init s₀)
 theorem leaderBlock_finalised_by (hinit : Init s₀)
     (hh : Honest f Δ lead s₀ instrs) (hb : ByzBound f s₀ instrs) (hs : PartialSync δ GST s₀ instrs)
     {v : View} {t e : Nat} (R : LeaderRound f Δ δ lead s₀ instrs GST v t e) {j : Fin n} :
-    Finalised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
+    Finalised f ((State.stateAt s₀ instrs (t + 3 * δ)).procs j).S
     (leaderBlockAt f lead s₀ instrs v e) := by
   have hn := R.hn
   have hδ1 := hs.one_le
@@ -62,7 +62,7 @@ theorem correct_leader_finalises_fast (hprot : IsMinimmit f Δ lead GST s₀ ins
     (hi : Correct s₀ instrs (lead v))
     {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
     ∀ j, Correct s₀ instrs j →
-      (∃ b : Block n Tx, b.view = v ∧ Finalised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
+      (∃ b : Block n Tx, b.view = v ∧ Finalised f ((State.stateAt s₀ instrs (t + 3 * δ)).procs j).S b)
       ∧ v.val < (viewAt s₀ instrs j (t + 3 * δ + 1)).val := by
   have ⟨hn, hinit, hh, hb, _, _⟩ := hprot
   intro j hj
@@ -72,10 +72,10 @@ theorem correct_leader_finalises_fast (hprot : IsMinimmit f Δ lead GST s₀ ins
   have hLN := leaderBlock_lnotarised_by (j := j) hinit hh hb hs R
   refine ⟨⟨leaderBlockAt f lead s₀ instrs v e, hbLv,
     leaderBlock_finalised_by (j := j) hinit hh hb hs R⟩, ?_⟩
-  have hM : MNotarised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S
+  have hM : MNotarised f ((State.stateAt s₀ instrs (t + 3 * δ)).procs j).S
       (leaderBlockAt f lead s₀ instrs v e) := by
     have h := hLN; unfold LNotarised at h; unfold MNotarised; omega
-  have hcert : Algo.HasCert f ((State.run s₀ instrs (t + 3 * δ)).procs j).S v := by
+  have hcert : Algo.HasCert f ((State.stateAt s₀ instrs (t + 3 * δ)).procs j).S v := by
     rw [← hbLv]
     exact Algo.hasCert_of_mnotarised hM
   have henter := enter_all hinit hh hs hfirst hgst hj

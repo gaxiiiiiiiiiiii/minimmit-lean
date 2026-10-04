@@ -60,10 +60,10 @@ theorem trace_snd (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
 
 /-- 実行は `trace` の状態成分。 -/
 theorem run_eq (f Δ : Nat) (lead : View → Fin n) (t : Nat) :
-    State.run (init (Tx := Tx)) (instrs f Δ lead) t = (trace f Δ lead t).1 := by
+    State.stateAt (init (Tx := Tx)) (instrs f Δ lead) t = (trace f Δ lead t).1 := by
   induction t with
   | zero => rfl
-  | succ t ih => simp only [State.run, ih]; rfl
+  | succ t ih => simp only [State.stateAt, ih]; rfl
 
 theorem init_spec : Init (init (n := n) (Tx := Tx)) :=
   ⟨fun _ => rfl, rfl, rfl, rfl⟩

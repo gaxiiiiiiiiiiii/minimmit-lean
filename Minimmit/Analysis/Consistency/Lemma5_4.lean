@@ -31,7 +31,7 @@ theorem one_le_view_of_receivesL (hn : 5 * f + 1 ≤ n) (hinit : Init s₀)
     自分の送信。 -/
 theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {m : Msg n Tx}
-    (hm : m ∈ (Algo.st5 f Δ lead q ((State.run s₀ instrs t).procs q)).S) {w : Fin n}
+    (hm : m ∈ (Algo.st5 f Δ lead q ((State.stateAt s₀ instrs t).procs q)).S) {w : Fin n}
     (hw : m.signer = some w) (hg : m ≠ .vote w .gen) : Sends s₀ instrs w m := by
   rcases Algo.mem_S_stage_or_sent f Δ lead q _ hm with hm' | ⟨hs, j, hj⟩
   · exact sends_of_mem_S hinit hm' hw hg
@@ -46,9 +46,9 @@ theorem sends_of_mem_S_st5 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instr
 theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     (hb : ByzBound f s₀ instrs) {b₂ : Block n Tx} (hg : b₂ ≠ .gen) (hM : ReceivesM f s₀ instrs b₂) :
     ∃ q t, Correct s₀ instrs q
-      ∧ (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view = b₂.view
-      ∧ ValidProposal f lead (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S
-          (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).view b₂
+      ∧ (Algo.st2 f lead q ((State.stateAt s₀ instrs t).procs q)).view = b₂.view
+      ∧ ValidProposal f lead (Algo.st2 f lead q ((State.stateAt s₀ instrs t).procs q)).S
+          (Algo.st2 f lead q ((State.stateAt s₀ instrs t).procs q)).view b₂
       ∧ ∀ t' w j', Correct s₀ instrs w → Action.send (Msg.vote w b₂) j' ∈ (instrs t').actions w →
           t ≤ t' := by
   classical
@@ -66,7 +66,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
     fun t' ht' w hw j' h => absurd (Nat.find_min' hex ⟨w, hw, j', h⟩) (not_le.mpr ht')
   -- Nat.find hex より前の S にある正直者の票はない
   have hnoS : ∀ w, Correct s₀ instrs w →
-      Msg.vote w b₂ ∉ ((State.run s₀ instrs (Nat.find hex)).procs q).S := by
+      Msg.vote w b₂ ∉ ((State.stateAt s₀ instrs (Nat.find hex)).procs q).S := by
     intro w hw hmem
     obtain ⟨t', ht', j', hj'⟩ := instructed_of_mem_S hinit hmem rfl (by simpa using hg)
     exact hmin t' ht' w hw j' hj'
@@ -74,7 +74,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
   rw [hact] at hj
   -- 転送なら転送以外の段に遡る
   obtain ⟨j', hj'⟩ : ∃ j', Action.send (Msg.vote q b₂) j'
-      ∈ Algo.innerActs f Δ lead q ((State.run s₀ instrs (Nat.find hex)).procs q) := by
+      ∈ Algo.innerActs f Δ lead q ((State.stateAt s₀ instrs (Nat.find hex)).procs q) := by
     rw [Algo.step_eq_stepPair, Algo.stepPair_snd'] at hj
     rcases List.mem_append.mp hj with hj | hj
     · exact ⟨j, hj⟩
@@ -87,7 +87,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
   · -- 19〜21 行: S に M-notarisation があるので、それより前に正直者が投票している
     exfalso
     obtain ⟨b', q', hm, _, hqv, hM1, _, _, _, _, hnew, _⟩ :=
-      Algo.send_climb (localInv_run hinit hh hqc _) hj'
+      Algo.send_climb (localInv_stateAt hinit hh hqc _) hj'
     injection hm with _ hbb
     subst hbb
     obtain ⟨w, hw, hwc⟩ := exists_correct_of_lt_card hb
@@ -110,7 +110,7 @@ theorem exists_valid_proposal_vote (hinit : Init s₀) (hh : Honest f Δ lead s�
 /-- 正直者の st2 の S にある M-notarisation は、実行上の M-notarisation。 -/
 theorem receivesM_of_MNotarised_st2 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs) {q : Fin n}
     (hqc : Correct s₀ instrs q) {t : Nat} {b₀ : Block n Tx}
-    (h : MNotarised f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S b₀) :
+    (h : MNotarised f (Algo.st2 f lead q ((State.stateAt s₀ instrs t).procs q)).S b₀) :
     ReceivesM f s₀ instrs b₀ := by
   by_cases hg : b₀ = .gen
   · exact Or.inl hg
@@ -123,7 +123,7 @@ theorem receivesM_of_MNotarised_st2 (hinit : Init s₀) (hh : Honest f Δ lead s
 
 theorem receivesNullification_of_Nullified_st2 (hinit : Init s₀) (hh : Honest f Δ lead s₀ instrs)
     {q : Fin n} (hqc : Correct s₀ instrs q) {t : Nat} {w : View}
-    (h : Nullified f (Algo.st2 f lead q ((State.run s₀ instrs t).procs q)).S w) :
+    (h : Nullified f (Algo.st2 f lead q ((State.stateAt s₀ instrs t).procs q)).S w) :
     ReceivesNullification f s₀ instrs w := by
   refine h.trans (Finset.card_le_card fun x hx => ?_)
   rw [mem_nullifiers] at hx
@@ -178,7 +178,7 @@ theorem receivesL_consistent (hprot : IsMinimmit f Δ lead GST s₀ instrs)
 
 /-- S にある M-notarisation は、実行上の M-notarisation。 -/
 theorem receivesM_of_MNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block n Tx}
-    (h : MNotarised f ((State.run s₀ instrs t).procs i).S b) : ReceivesM f s₀ instrs b := by
+    (h : MNotarised f ((State.stateAt s₀ instrs t).procs i).S b) : ReceivesM f s₀ instrs b := by
   by_cases hg : b = .gen
   · exact Or.inl hg
   · right
@@ -189,7 +189,7 @@ theorem receivesM_of_MNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
 
 /-- 正直者の S にある L-notarisation は、実行上の L-notarisation。 -/
 theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : Block n Tx}
-    (h : LNotarised f ((State.run s₀ instrs t).procs i).S b) : ReceivesL f s₀ instrs b := by
+    (h : LNotarised f ((State.stateAt s₀ instrs t).procs i).S b) : ReceivesL f s₀ instrs b := by
   by_cases hg : b = .gen
   · exact Or.inl hg
   · right
@@ -202,8 +202,8 @@ theorem receivesL_of_LNotarised (hinit : Init s₀) {i : Fin n} {t : Nat} {b : B
     ブロックは、一方が他方の祖先。 -/
 theorem lnotarised_consistent (hprot : IsMinimmit f Δ lead GST s₀ instrs)
     {i j : Fin n} {t t' : Nat} {b b' : Block n Tx}
-    (hbi : LNotarised f ((State.run s₀ instrs t).procs i).S b)
-    (hbj : LNotarised f ((State.run s₀ instrs t').procs j).S b') :
+    (hbi : LNotarised f ((State.stateAt s₀ instrs t).procs i).S b)
+    (hbj : LNotarised f ((State.stateAt s₀ instrs t').procs j).S b') :
     b.Ancestor b' ∨ b'.Ancestor b :=
   receivesL_consistent hprot (receivesL_of_LNotarised hprot.init hbi)
     (receivesL_of_LNotarised hprot.init hbj)
@@ -212,10 +212,10 @@ theorem lnotarised_consistent (hprot : IsMinimmit f Δ lead GST s₀ instrs)
 theorem consistency (hprot : IsMinimmit f Δ lead GST s₀ instrs) : Consistency f s₀ instrs := by
   intro i j _ _ t t'
   unfold Compatible log
-  cases hl : (finalisedBlocks f ((State.run s₀ instrs t).procs i).S).argmax Block.depth with
+  cases hl : (finalisedBlocks f ((State.stateAt s₀ instrs t).procs i).S).argmax Block.depth with
   | none => exact Or.inl (List.nil_prefix)
   | some b =>
-    cases hl' : (finalisedBlocks f ((State.run s₀ instrs t').procs j).S).argmax Block.depth with
+    cases hl' : (finalisedBlocks f ((State.stateAt s₀ instrs t').procs j).S).argmax Block.depth with
     | none => exact Or.inr (List.nil_prefix)
     | some b' =>
       have hb := (mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl))).2

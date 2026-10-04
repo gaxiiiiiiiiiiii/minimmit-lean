@@ -32,14 +32,14 @@ def Compatible (σ τ : List Tx) : Prop := σ <+: τ ∨ τ <+: σ
 /-- Consistency（§2）: 正直な p_i・p_j の log_i(t) と log_j(t′) は compatible。 -/
 def Consistency (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
   ∀ i j, Correct s₀ instrs i → Correct s₀ instrs j → ∀ t t',
-    Compatible (log f ((State.run s₀ instrs t).procs i).S)
-      (log f ((State.run s₀ instrs t').procs j).S)
+    Compatible (log f ((State.stateAt s₀ instrs t).procs i).S)
+      (log f ((State.stateAt s₀ instrs t').procs j).S)
 
 /-- Liveness（§2）: 正直な p_i が受け取った取引は、正直な p_j の log にいずれ入る。 -/
 def Liveness (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
   ∀ i j, Correct s₀ instrs i → Correct s₀ instrs j → ∀ t (tr : Tx),
-    Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S →
-    ∃ t', tr ∈ log f ((State.run s₀ instrs t').procs j).S
+    Msg.tx tr ∈ ((State.stateAt s₀ instrs t).procs i).S →
+    ∃ t', tr ∈ log f ((State.stateAt s₀ instrs t').procs j).S
 
 theorem mem_finalisedBlocks {S : Finset (Msg n Tx)} {b : Block n Tx} :
     b ∈ finalisedBlocks f S ↔ b ∈ Algo.votedBlocks S ∧ Finalised f S b := by

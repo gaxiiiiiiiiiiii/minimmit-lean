@@ -360,9 +360,9 @@ view 番号とタイムスロットを意味する自然数のラッパー
 - **実装**
 
   ```lean
-  def run [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
+  def stateAt [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Nat → State n Tx
     | 0 => s₀
-    | t + 1 => (run s₀ instrs t).step (instrs t)
+    | t + 1 => (stateAt s₀ instrs t).step (instrs t)
   ```
 
 ### 2.4 Algorithm 1
@@ -866,11 +866,11 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def Honest [DecidableEq Tx] (f Δ : Nat) (lead : View → Fin n) (s₀ : State n Tx)
       (instrs : Nat → Instr n Tx) : Prop :=
-    ∀ t i, i ∉ (State.run s₀ instrs t).byz →
-      (instrs t).actions i = Algo.step f Δ lead i ((State.run s₀ instrs t).procs i)
+    ∀ t i, i ∉ (State.stateAt s₀ instrs t).byz →
+      (instrs t).actions i = Algo.step f Δ lead i ((State.stateAt s₀ instrs t).procs i)
   ```
 
-  - `(State.run s₀ instrs t).byz` は、スロット t までに腐敗したプロセッサの集合。
+  - `(State.stateAt s₀ instrs t).byz` は、スロット t までに腐敗したプロセッサの集合。
 
 #### ■ 腐敗
 
@@ -885,7 +885,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def Correct [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) :
       Prop :=
-    ∀ t, i ∉ (State.run s₀ instrs t).byz
+    ∀ t, i ∉ (State.stateAt s₀ instrs t).byz
   ```
 
   `ByzBound` は、腐敗したプロセッサの数を常に f 以下に限る。原文の 5f + 1 ≤ n は述語にせず、`IsMinimmit` の成分にする。
@@ -893,7 +893,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def ByzBound [DecidableEq Tx] (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) :
       Prop :=
-    ∀ t, (State.run s₀ instrs t).byz.card ≤ f
+    ∀ t, (State.stateAt s₀ instrs t).byz.card ≤ f
   ```
 
 #### ■ 部分同期
@@ -918,7 +918,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   structure PartialSync [DecidableEq Tx] (Δ : Nat) (GST : Time) (s₀ : State n Tx)
       (instrs : Nat → Instr n Tx) : Prop where
-    timely : ∀ t, (State.run s₀ instrs t).Timely Δ GST
+    timely : ∀ t, (State.stateAt s₀ instrs t).Timely Δ GST
     one_le : 1 ≤ Δ
   ```
 
@@ -986,7 +986,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def Sends [DecidableEq Tx] (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n)
       (m : Msg n Tx) : Prop :=
-    ∃ t, ∃ x ∈ (State.run s₀ instrs t).pool, x.src = i ∧ x.msg = m
+    ∃ t, ∃ x ∈ (State.stateAt s₀ instrs t).pool, x.src = i ∧ x.msg = m
   ```
 
   `voteSenders` は、b への自分の票を `Sends` するプロセッサの集合。
@@ -1043,7 +1043,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
   ```lean
   def viewAt (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (i : Fin n) (t : Nat) : View :=
-    ((State.run s₀ instrs t).procs i).view
+    ((State.stateAt s₀ instrs t).procs i).view
   ```
 
   `Enters` は、p_i がスロット t で view v に達すること。
@@ -1146,8 +1146,8 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def Consistency (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
     ∀ i j, Correct s₀ instrs i → Correct s₀ instrs j → ∀ t t',
-      Compatible (log f ((State.run s₀ instrs t).procs i).S)
-        (log f ((State.run s₀ instrs t').procs j).S)
+      Compatible (log f ((State.stateAt s₀ instrs t).procs i).S)
+        (log f ((State.stateAt s₀ instrs t').procs j).S)
   ```
 
 #### ■ Liveness
@@ -1163,8 +1163,8 @@ view 番号とタイムスロットを意味する自然数のラッパー
   ```lean
   def Liveness (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) : Prop :=
     ∀ i j, Correct s₀ instrs i → Correct s₀ instrs j → ∀ t (tr : Tx),
-      Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S →
-      ∃ t', tr ∈ log f ((State.run s₀ instrs t').procs j).S
+      Msg.tx tr ∈ ((State.stateAt s₀ instrs t).procs i).S →
+      ∃ t', tr ∈ log f ((State.stateAt s₀ instrs t').procs j).S
   ```
 
 #### ■ latency
@@ -1179,8 +1179,8 @@ view 番号とタイムスロットを意味する自然数のラッパー
 
   ```lean
   def FirstReceived (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (tr : Tx) (t : Nat) : Prop :=
-    (∃ i, Correct s₀ instrs i ∧ Msg.tx tr ∈ ((State.run s₀ instrs t).procs i).S)
-    ∧ ∀ j t', Correct s₀ instrs j → t' < t → Msg.tx tr ∉ ((State.run s₀ instrs t').procs j).S
+    (∃ i, Correct s₀ instrs i ∧ Msg.tx tr ∈ ((State.stateAt s₀ instrs t).procs i).S)
+    ∧ ∀ j t', Correct s₀ instrs j → t' < t → Msg.tx tr ∉ ((State.stateAt s₀ instrs t').procs j).S
   ```
 
   `FinalisedByAll` は、全正直者が T までに tr を finalise していること。
@@ -1189,7 +1189,7 @@ view 番号とタイムスロットを意味する自然数のラッパー
   def FinalisedByAll (f : Nat) (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (tr : Tx) (T : Nat) :
       Prop :=
     ∀ j, Correct s₀ instrs j → ∃ b : Block n Tx,
-      Finalised f ((State.run s₀ instrs T).procs j).S b ∧ tr ∈ b.trStar
+      Finalised f ((State.stateAt s₀ instrs T).procs j).S b ∧ tr ∈ b.trStar
   ```
 
   `Latency` は、tr の latency が ℓ であること。全正直者が初めて finalise している時刻を、t + ℓ では finalise していてそれより前では finalise していない、で言う。
@@ -1346,7 +1346,7 @@ Lemma 5.10 の導出には O(·) が隠す定数まで要るので、本形式�
       (hi : Correct s₀ instrs (lead v))
       {t : Nat} (hfirst : FirstEntry s₀ instrs v t) (hgst : GST.val ≤ t) :
       ∀ j, Correct s₀ instrs j →
-        (∃ b : Block n Tx, b.view = v ∧ Finalised f ((State.run s₀ instrs (t + 3 * δ)).procs j).S b)
+        (∃ b : Block n Tx, b.view = v ∧ Finalised f ((State.stateAt s₀ instrs (t + 3 * δ)).procs j).S b)
         ∧ v.val < (viewAt s₀ instrs j (t + 3 * δ + 1)).val
   ```
 
@@ -1448,7 +1448,7 @@ Minimmit の実行が存在することを示す。
 
   ```lean
   theorem sends_of_mem_S (hinit : Init s₀) {t : Nat} {k : Fin n} {m : Msg n Tx} {q : Fin n}
-      (hm : m ∈ ((State.run s₀ instrs t).procs k).S) (hq : m.signer = some q)
+      (hm : m ∈ ((State.stateAt s₀ instrs t).procs k).S) (hq : m.signer = some q)
       (hg : m ≠ .vote q .gen) : Sends s₀ instrs q m
   ```
 
@@ -1457,12 +1457,12 @@ Minimmit の実行が存在することを示す。
   ```lean
   def SendsBlockBefore (s₀ : State n Tx) (instrs : Nat → Instr n Tx) (q : Fin n) (b : Block n Tx)
       (t : Nat) : Prop :=
-    ∃ x ∈ (State.run s₀ instrs t).pool, x.src = q ∧ x.msg.block = some b
+    ∃ x ∈ (State.stateAt s₀ instrs t).pool, x.src = q ∧ x.msg.block = some b
   ```
 
   ```lean
   theorem sendsBlockBefore_of_containsBlock_S (hinit : Init s₀) {t : Nat} {k : Fin n}
-      {b : Block n Tx} {q : Fin n} (hb : containsBlock ((State.run s₀ instrs t).procs k).S b)
+      {b : Block n Tx} {q : Fin n} (hb : containsBlock ((State.stateAt s₀ instrs t).procs k).S b)
       (hq : b.signer = some q) : SendsBlockBefore s₀ instrs q b t
   ```
 

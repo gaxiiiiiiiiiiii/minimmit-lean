@@ -67,6 +67,12 @@ theorem containsBlock_of_mem_votedBlocks {S : Finset (Msg n Tx)} {b : Block n Tx
   | vote q b' => simp only [Option.some.injEq] at hmb; subst hmb; rfl
   | _ => simp at hmb
 
+theorem mem_votedBlocks_of_subset {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b : Block n Tx}
+    (hb : b ∈ votedBlocks S) : b ∈ votedBlocks S' := by
+  simp only [votedBlocks, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at hb ⊢
+  obtain ⟨m, hm, hmb⟩ := hb
+  exact ⟨m, h hm, hmb⟩
+
 theorem containsBlock_of_mem_proposals {lead : View → Fin n} {S : Finset (Msg n Tx)} {v : View}
     {b : Block n Tx} (h : b ∈ proposals lead S v) : containsBlock S b := by
   simp only [proposals, List.mem_dedup, List.mem_filterMap, Finset.mem_toList] at h

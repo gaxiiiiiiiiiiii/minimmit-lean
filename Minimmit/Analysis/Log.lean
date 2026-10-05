@@ -61,4 +61,21 @@ theorem log_eq_of_finalised {S : Finset (Msg n Tx)}
     · exact h
     · rw [Block.eq_of_ancestor_of_depth_le h hle]; exact Block.Ancestor.refl _
 
+/-- S ⊆ S′ で、S′ で finalise したブロックのどの 2 つも一方が他方の祖先なら、S の log は S′ の
+    log の接頭辞。 -/
+theorem log_prefix_of_subset {S S' : Finset (Msg n Tx)} (hS : S ⊆ S')
+    (hchain : ∀ b b', Finalised f S' b → Finalised f S' b' →
+      Block.Ancestor b b' ∨ Block.Ancestor b' b) :
+    log f S <+: log f S' := by
+  unfold log
+  cases hl : (finalisedBlocks f S).argmax Block.depth with
+  | none => exact List.nil_prefix
+  | some b =>
+    obtain ⟨hvb, hb⟩ := mem_finalisedBlocks.mp (List.argmax_mem (Option.mem_def.mpr hl))
+    obtain ⟨b', -, hanc, hlog⟩ :=
+      log_eq_of_finalised hchain (hb.mono hS) (Algo.mem_votedBlocks_of_subset hS hvb)
+    unfold log at hlog
+    rw [hlog]
+    exact Block.trStar_prefix_of_ancestor hanc
+
 end Minimmit

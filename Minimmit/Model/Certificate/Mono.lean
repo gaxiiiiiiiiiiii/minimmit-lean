@@ -1,4 +1,5 @@
 import Minimmit.Model.Certificate.Basic
+import Minimmit.Model.Transition.Execute
 
 /-!
 # 証明書の補題
@@ -27,6 +28,10 @@ theorem MNotarised.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b :
 theorem LNotarised.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b : Block n Tx}
     (hb : LNotarised f S b) : LNotarised f S' b :=
   hb.trans (Finset.card_le_card (voters_subset h b))
+
+theorem Finalised.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b : Block n Tx}
+    (hb : Finalised f S b) : Finalised f S' b :=
+  ⟨hb.1.mono h, fun a ha => containsBlock_mono h (hb.2 a ha)⟩
 
 theorem Nullified.mono {f : Nat} {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {v : View}
     (hv : Nullified f S v) : Nullified f S' v :=

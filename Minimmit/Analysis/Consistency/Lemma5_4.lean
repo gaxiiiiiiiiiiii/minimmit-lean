@@ -223,4 +223,12 @@ theorem consistency (hprot : IsMinimmit f Δ lead GST s₀ instrs) : Consistency
       · exact Or.inl (Block.trStar_prefix_of_ancestor h)
       · exact Or.inr (Block.trStar_prefix_of_ancestor h)
 
+/-- log は追記のみ（§2）: t ≤ t′ で log_i(t) ⪯ log_i(t′)。 -/
+theorem log_append_only (hprot : IsMinimmit f Δ lead GST s₀ instrs) (i : Fin n) {t t' : Nat}
+    (hle : t ≤ t') :
+    log f ((State.stateAt s₀ instrs t).procs i).S
+      <+: log f ((State.stateAt s₀ instrs t').procs i).S :=
+  log_prefix_of_subset (S_subset_stateAt s₀ instrs i hle) fun _ _ hb hb' =>
+    lnotarised_consistent hprot hb.1 hb'.1
+
 end Minimmit

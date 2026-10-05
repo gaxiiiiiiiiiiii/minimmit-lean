@@ -15,10 +15,6 @@ variable {n : Nat} {Tx : Type} [DecidableEq Tx]
 variable {f Δ δ : Nat} {GST : Time} {lead : View → Fin n} {s₀ : State n Tx}
   {instrs : Nat → Instr n Tx}
 
-theorem Finalised.mono {S S' : Finset (Msg n Tx)} (h : S ⊆ S') {b : Block n Tx}
-    (hb : Finalised f S b) : Finalised f S' b :=
-  ⟨hb.1.mono h, fun a ha => containsBlock_mono h (hb.2 a ha)⟩
-
 omit [DecidableEq Tx] in
 /-- 祖先は、自分自身か、親の祖先。 -/
 theorem Block.Ancestor.eq_or_parent {a b : Block n Tx} (h : Block.Ancestor a b) :
